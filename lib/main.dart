@@ -21,9 +21,9 @@ class MyApp extends StatelessWidget {
         Provider<SlideRepositoryImpl>(create: (_)=> SlideRepositoryImpl()),  //Aqui lo que hacemos es registrar el repositorio de Slide 
         //Blocs para el estado
       ChangeNotifierProvider(create: (context)=> KahootEditorBloc(context.read<KahootRepositoryImpl>())), //Aqui registramos el Bloc de Kahoot
-      ChangeNotifierProvider(create: (context)=> SlideEditorBloc(context.read<SlideRepositorytImpl>())), //Aqui registramos el Bloc de Slide
+      ChangeNotifierProvider(create: (context)=> SlideEditorBloc(context.read<SlideRepositoryImpl>())), //Aqui registramos el Bloc de Slide
       ],
-      child: MateriaLApp(
+      child: MaterialApp(
           title: 'Trivvy',
           theme: ThemeData(primarySwatch: Colors.blue), //tema personalizado
           home: DashboardPage(),//Pagina inicial

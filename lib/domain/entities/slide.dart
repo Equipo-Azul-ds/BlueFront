@@ -30,6 +30,6 @@ class SlideOption {
     SlideOption({
       required this.text,
       required this.isCorrect,
-      this.medaUrl,
+      this.medaUrl, required mediaUrl,
     });
   }
