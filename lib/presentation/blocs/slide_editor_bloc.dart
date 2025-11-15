@@ -11,16 +11,15 @@ import '../../infraestructure/repositories/slide_repository_impl.dart';
 //BloC para gestionar estado del editor de Slide
 class SlideEditorBloc extends ChangeNotifier {
   final SlideRepositoryImpl slideRepository;
-  final String kahootId; // ID del Kahoot al que pertenecen las diapositivas
   List<Slide> slides = []; //Lista de diapositivas
   Slide? currentSlide; //Slide actual
   bool isLoading = false; //Indicador de carga
   String? errorMessage; //Mensaje de error
 
-  SlideEditorBloc(this.slideRepository, this.kahootId);
+  SlideEditorBloc(this.slideRepository);
 
   //Metodo para cargar toodos los slides de un kahoot
-  Future<void> loadSlides() async{
+  Future<void> loadSlides(String kahootId) async{
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -36,7 +35,7 @@ class SlideEditorBloc extends ChangeNotifier {
   }
 
   //Metodo para crear un nuevo Slide
-  Future<void> createSlide(Map<String,dynamic>slideData)async{
+  Future<void> createSlide(String kahootId, Map<String,dynamic>slideData)async{
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -54,13 +53,13 @@ class SlideEditorBloc extends ChangeNotifier {
   }
 
   //Metodo para actualizar un Slide
-  Future<void> updateSlide(String slideId, Map<String, dynamic>updates)async{
+  Future<void> updateSlide(String kahootId, String slideId, Map<String, dynamic>updates)async{
     isLoading = true;
     errorMessage = null;
     notifyListeners();
     try {
       final useCase = UpdateSlideUsecase(slideRepository);
-      final updatedSlide = await useCase.call(kahootId, slideId, updates); 
+      final updatedSlide = await useCase.call(kahootId, slideId, updates);
       final index = slides.indexWhere((s)=>s.id ==slideId);
       if (index!= -1){
         slides[index] = updatedSlide; //Actualiza el slide en la lista local
@@ -74,7 +73,7 @@ class SlideEditorBloc extends ChangeNotifier {
   }
 
   //Metodo para eliminar un Slide
-  Future<void> deleteSlide(String slideId) async {
+  Future<void> deleteSlide(String kahootId, String slideId) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -92,7 +91,7 @@ class SlideEditorBloc extends ChangeNotifier {
   }
 
   //Metood para duplicar un Slide
-  Future<void> duplicateSlide(String slideId)async{
+  Future<void> duplicateSlide(String kahootId, String slideId)async{
     isLoading = true;
     errorMessage = null;
     notifyListeners();
