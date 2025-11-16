@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 import 'presentation/blocs/kahoot_editor_bloc.dart';
 import 'presentation/blocs/slide_editor_bloc.dart';
 import 'presentation/pages/dashboard_page.dart';
+import 'presentation/pages/kahoot_editor_page.dart';
+import 'presentation/pages/slide_editor_page.dart';
+import 'presentation/pages/template_selector_page.dart';
 import 'infraestructure/repositories/kahoot_repository_impl.dart';
 import 'infraestructure/repositories/slide_repository_impl.dart';
 
@@ -26,6 +29,13 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
           title: 'Trivvy',
           theme: ThemeData(primarySwatch: Colors.blue), //tema personalizado
+          initialRoute: '/dashboard',
+          routes:{
+            '/dashboard': (context)=> DashboardPage(),
+            '/create': (context)=> KahootEditorPage(),
+            '/slideEditor': (context) => SlideEditorPage(slideId: ModalRoute.of(context)!.settings.arguments as String),
+            '/templateSelector': (context) => TemplateSelectorPage(),
+          },
           home: DashboardPage(),//Pagina inicial
       ),
     );

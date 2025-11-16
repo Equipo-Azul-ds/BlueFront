@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:trivvy/aplication/usecases/duplicate_slide_usecase.dart';
 import '../../domain/entities/slide.dart';
 import '../../aplication/usecases/create_slide_usecase.dart';
 import '../../aplication/usecases/delete_slide_usecase.dart';
 import '../../aplication/usecases/get_slides_usecase.dart';
 import '../../aplication/usecases/update_slide_usecase.dart';
+import '../../aplication/usecases/duplicate_slide_usecase.dart';
 import '../../infraestructure/repositories/slide_repository_impl.dart';
 
 

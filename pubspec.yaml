@@ -1,4 +1,4 @@
-name: trivvy
+name: Trivvy
 description: "A new Flutter project."
 publish_to: 'none'
 version: 1.0.0+1
@@ -17,13 +17,13 @@ dependencies:
   provider: ^6.0.5
 
   # Para grid irregulares
-  flutter_staggered_grid_view: ^0.6.2
+  flutter_staggered_grid_view: ^0.7.0
 
   # Para subir imágenes
   image_picker: ^1.0.4
 
   # Formularios avanzados
-  flutter_form_builder: ^9.1.0
+  flutter_form_builder: ^10.2.0
 
   # Animaciones
   animations: ^2.0.6
@@ -32,23 +32,23 @@ dependencies:
   video_player: ^2.8.1
 
   # Para subir archivos
-  file_picker: ^5.2.7
+  file_picker: ^10.3.6
 
   # Cliente HTTP para consumir APIs
   http: ^1.1.0
 
   # Inyección de dependencias
-  get_it: ^7.6.1
+  get_it: ^9.0.5
 
   # Almacenamiento seguro de datos
-  flutter_secure_storage: ^8.1.0
+  flutter_secure_storage: ^9.2.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints...
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
   # Para generar íconos de la app
   flutter_launcher_icons: ^0.14.4
