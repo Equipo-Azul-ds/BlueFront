@@ -19,9 +19,16 @@ class TemplateSelectorPage extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: Text('Selecciona la plantial que mas te guste!')),
-      body: StaggeredGrid(
-        children: templates.map((t)=>KahootCard(kahoot: t, onTap:()=>Navigator.pop(context,t))).toList(),
+      appBar: AppBar(title: Text('Selecciona la plantilla que mas te guste!')),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return Padding(
+            padding: EdgeInsets.all(constraints.maxWidth * 0.04),
+            child: StaggeredGrid(
+              children: templates.map((t)=>KahootCard(kahoot: t, onTap:()=>Navigator.pop(context,t))).toList(),
+            ),
+          );
+        },
       ),
     );
   }

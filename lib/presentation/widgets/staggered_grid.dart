@@ -8,12 +8,16 @@ class StaggeredGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MasonryGridView.count(
-      crossAxisCount: 2,
-      mainAxisSpacing: 8,
-      crossAxisSpacing: 8,
-      itemCount: children.length,
-      itemBuilder: (context, index) => children[index],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return MasonryGridView.count(
+          crossAxisCount: 2,
+          mainAxisSpacing: constraints.maxHeight * 0.01,
+          crossAxisSpacing: constraints.maxWidth * 0.02,
+          itemCount: children.length,
+          itemBuilder: (context, index) => children[index],
+        );
+      },
     );
   }
 }

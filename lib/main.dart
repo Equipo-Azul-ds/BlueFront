@@ -35,6 +35,11 @@ class MyApp extends StatelessWidget {
             '/create': (context)=> KahootEditorPage(),
             '/slideEditor': (context) => SlideEditorPage(slideId: ModalRoute.of(context)!.settings.arguments as String),
             '/templateSelector': (context) => TemplateSelectorPage(),
+            //Comentoados por ahora
+            //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
+            //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
+            //'/discover': (context) => DiscoverPage(), // Agregar si existe
+            //'/library': (context) => LibraryPage(), // Agregar si existe
           },
           home: DashboardPage(),//Pagina inicial
       ),

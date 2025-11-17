@@ -4,21 +4,34 @@ import 'package:image_picker/image_picker.dart';
 class MediaUpload extends StatelessWidget{
   final Function(XFile) onMediaSelected;
 
-  MediaUpload({required this.onMediaSelected});
+  const MediaUpload({super.key, required this.onMediaSelected});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () async{
-        final picker = ImagePicker();
-        final file = await picker.pickImage(source: ImageSource.gallery);
-        if(file !=null) onMediaSelected(file);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          onTap: () async{
+            final picker = ImagePicker();
+            final file = await picker.pickImage(source: ImageSource.gallery);
+            if(file != null) onMediaSelected(file);
+          },
+          child: Container(
+            height: constraints.maxWidth * 0.25, // Responsive height
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey)
+            ),
+            child: Center(
+              child: Icon(
+                Icons.image,
+                size: constraints.maxWidth * 0.08, // Responsive icon size
+              ),
+            ),
+          ),
+        );
       },
-      child: Container(
-        height: 100,
-        decoration: BoxDecoration(color: Colors.grey[200],borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.grey)),
-        child: Center(child: Icon(Icons.image)),
-      ),
     );
   }
 }

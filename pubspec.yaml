@@ -53,11 +53,11 @@ dev_dependencies:
   # Para generar íconos de la app
   flutter_launcher_icons: ^0.14.4
 
-# Configuración para flutter_launcher_icons 
+# Configuración para flutter_launcher_icons
 flutter_launcher_icons:
-  android: trueS
+  android: true
   ios: true
-  image_path: "assets/images/appIcon.png"  
+  image_path: "assets/images/appIcon.png"
 
 # The following section is specific to Flutter packages.
 flutter:

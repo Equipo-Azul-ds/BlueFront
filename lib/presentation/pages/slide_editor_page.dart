@@ -15,15 +15,37 @@ class SlideEditorPage extends StatelessWidget{
 
     return Scaffold(
       appBar: AppBar(title: Text('Editor Slide')),
-      body: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(controller: TextEditingController(text: slide.text), decoration: InputDecoration(labelText: 'Texto del Slide')),
-            //Mas adelante agrega opcciones, tiempo, puntos....
-            ElevatedButton(onPressed:()=>bloc.updateSlide('kahootId', slideId, {}),child:Text('Guardar')),
-          ],
-        ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            padding: EdgeInsets.all(constraints.maxWidth * 0.04),
+            child: Column(
+              children: [
+                TextField(
+                  controller: TextEditingController(text: slide.text),
+                  decoration: InputDecoration(
+                    labelText: 'Texto del Slide',
+                    contentPadding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: constraints.maxHeight * 0.015),
+                  ),
+                  style: TextStyle(fontSize: constraints.maxWidth * 0.04),
+                ),
+                SizedBox(height: constraints.maxHeight * 0.02),
+                //Mas adelante agrega opcciones, tiempo, puntos....
+                ElevatedButton(
+                  onPressed:()=>bloc.updateSlide('kahootId', slideId, {}),
+                  child: Text(
+                    'Guardar',
+                    style: TextStyle(fontSize: constraints.maxWidth * 0.04),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: Size(double.infinity, constraints.maxHeight * 0.06),
+                    padding: EdgeInsets.symmetric(vertical: constraints.maxHeight * 0.015),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
