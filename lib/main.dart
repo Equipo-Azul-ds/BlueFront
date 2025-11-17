@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'presentation/blocs/kahoot_editor_bloc.dart';
-import 'presentation/blocs/slide_editor_bloc.dart';
-import 'presentation/pages/dashboard_page.dart';
-import 'presentation/pages/kahoot_editor_page.dart';
-import 'presentation/pages/slide_editor_page.dart';
-import 'presentation/pages/template_selector_page.dart';
-import 'infraestructure/repositories/kahoot_repository_impl.dart';
-import 'infraestructure/repositories/slide_repository_impl.dart';
+import 'features/kahoot/presentation/blocs/kahoot_editor_bloc.dart';
+import 'features/slide/presentation/blocs/slide_editor_bloc.dart';
+import 'common_pages/dashboard_page.dart';
+import 'features/kahoot/presentation/pages/kahoot_editor_page.dart';
+import 'features/slide/presentation/pages/slide_editor_page.dart';
+import 'common_pages/template_selector_page.dart';
+import 'features/kahoot/infrastructure/repositories/kahoot_repository_impl.dart';
+import 'features/slide/infrastructure/repositories/slide_repository_impl.dart';
 
 
 void main() {
