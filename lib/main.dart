@@ -8,6 +8,7 @@ import 'features/slide/presentation/pages/slide_editor_page.dart';
 import 'common_pages/template_selector_page.dart';
 import 'features/kahoot/infrastructure/repositories/kahoot_repository_impl.dart';
 import 'features/slide/infrastructure/repositories/slide_repository_impl.dart';
+import 'core/constants/colors.dart';
 
 
 void main() {
@@ -28,7 +29,22 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
           title: 'Trivvy',
-          theme: ThemeData(primarySwatch: Colors.blue), //tema personalizado
+          theme: ThemeData(
+            primarySwatch: createMaterialColor(AppColor.primary),
+            primaryColor: AppColor.primary,
+            scaffoldBackgroundColor: AppColor.background,
+            appBarTheme: AppBarTheme(
+              backgroundColor: AppColor.primary,
+              iconTheme: IconThemeData(color: AppColor.onPrimary),
+              titleTextStyle: TextStyle(color: AppColor.onPrimary, fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+            floatingActionButtonTheme: FloatingActionButtonThemeData(backgroundColor: AppColor.secundary, foregroundColor: AppColor.onPrimary),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColor.secundary, foregroundColor: AppColor.onPrimary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            ),
+            iconTheme: IconThemeData(color: AppColor.primary),
+            colorScheme: ColorScheme.fromSwatch(primarySwatch: createMaterialColor(AppColor.primary)).copyWith(secondary: AppColor.accent),
+          ),
           initialRoute: '/dashboard',
           routes:{
             '/dashboard': (context)=> DashboardPage(),

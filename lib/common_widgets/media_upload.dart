@@ -8,30 +8,28 @@ class MediaUpload extends StatelessWidget{
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return GestureDetector(
-          onTap: () async{
-            final picker = ImagePicker();
-            final file = await picker.pickImage(source: ImageSource.gallery);
-            if(file != null) onMediaSelected(file);
-          },
-          child: Container(
-            height: constraints.maxWidth * 0.25, // Responsive height
-            decoration: BoxDecoration(
-              color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey)
-            ),
-            child: Center(
-              child: Icon(
-                Icons.image,
-                size: constraints.maxWidth * 0.08, // Responsive icon size
-              ),
-            ),
-          ),
-        );
+    final screenWidth = MediaQuery.of(context).size.width;
+    final base = screenWidth;
+    return GestureDetector(
+      onTap: () async{
+        final picker = ImagePicker();
+        final file = await picker.pickImage(source: ImageSource.gallery);
+        if(file != null) onMediaSelected(file);
       },
+      child: Container(
+        height: base * 0.20, 
+        decoration: BoxDecoration(
+          color: Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey)
+        ),
+        child: Center(
+          child: Icon(
+            Icons.image,
+            size: base * 0.08,
+          ),
+        ),
+      ),
     );
   }
 }

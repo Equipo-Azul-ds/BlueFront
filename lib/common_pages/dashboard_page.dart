@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
+import 'dart:math';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart' as staggered;
-import 'package:provider/provider.dart';
-import '../features/kahoot/presentation/blocs/kahoot_editor_bloc.dart';
+// imports removed: provider and bloc not used in this page
 import '../core/constants/colors.dart';
 import '../features/kahoot/domain/entities/kahoot.dart';
 import '../common_widgets/kahoot_card.dart';
-import '../common_widgets/staggered_grid.dart';
+// removed unused staggered_grid import
 
 class DashboardPage extends StatelessWidget{
   @override
   Widget build(BuildContext context){
-    final kahootBloc = Provider.of<KahootEditorBloc>(context);
+    // Obtener el bloc si es necesario en el futuro
 
     //Datos simualdos que posteriormente se reemplazaran con la api
       final recentKahoots = [
@@ -59,123 +59,133 @@ class DashboardPage extends StatelessWidget{
       bottom: false,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final screenSize = MediaQuery.of(context).size;
+          // Limitar la altura del header para evitar tamaños enormes al hacer overscroll
+          double headerHeight = min(constraints.maxHeight * 0.45, screenSize.height * 0.45);
+          // Asegurar un minimo para que el header no colapse en pantallas pequeñas
+          headerHeight = max(headerHeight, screenSize.height * 0.22);
+
           return CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
-                child: Container(
-                  padding: EdgeInsets.all(constraints.maxWidth * 0.05), // Responsive padding
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColor.primary, AppColor.secundary],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                child: SizedBox(
+                  height: headerHeight,
+                  child: Container(
+                    padding: EdgeInsets.all(constraints.maxWidth * 0.05), 
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColor.primary, AppColor.secundary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(40),
+                        bottomRight: Radius.circular(40),
+                      ),
                     ),
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(40),
-                      bottomRight: Radius.circular(40),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: constraints.maxHeight * 0.03), // Responsive height
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Hola, Jugador!',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: headerHeight * 0.06), // Responsive height based on header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Hola, Jugador!',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: constraints.maxWidth * 0.07, // Responsive font size
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text('Listo para jugar hoy?',
+                                      style: TextStyle(color: Colors.white70, fontSize: constraints.maxWidth * 0.04)),
+                                ],
+                              ),
+                            ),
+                            // Limitar el radio del avatar para evitar tamaños extremos
+                            CircleAvatar(
+                              radius: (constraints.maxWidth * 0.06).clamp(18.0, 40.0),
+                              backgroundImage: AssetImage('assets/images/logo.png'),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: headerHeight * 0.04),
+                        // Tu input PIN y botón
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: screenSize.height * 0.03),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 8,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: pinController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  hintText: 'Ingresa PIN de juego',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.grey[200],
+                                    contentPadding:
+                                      EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.015),
+                                ),
+                              ),
+                                  SizedBox(height: screenSize.height * 0.015),
+                              ElevatedButton(
+                                onPressed: () {
+                                  final pin = pinController.text.trim();
+                                  if (pin.isEmpty) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            'Por favor ingresa un PIN valido para poder jugar'),
+                                      ),
+                                    );
+                                  } else {
+                                    Navigator.pushNamed(context, '/joinLobby',
+                                        arguments: pin);
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.amber.shade400,
+                                  minimumSize: Size(double.infinity, max(48.0, screenSize.height * 0.06)),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30)),
+                                  elevation: 6,
+                                  shadowColor: Colors.amber.shade300,
+                                ),
+                                child: Text(
+                                  'Unirse al juego',
                                   style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: constraints.maxWidth * 0.07, // Responsive font size
                                     fontWeight: FontWeight.bold,
+                                    fontSize: constraints.maxWidth * 0.04,
+                                    color: Colors.grey.shade900,
                                   ),
                                 ),
-                                SizedBox(height: 4),
-                                Text('Listo para jugar hoy?',
-                                    style: TextStyle(color: Colors.white70, fontSize: constraints.maxWidth * 0.04)),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          CircleAvatar(
-                            radius: constraints.maxWidth * 0.06, // Responsive radius
-                            backgroundImage: AssetImage('assets/images/logo.png'),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: constraints.maxHeight * 0.025),
-                      // Tu input PIN y botón
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: constraints.maxHeight * 0.02),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 8,
-                              offset: Offset(0, 4),
-                            ),
-                          ],
                         ),
-                        child: Column(
-                          children: [
-                            TextField(
-                              controller: pinController,
-                              keyboardType: TextInputType.number,
-                              decoration: InputDecoration(
-                                hintText: 'Ingresa PIN de juego',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey[200],
-                                contentPadding:
-                                    EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: constraints.maxHeight * 0.015),
-                              ),
-                            ),
-                            SizedBox(height: constraints.maxHeight * 0.015),
-                            ElevatedButton(
-                              onPressed: () {
-                                final pin = pinController.text.trim();
-                                if (pin.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          'Por favor ingresa un PIN valido para poder jugar'),
-                                    ),
-                                  );
-                                } else {
-                                  Navigator.pushNamed(context, '/joinLobby',
-                                      arguments: pin);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.amber.shade400,
-                                minimumSize: Size(double.infinity, constraints.maxHeight * 0.06),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30)),
-                                elevation: 6,
-                                shadowColor: Colors.amber.shade300,
-                              ),
-                              child: Text(
-                                'Unirse al juego',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: constraints.maxWidth * 0.04,
-                                  color: Colors.grey.shade900,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: constraints.maxHeight * 0.025),
-                    ],
+                        SizedBox(height: screenSize.height * 0.02),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -211,8 +221,8 @@ class DashboardPage extends StatelessWidget{
                     (context, index) {
                       final kahoot = recentKahoots[index];
                       return Container(
-                        margin: EdgeInsets.only(bottom: constraints.maxHeight * 0.015),
-                        padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: constraints.maxHeight * 0.015),
+                        margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
+                        padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: screenSize.height * 0.015),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
@@ -246,7 +256,7 @@ class DashboardPage extends StatelessWidget{
               ),
 
               SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: constraints.maxHeight * 0.0125),
+                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.0125),
                 sliver: SliverToBoxAdapter(
                   child: Text(
                     'Recomendado para ti',
@@ -259,10 +269,10 @@ class DashboardPage extends StatelessWidget{
               ),
 
               SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: constraints.maxHeight * 0.0125),
+                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.0125),
                 sliver: staggered.SliverMasonryGrid.count(
                   crossAxisCount: 2,
-                  mainAxisSpacing: constraints.maxHeight * 0.01,
+                  mainAxisSpacing: max(8.0, screenSize.height * 0.01),
                   crossAxisSpacing: constraints.maxWidth * 0.02,
                   childCount: recommendedKahoots.length,
                   itemBuilder: (context, index) {
@@ -276,7 +286,7 @@ class DashboardPage extends StatelessWidget{
                 ),
               ),
 
-              SliverToBoxAdapter(child: SizedBox(height: constraints.maxHeight * 0.1)),
+              SliverToBoxAdapter(child: SizedBox(height: min(screenSize.height * 0.06, 120))),
             ],
           );
         },
