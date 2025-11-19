@@ -87,18 +87,29 @@ class DashboardPage extends StatelessWidget{
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(height: headerHeight * 0.06), // Responsive height based on header
+                        // Colocar el logo arriba del saludo y alineado a la izquierda
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Logo a la izquierda, arriba del texto
+                            Image.asset(
+                              'assets/images/logo.png',
+                              width: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
+                              height: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
+                              fit: BoxFit.contain,
+                            ),
+                            SizedBox(width: constraints.maxWidth * 0.04),
+                            // Textos (Hola, Jugador! y subtitulo)
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  SizedBox(height: 4),
                                   Text(
                                     'Hola, Jugador!',
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: constraints.maxWidth * 0.07, // Responsive font size
+                                      fontSize: constraints.maxWidth * 0.07,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -107,11 +118,6 @@ class DashboardPage extends StatelessWidget{
                                       style: TextStyle(color: Colors.white70, fontSize: constraints.maxWidth * 0.04)),
                                 ],
                               ),
-                            ),
-                            // Limitar el radio del avatar para evitar tamaños extremos
-                            CircleAvatar(
-                              radius: (constraints.maxWidth * 0.06).clamp(18.0, 40.0),
-                              backgroundImage: AssetImage('assets/images/logo.png'),
                             ),
                           ],
                         ),

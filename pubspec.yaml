@@ -42,6 +42,7 @@ dependencies:
 
   # Almacenamiento seguro de datos
   flutter_secure_storage: ^9.2.4
+  
 
 dev_dependencies:
   flutter_test:
@@ -67,3 +68,26 @@ flutter:
   # Assets para imágenes
   assets:
     - assets/images/
+    
+  # Fuentes locales
+  fonts:
+    - family: Onest
+      fonts:
+        - asset: assets/fonts/static/Onest-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/static/Onest-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/static/Onest-Light.ttf
+          weight: 300
+        - asset: assets/fonts/static/Onest-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/static/Onest-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/static/Onest-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/static/Onest-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/static/Onest-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/static/Onest-Black.ttf
+          weight: 900

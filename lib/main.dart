@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'features/kahoot/presentation/blocs/kahoot_editor_bloc.dart';
-import 'features/slide/presentation/blocs/slide_editor_bloc.dart';
+import 'features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
+import 'features/media/presentation/blocs/media_editor_bloc.dart';
 import 'common_pages/dashboard_page.dart';
-import 'features/kahoot/presentation/pages/kahoot_editor_page.dart';
-import 'features/slide/presentation/pages/slide_editor_page.dart';
+import 'features/kahoot/presentation/pages/quiz_editor_page.dart';
+import 'features/media/presentation/pages/slide_editor_page.dart';
 import 'common_pages/template_selector_page.dart';
 import 'features/kahoot/infrastructure/repositories/kahoot_repository_impl.dart';
-import 'features/slide/infrastructure/repositories/slide_repository_impl.dart';
+import 'features/media/infrastructure/repositories/slide_repository_impl.dart';
 import 'core/constants/colors.dart';
 
 
@@ -30,6 +30,7 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
           title: 'Trivvy',
           theme: ThemeData(
+            fontFamily: 'Onest',
             primarySwatch: createMaterialColor(AppColor.primary),
             primaryColor: AppColor.primary,
             scaffoldBackgroundColor: AppColor.background,
