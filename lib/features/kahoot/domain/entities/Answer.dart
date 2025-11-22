@@ -18,8 +18,8 @@ class Answer{
 
   factory Answer.fromJson(Map<String, dynamic> json) {
     return Answer(
-      answerId: json['answerId'],
-      questionId: json['questionId'],
+      answerId: json['answerId'] ?? json['id'],
+      questionId: json['questionId'] ?? json['question_id'],
       isCorrect: json['isCorrect'],
       text: json['text'],
       mediaUrl: json['mediaUrl'],

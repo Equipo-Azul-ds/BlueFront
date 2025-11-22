@@ -25,15 +25,15 @@ class Quiz {
 
   factory Quiz.fromJson(Map<String, dynamic> json) {
     return Quiz(
-      quizId: json['quizId'],
-      authorId: json['authorId'],
+      quizId: json['quizId'] ?? json['id'],
+      authorId: json['authorId'] ?? (json['author'] != null ? json['author']['authorId'] : null) ?? '',
       title: json['title'],
       description: json['description'],
       visibility: json['visibility'],
       themeId: json['themeId'],
-      coverImageUrl: json['coverImageUrl'],
-      createdAt: DateTime.parse(json['createdAt']),
-      questions: (json['questions'] as List).map((q) => Question.fromJson(q)).toList(),
+      coverImageUrl: json['coverImageUrl'] ?? json['coverImage'] ?? json['cover_image'],
+      createdAt: DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
+      questions: (json['questions'] as List).map((q) => Question.fromJson(q as Map<String, dynamic>)).toList(),
     );
   }
 

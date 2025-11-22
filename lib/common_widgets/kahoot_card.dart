@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../core/constants/colors.dart';
-import '../features/kahoot/domain/entities/kahoot.dart';
+// colors import removed; card uses default colors to preserve visual layout
+import '../features/kahoot/domain/entities/Quiz.dart';
 
 class KahootCard extends StatelessWidget{
-  final Kahoot kahoot;
+  final Quiz kahoot;
   final VoidCallback onTap;
 
   KahootCard({required this.kahoot, required this.onTap});
@@ -45,7 +45,7 @@ class KahootCard extends StatelessWidget{
                   ),
                   SizedBox(height: 6),
                   Text(
-                    '${kahoot.authorId} • ${kahoot.themes.length} preguntas',
+                    '${kahoot.authorId} • ${kahoot.questions.length} preguntas',
                     style: TextStyle(
                       color: Colors.grey,
                       fontSize: base * 0.03,

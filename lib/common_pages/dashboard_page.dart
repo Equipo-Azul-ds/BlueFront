@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart' as staggered;
 // imports removed: provider and bloc not used in this page
 import '../core/constants/colors.dart';
-import '../features/kahoot/domain/entities/kahoot.dart';
+import '../features/kahoot/domain/entities/Quiz.dart';
 import '../common_widgets/kahoot_card.dart';
 // removed unused staggered_grid import
 
@@ -14,41 +14,49 @@ class DashboardPage extends StatelessWidget{
 
     //Datos simualdos que posteriormente se reemplazaran con la api
       final recentKahoots = [
-        Kahoot(
-          id: '1',
-           title: 'Arquitectura Hexagonal',
-            visibility: 'publico', 
-            status: 'publico', 
-            themes: [], 
-            authorId: 'Massiel', 
-            createdAt: DateTime.now()),
-        Kahoot(
-          id: '2', 
-          title: 'Desarrollo de software', 
-          visibility: 'publico',
-          status: 'publico', 
-          themes: [], 
-          authorId: 'Jose', 
-          createdAt: DateTime.now()),
+        Quiz(
+          quizId: '1',
+          authorId: 'Massiel',
+          title: 'Arquitectura Hexagonal',
+          description: '',
+          visibility: 'public',
+          themeId: '',
+          createdAt: DateTime.now(),
+          questions: [],
+        ),
+        Quiz(
+          quizId: '2',
+          authorId: 'Jose',
+          title: 'Desarrollo de software',
+          description: '',
+          visibility: 'public',
+          themeId: '',
+          createdAt: DateTime.now(),
+          questions: [],
+        ),
       ];
 
       final recommendedKahoots = [
-        Kahoot(
-          id: '3', 
-          title: 'Seguimos en prueba', 
-          visibility: 'publico', 
-          status: 'publico', 
-          themes: [], 
-          authorId: 'Massiel', 
-          createdAt: DateTime.now()),
-        Kahoot(
-          id: '4', 
-          title: 'hOLA ESTO ES UNA PRUEBA', 
-          visibility: 'publico', 
-          status: 'publico', 
-          themes: [], 
-          authorId: 'Jose', 
-          createdAt: DateTime.now()),
+        Quiz(
+          quizId: '3',
+          authorId: 'Massiel',
+          title: 'Seguimos en prueba',
+          description: '',
+          visibility: 'public',
+          themeId: '',
+          createdAt: DateTime.now(),
+          questions: [],
+        ),
+        Quiz(
+          quizId: '4',
+          authorId: 'Jose',
+          title: 'hOLA ESTO ES UNA PRUEBA',
+          description: '',
+          visibility: 'public',
+          themeId: '',
+          createdAt: DateTime.now(),
+          questions: [],
+        ),
       ];
 
       final TextEditingController pinController = TextEditingController();
@@ -285,8 +293,8 @@ class DashboardPage extends StatelessWidget{
                     final kahoot = recommendedKahoots[index];
                     return KahootCard(
                       kahoot: kahoot,
-                      onTap: () => Navigator.pushNamed(context, '/gameDetail',
-                          arguments: kahoot.id),
+                        onTap: () => Navigator.pushNamed(context, '/gameDetail',
+                          arguments: kahoot.quizId),
                     );
                   },
                 ),
@@ -299,8 +307,14 @@ class DashboardPage extends StatelessWidget{
       ),
     ),
     floatingActionButton: FloatingActionButton(
-      onPressed: () {
-        Navigator.pushNamed(context, '/create');
+      onPressed: () async {
+        // Abrir selector de plantillas; si el usuario elige una, navegar al editor con la plantilla
+        final selected = await Navigator.pushNamed(context, '/templateSelector');
+        if (selected != null && selected is Quiz) {
+          Navigator.pushNamed(context, '/create', arguments: selected);
+        } else {
+          Navigator.pushNamed(context, '/create');
+        }
       },
       backgroundColor: Colors.amber.shade400,
       child: Icon(Icons.add),

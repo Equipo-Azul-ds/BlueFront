@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/Quiz.dart';
+import '../../domain/entities/Question.dart';
 import '../../domain/repositories/QuizRepository.dart';
 import '../../application/dtos/create_quiz_dto.dart';
 import '../../application/create_quiz_usecase.dart';
@@ -116,6 +117,34 @@ class QuizEditorBloc extends ChangeNotifier {
   void clear() {
     currentQuiz = null;
     errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Establece el quiz actual y notifica a los oyentes.
+  void setCurrentQuiz(Quiz quiz) {
+    currentQuiz = quiz;
+    notifyListeners();
+  }
+
+  // Local editing helpers used by the UI to mutate the in-memory quiz and notify listeners
+  void updateQuestionAt(int index, Question updated) {
+    if (currentQuiz == null) return;
+    if (index < 0 || index >= currentQuiz!.questions.length) return;
+    currentQuiz!.questions[index] = updated;
+    notifyListeners();
+  }
+
+  void insertQuestionAt(int index, Question question) {
+    if (currentQuiz == null) return;
+    final insertIdx = index.clamp(0, currentQuiz!.questions.length);
+    currentQuiz!.questions.insert(insertIdx, question);
+    notifyListeners();
+  }
+
+  void removeQuestionAt(int index) {
+    if (currentQuiz == null) return;
+    if (index < 0 || index >= currentQuiz!.questions.length) return;
+    currentQuiz!.questions.removeAt(index);
     notifyListeners();
   }
 }

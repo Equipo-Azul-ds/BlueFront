@@ -13,7 +13,7 @@ class QuizRepositoryImpl implements QuizRepository {
   @override
   Future<Quiz> save(Quiz quiz) async {
     final isNew = quiz.quizId.isEmpty;
-    final url = isNew ? '$baseUrl/quizzes' : '$baseUrl/quizzes/${quiz.quizId}';
+    final url = isNew ? '$baseUrl/kahoots' : '$baseUrl/kahoots/${quiz.quizId}';
     final method = isNew ? 'POST' : 'PUT';
 
     final body = jsonEncode(quiz.toJson());
@@ -32,7 +32,7 @@ class QuizRepositoryImpl implements QuizRepository {
 
   @override 
   Future<Quiz?> find(String id) async {
-  final response = await cliente.get(Uri.parse('$baseUrl/quizzes/$id'));
+    final response = await cliente.get(Uri.parse('$baseUrl/kahoots/$id'));
     if (response.statusCode == 200){
       final jsonResponse = jsonDecode(response.body);
       return Quiz.fromJson(jsonResponse);
@@ -45,15 +45,17 @@ class QuizRepositoryImpl implements QuizRepository {
 
   @override
   Future<void> delete(String id) async {
-    final response = await cliente.delete(Uri.parse('$baseUrl/quizzes/$id'));
-    if (response.statusCode != 204){
+    final response = await cliente.delete(Uri.parse('$baseUrl/kahoots/$id'));
+    // backend may return 200 or 204
+    if (response.statusCode != 204 && response.statusCode != 200){
       throw Exception('Error al eliminar el quiz: ${response.statusCode}');
     }
   }
 
   @override
   Future<List<Quiz>> searchByAuthor(String authorId) async {
-    final response = await cliente.get(Uri.parse('$baseUrl/quizzes?authorId=$authorId'));
+    // backend exposes: GET /kahoots/user/:userId
+    final response = await cliente.get(Uri.parse('$baseUrl/kahoots/user/$authorId'));
 
     if (response.statusCode == 200){
       final List<dynamic> jsonResponse = jsonDecode(response.body);

@@ -82,7 +82,7 @@ class MediaEditorBloc extends ChangeNotifier {
       await deleteUseCase.run(id);
       // limpiar si era el último
       if (lastMedia != null) {
-        final mediaId = (lastMedia as dynamic).mediaId ?? (lastMedia as dynamic).id ?? null;
+        final mediaId = (lastMedia as dynamic).id ?? (lastMedia as dynamic).mediaId ?? null;
         if (mediaId == id) {
           lastMedia = null;
           lastFileBytes = null;

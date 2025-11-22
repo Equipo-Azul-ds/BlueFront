@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../../domain/repositories/Storage_Provider_Repository.dart';
 
-class StorageProviderRepositoryImpl {
+class StorageProviderRepositoryImpl implements StorageProviderRepository {
   final String baseUrl;
   final http.Client client;
 
@@ -41,5 +41,17 @@ class StorageProviderRepositoryImpl {
     if (response.statusCode != 204) {
       throw Exception('Error eliminando archivo: ${response.statusCode}');
     }
+  }
+
+  @override
+  Future<Uint8List?> get(String path) async {
+    final response = await client.get(Uri.parse('$baseUrl/storage/file/$path'));
+    if (response.statusCode == 200) {
+      return response.bodyBytes;
+    }
+    if (response.statusCode == 404) {
+      return null;
+    }
+    throw Exception('Error obteniendo archivo: ${response.statusCode}');
   }
 }

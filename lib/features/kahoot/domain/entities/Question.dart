@@ -40,14 +40,14 @@ class Question {
 
   factory Question.fromJson(Map<String, dynamic> json){
     return Question(
-      questionId: json['questionId'],
-      quizId: json['quizId'],
+      questionId: json['questionId'] ?? json['id'],
+      quizId: json['quizId'] ?? json['quiz_id'] ?? json['quizId'],
       text: json['text'],
       mediaUrl: json['mediaUrl'],
       type: json['type'],
       timeLimit: json['timeLimit'],
       points: json['points'],
-      answers: (json['answers'] as List).map((a) => Answer.fromJson(a)).toList(),
+      answers: (json['answers'] as List).map((a) => Answer.fromJson(a as Map<String, dynamic>)).toList(),
     );
   }
 

@@ -4,11 +4,22 @@ import 'features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import 'features/media/presentation/blocs/media_editor_bloc.dart';
 import 'common_pages/dashboard_page.dart';
 import 'features/kahoot/presentation/pages/quiz_editor_page.dart';
-import 'features/media/presentation/pages/slide_editor_page.dart';
+import 'features/kahoot/presentation/pages/question_editor_page.dart';
 import 'common_pages/template_selector_page.dart';
-import 'features/kahoot/infrastructure/repositories/kahoot_repository_impl.dart';
-import 'features/media/infrastructure/repositories/slide_repository_impl.dart';
+import 'features/kahoot/infrastructure/repositories/Quiz_Repository_Impl.dart';
+import 'features/media/infrastructure/repositories/Media_Repository_Impl.dart';
+import 'features/media/infrastructure/repositories/Storage_Provider_Repository_Impl.dart';
+import 'features/kahoot/domain/repositories/QuizRepository.dart';
+import 'features/media/domain/repositories/Media_Repository.dart';
+import 'features/media/domain/repositories/Storage_Provider_Repository.dart';
+import 'features/media/application/upload_media_usecase.dart';
+import 'features/media/application/get_media_usecase.dart';
+import 'features/media/application/delete_media_usecase.dart';
 import 'core/constants/colors.dart';
+import 'features/kahoot/domain/entities/Quiz.dart';
+
+// API base URL configurable vía --dart-define=API_BASE_URL
+const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:3000');
 
 
 void main() {
@@ -21,11 +32,17 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         //Estos son los proveedores para los repositorios (inyeccion de dependencias)
-        Provider<KahootRepositoryImpl>(create: (_)=> KahootRepositoryImpl()), //Aqui lo que hacemos es registrar el repositorio de Kahoot
-        Provider<SlideRepositoryImpl>(create: (_)=> SlideRepositoryImpl()),  //Aqui lo que hacemos es registrar el repositorio de Slide 
-        //Blocs para el estado
-      ChangeNotifierProvider(create: (context)=> KahootEditorBloc(context.read<KahootRepositoryImpl>())), //Aqui registramos el Bloc de Kahoot
-      ChangeNotifierProvider(create: (context)=> SlideEditorBloc(context.read<SlideRepositoryImpl>())),
+        // Repositorios con configuración mínima (ajusta baseUrl según tu entorno)
+        Provider<QuizRepository>(create: (_)=> QuizRepositoryImpl(baseUrl: apiBaseUrl)),
+        Provider<MediaRepository>(create: (_)=> MediaRepositoryImpl(baseUrl: apiBaseUrl)),
+        Provider<StorageProviderRepository>(create: (_)=> StorageProviderRepositoryImpl(baseUrl: apiBaseUrl)),
+        // Blocs / ChangeNotifiers
+        ChangeNotifierProvider(create: (context)=> QuizEditorBloc(context.read<QuizRepository>())),
+        ChangeNotifierProvider(create: (context)=> MediaEditorBloc(
+          uploadUseCase: UploadMediaUseCase(mediaRepository: context.read<MediaRepository>()),
+          getUseCase: GetMediaUseCase(mediaRepository: context.read<MediaRepository>(), storageProvider: context.read<StorageProviderRepository>()),
+          deleteUseCase: DeleteMediaUseCase(mediaRepository: context.read<MediaRepository>(), storageProvider: context.read<StorageProviderRepository>()),
+        )),
       ],
       child: MaterialApp(
           title: 'Trivvy',
@@ -49,8 +66,17 @@ class MyApp extends StatelessWidget {
           initialRoute: '/dashboard',
           routes:{
             '/dashboard': (context)=> DashboardPage(),
-            '/create': (context)=> KahootEditorPage(),
-            '/slideEditor': (context) => SlideEditorPage(slideId: ModalRoute.of(context)!.settings.arguments as String),
+            // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
+            '/create': (context) {
+              final args = ModalRoute.of(context)?.settings.arguments;
+              Quiz? template;
+              if (args is Quiz) template = args;
+              return QuizEditorPage(template: template);
+            },
+            '/questionEditor': (context) {
+              final args = ModalRoute.of(context)!.settings.arguments as Map<String, String>;
+              return QuestionEditorPage(quizId: args['quizId']!, questionId: args['questionId']!);
+            },
             '/templateSelector': (context) => TemplateSelectorPage(),
             //Comentoados por ahora
             //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
