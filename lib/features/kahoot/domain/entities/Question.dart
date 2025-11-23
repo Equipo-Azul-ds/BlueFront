@@ -42,11 +42,11 @@ class Question {
     return Question(
       questionId: json['questionId'] ?? json['id'],
       quizId: json['quizId'] ?? json['quiz_id'] ?? json['quizId'],
-      text: json['text'],
-      mediaUrl: json['mediaUrl'],
-      type: json['type'],
-      timeLimit: json['timeLimit'],
-      points: json['points'],
+      text: json['text'] ?? json['questionText'] ?? json['question_text'] ?? '',
+      mediaUrl: json['mediaUrl'] ?? json['mediaId'] ?? json['media_id'],
+      type: json['type'] ?? json['questionType'] ?? json['question_type'] ?? 'quiz',
+      timeLimit: (json['timeLimit'] ?? json['time_limit'] ?? 30) as int,
+      points: (json['points'] ?? json['points'] ?? 0) as int,
       answers: (json['answers'] as List).map((a) => Answer.fromJson(a as Map<String, dynamic>)).toList(),
     );
   }

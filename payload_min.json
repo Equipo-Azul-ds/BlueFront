@@ -1,0 +1,23 @@
+{
+  "authorId": "f1986c62-7dc1-47c5-9a1f-03d34043e8f4",
+  "title": "Prueba mínima",
+  "description": "Quiz de prueba (sin media)",
+  "coverImageId": null,
+  "visibility": "private",
+  "status": "draft",
+  "category": "Tecnología",
+  "themeId": "f1986c62-7dc1-47c5-9a1f-03d34043e8f4",
+  "questions": [
+    {
+      "questionText": "¿Cuál es la capital de Francia?",
+      "mediaId": null,
+      "questionType": "quiz",
+      "timeLimit": 30,
+      "points": 100,
+      "answers": [
+        { "answerText": "Madrid", "mediaId": null, "isCorrect": false },
+        { "answerText": "París", "mediaId": null, "isCorrect": true }
+      ]
+    }
+  ]
+}

@@ -6,6 +6,8 @@ class Quiz {
   String title;
   String description;
   String visibility; // 'public' o 'private'
+  String? status; // 'draft' | 'published'
+  String? category;
   String themeId;
   String? coverImageUrl;
   final DateTime createdAt;
@@ -17,6 +19,8 @@ class Quiz {
     required this.title,
     required this.description,
     required this.visibility,
+    this.status,
+    this.category,
     required this.themeId,
     this.coverImageUrl,
     required this.createdAt,
@@ -30,6 +34,8 @@ class Quiz {
       title: json['title'],
       description: json['description'],
       visibility: json['visibility'],
+      status: json['status'],
+      category: json['category'],
       themeId: json['themeId'],
       coverImageUrl: json['coverImageUrl'] ?? json['coverImage'] ?? json['cover_image'],
       createdAt: DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
@@ -44,6 +50,8 @@ class Quiz {
       'title': title,
       'description': description,
       'visibility': visibility,
+      'status': status,
+      'category': category,
       'themeId': themeId,
       'coverImageUrl': coverImageUrl,
       'createdAt': createdAt.toIso8601String(),

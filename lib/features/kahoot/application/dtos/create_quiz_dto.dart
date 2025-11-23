@@ -7,8 +7,11 @@ class CreateAnswerDto {
   CreateAnswerDto({this.answerText, this.answerImage, required this.isCorrect});
 
   Map<String, dynamic> toJson() => {
-        'answerText': answerText,
-        'answerImage': answerImage,
+      // Backend may expect 'answerText' or 'text'. Provide both for compatibility.
+      'answerText': answerText,
+      'text': answerText,
+      'answerImage': answerImage,
+      'mediaUrl': answerImage,
         'isCorrect': isCorrect,
       };
 }
@@ -31,12 +34,15 @@ class CreateQuestionDto {
   });
 
   Map<String, dynamic> toJson() => {
-        'questionText': questionText,
-        'mediaUrl': mediaUrl,
-        'questionType': questionType,
-        'timeLimit': timeLimit,
-        'points': points,
-        'answers': answers.map((a) => a.toJson()).toList(),
+      // Provide both shapes: 'questionText' (backend examples) and 'text' (internal entities)
+      'questionText': questionText,
+      'text': questionText,
+      'mediaUrl': mediaUrl,
+      'questionType': questionType,
+      'type': questionType,
+      'timeLimit': timeLimit,
+      'points': points,
+      'answers': answers.map((a) => a.toJson()).toList(),
       };
 }
 
@@ -46,6 +52,8 @@ class CreateQuizDto {
   final String? description;
   final String? coverImage;
   final String visibility; // 'public' | 'private'
+  final String? status; // 'draft' | 'published'
+  final String? category;
   final String? themeId;
   final List<CreateQuestionDto> questions;
 
@@ -55,6 +63,8 @@ class CreateQuizDto {
     this.description,
     this.coverImage,
     required this.visibility,
+    this.status,
+    this.category,
     this.themeId,
     required this.questions,
   });
@@ -65,6 +75,8 @@ class CreateQuizDto {
         'description': description,
         'coverImage': coverImage,
         'visibility': visibility,
+        'status': status,
+        'category': category,
         'themeId': themeId,
         'questions': questions.map((q) => q.toJson()).toList(),
       };

@@ -21,8 +21,8 @@ class Answer{
       answerId: json['answerId'] ?? json['id'],
       questionId: json['questionId'] ?? json['question_id'],
       isCorrect: json['isCorrect'],
-      text: json['text'],
-      mediaUrl: json['mediaUrl'],
+      text: json['text'] ?? json['answerText'] ?? json['answer_text'],
+      mediaUrl: json['mediaUrl'] ?? json['mediaId'] ?? json['media_id'],
     );
   }
 

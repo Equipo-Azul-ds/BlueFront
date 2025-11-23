@@ -147,4 +147,24 @@ class QuizEditorBloc extends ChangeNotifier {
     currentQuiz!.questions.removeAt(index);
     notifyListeners();
   }
+
+  /// Persiste el `currentQuiz` actual enviándolo al repositorio.
+  /// Retorna la entidad guardada y actualiza `currentQuiz` con la respuesta del servidor.
+  Future<void> saveCurrentQuiz() async {
+    if (currentQuiz == null) return;
+    isLoading = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final saved = await repository.save(currentQuiz!);
+      currentQuiz = saved;
+    } catch (e) {
+      errorMessage = 'Error al persistir el quiz: $e';
+      rethrow;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
 }

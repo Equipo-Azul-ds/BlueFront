@@ -21,16 +21,38 @@ class Media {
 
   factory Media.fromJson(Map<String, dynamic> json){
     // Backend may return 'id' or 'mediaId' depending on implementation.
-    final id = json['id'] ?? json['mediaId'];
+    // Use safe fallbacks and convert to string to avoid runtime Null type errors.
+    String? _safeStringOrNull(dynamic v) {
+      if (v == null) return null;
+      if (v is String) return v;
+      try {
+        return v.toString();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final id = _safeStringOrNull(json['id'] ?? json['mediaId']) ?? '';
+    final path = _safeStringOrNull(json['path'] ?? json['url'] ?? json['pathUrl']) ?? '';
+    final mimeType = _safeStringOrNull(json['mimeType'] ?? json['contentType']) ?? '';
+    final size = (json['size'] ?? json['fileSize'] ?? 0);
+    final originalName = _safeStringOrNull(json['originalName'] ?? json['name']) ?? '';
+    DateTime createdAt;
+    try {
+      createdAt = DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String());
+    } catch (_) {
+      createdAt = DateTime.now();
+    }
+
     return Media(
       id: id,
-      path: json['path'],
-      mimeType: json['mimeType'],
-      size: json['size'],
-      originalName: json['originalName'],
-      createdAt: DateTime.parse(json['createdAt']),
-      previewPath: json['previewPath'],
-      ownerId: json['ownerId'],
+      path: path,
+      mimeType: mimeType,
+      size: size is int ? size : int.tryParse(size.toString()) ?? 0,
+      originalName: originalName,
+      createdAt: createdAt,
+      previewPath: _safeStringOrNull(json['previewPath'] ?? json['thumbnail']),
+      ownerId: _safeStringOrNull(json['ownerId'] ?? json['owner_id']),
     );
   }
 

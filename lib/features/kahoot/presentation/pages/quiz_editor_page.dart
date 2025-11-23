@@ -3,6 +3,7 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../media/presentation/blocs/media_editor_bloc.dart';
 import '../blocs/quiz_editor_bloc.dart';
 import '../../domain/entities/Question.dart' as Q;
 import '../../domain/entities/Answer.dart' as A;
@@ -41,7 +42,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
           )).toList();
           return Q.Question(
             questionId: qid,
-            quizId: 'quiz_${now}',
+            quizId: '',
             text: q.text,
             mediaUrl: q.mediaUrl,
             type: q.type,
@@ -52,25 +53,30 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
         }).toList();
 
             final newQuiz = Quiz(
-          quizId: 'quiz_${now}',
+              quizId: '',
           authorId: quizBloc.currentQuiz?.authorId ?? 'author-id-placeholder',
           title: tpl.title,
           description: tpl.description,
           visibility: tpl.visibility,
+          status: tpl.status,
+          category: tpl.category,
           themeId: tpl.themeId,
           coverImageUrl: tpl.coverImageUrl,
           createdAt: DateTime.now(),
           questions: copiedQuestions,
         );
 
-            // Si la plantilla trae imagen de portada, la guardamos en el estado local para preview
-            if (tpl.coverImageUrl != null) {
-              // setState en post-frame para actualizar el widget de MediaUpload
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() => _coverImagePath = tpl.coverImageUrl);
-              });
-            }
-        quizBloc.setCurrentQuiz(newQuiz);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          // Inicializar controles UI con valores de la plantilla
+          setState(() {
+            _coverImagePath = tpl.coverImageUrl;
+            _visibility = tpl.visibility;
+            _status = tpl.status ?? 'draft';
+            _category = tpl.category ?? 'Tecnología';
+          });
+          quizBloc.setCurrentQuiz(newQuiz);
+        });
       });
     }
   }
@@ -91,6 +97,8 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
   // Estado temporal para elementos que antes se pasaban directo al BLoC
   String? _coverImagePath;
   String _visibility = 'private';
+  String _status = 'draft';
+  String _category = 'Tecnología';
 
   Future<void> _saveQuiz() async {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
@@ -107,6 +115,8 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
       description: description,
       coverImage: _coverImagePath,
       visibility: _visibility,
+      status: _status,
+      category: _category,
       themeId: quizBloc.currentQuiz?.themeId, // mantiene tema si existe
       questions: [], 
     );
@@ -155,9 +165,17 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                 key: _formKey,
                 child: Column(
                   children:[
-                    //Subir imagen -> guardamos localmente la ruta
-                    media.MediaUpload(onMediaSelected: (file) {
-                      setState(()=> _coverImagePath = file.path);
+                    //Subir imagen -> subimos al backend y guardamos el mediaId
+                    media.MediaUpload(onMediaSelected: (file) async {
+                      final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
+                      try {
+                        final uploaded = await mediaBloc.uploadFromXFile(file);
+                        // Guardar el id devuelto por el backend. Conservamos la variable name por compatibilidad.
+                        setState(()=> _coverImagePath = (uploaded as dynamic).id ?? (uploaded as dynamic).mediaId ?? null);
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Imagen subida')));
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error subiendo imagen: $e')));
+                      }
                     }),
                     SizedBox(height: constraints.maxHeight * 0.02),
                         FormBuilderTextField(
@@ -180,17 +198,77 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                       style: TextStyle(fontSize: constraints.maxWidth * 0.04),
                     ),
                     SizedBox(height: constraints.maxHeight * 0.02),
+                    // Estado (status) y categoria del quiz
+                    Row(children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _status,
+                          items: ['draft','published'].map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                          onChanged: (v) {
+                            final val = v ?? 'draft';
+                            setState(()=> _status = val);
+                            // Propagar al BLoC para que saveCurrentQuiz use el valor seleccionado
+                            if (quizBloc.currentQuiz != null) {
+                              quizBloc.currentQuiz!.status = _status;
+                              quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                            }
+                          },
+                          decoration: InputDecoration(labelText: 'Estado'),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _category,
+                          items: ['Tecnología','Educación','General'].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                          onChanged: (v) {
+                            final val = v ?? 'Tecnología';
+                            setState(()=> _category = val);
+                            if (quizBloc.currentQuiz != null) {
+                              quizBloc.currentQuiz!.category = _category;
+                              quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                            }
+                          },
+                          decoration: InputDecoration(labelText: 'Categoría'),
+                        ),
+                      ),
+                    ]),
+                    SizedBox(height: constraints.maxHeight * 0.02),
                     SwitchListTile(
                       title: Text(
                         'Visible para todos',
                         style: TextStyle(fontSize: constraints.maxWidth * 0.04),
                       ),
                       value: _visibility == 'public',
-                      onChanged: (val) => setState(()=> _visibility = val ? 'public' : 'private'),
+                      onChanged: (val) {
+                        final v = val ? 'public' : 'private';
+                        setState(()=> _visibility = v);
+                        if (quizBloc.currentQuiz != null) {
+                          quizBloc.currentQuiz!.visibility = _visibility;
+                          quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                        }
+                      },
                     ),
                     SizedBox(height: constraints.maxHeight * 0.03),
                     ElevatedButton(
-                      onPressed: () => setState(()=>_step = 2),
+                      onPressed: () {
+                        // Save form values and propagate to currentQuiz before moving to questions
+                        _formKey.currentState?.save();
+                        final values = _formKey.currentState?.value ?? {};
+                        final titleVal = values['title'] as String? ?? '';
+                        final descriptionVal = values['description'] as String? ?? '';
+                        // Update the in-memory quiz so subsequent saveCurrentQuiz uses updated values
+                        if (quizBloc.currentQuiz != null) {
+                          quizBloc.currentQuiz!.title = titleVal;
+                          quizBloc.currentQuiz!.description = descriptionVal;
+                          quizBloc.currentQuiz!.visibility = _visibility;
+                          quizBloc.currentQuiz!.status = _status;
+                          quizBloc.currentQuiz!.category = _category;
+                          quizBloc.currentQuiz!.coverImageUrl = _coverImagePath;
+                          quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                        }
+                        setState(()=>_step = 2);
+                      },
                       child: Text(
                         'Continuar a preguntas',
                         style: TextStyle(fontSize: constraints.maxWidth * 0.04),
@@ -230,7 +308,47 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                       padding: EdgeInsets.all(constraints.maxWidth * 0.04),
                       decoration: BoxDecoration(color:Colors.white, borderRadius: BorderRadius.circular(16)),
                       child: selectedQuestion == null
-                        ? const Text('Seleccione o cree una pregunta')
+                        ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text('Seleccione o cree una pregunta', style: TextStyle(fontSize: constraints.maxWidth * 0.045)),
+                            SizedBox(height: constraints.maxHeight * 0.02),
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                if (quizBloc.currentQuiz == null){
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guarda el quiz primero (Paso 1)')));
+                                  return;
+                                }
+                                final now = DateTime.now().microsecondsSinceEpoch;
+                                final qid = 'q_$now';
+                                final a1 = A.Answer(answerId: 'a1_$now', questionId: qid, isCorrect: true, text: 'Respuesta 1');
+                                final a2 = A.Answer(answerId: 'a2_$now', questionId: qid, isCorrect: false, text: 'Respuesta 2');
+                                final newQ = Q.Question(
+                                  questionId: qid,
+                                  quizId: quizBloc.currentQuiz!.quizId,
+                                  text: 'Nueva pregunta',
+                                  mediaUrl: null,
+                                  type: 'quiz',
+                                  timeLimit: 30,
+                                  points: 100,
+                                  answers: [a1, a2],
+                                );
+
+                                quizBloc.insertQuestionAt(quizBloc.currentQuiz!.questions.length, newQ);
+                                setState(()=> _selectedIndex = quizBloc.currentQuiz!.questions.length - 1);
+
+                                try {
+                                  await quizBloc.saveCurrentQuiz();
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pregunta creada en el servidor')));
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear pregunta: $e')));
+                                }
+                              },
+                              icon: Icon(Icons.add),
+                              label: Text('Crear pregunta'),
+                            )
+                          ],
+                        )
                         : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -325,19 +443,28 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                             SizedBox(height: constraints.maxHeight * 0.01),
 
                             // Media upload for question
-                            media.MediaUpload(onMediaSelected: (file) {
+                            media.MediaUpload(onMediaSelected: (file) async {
                               final q = selectedQuestion;
-                              final updated = Q.Question(
-                                questionId: q.questionId,
-                                quizId: q.quizId,
-                                text: q.text,
-                                mediaUrl: file.path,
-                                type: q.type,
-                                timeLimit: q.timeLimit,
-                                points: q.points,
-                                answers: q.answers,
-                              );
-                              quizBloc.updateQuestionAt(_selectedIndex, updated);
+                              final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
+                              try {
+                                final uploaded = await mediaBloc.uploadFromXFile(file);
+                                final mediaId = (uploaded as dynamic).id ?? (uploaded as dynamic).mediaId ?? file.path;
+                                final updated = Q.Question(
+                                  questionId: q.questionId,
+                                  quizId: q.quizId,
+                                  text: q.text,
+                                  // Guardamos el mediaId devuelto por el backend en la propiedad mediaUrl
+                                  mediaUrl: mediaId,
+                                  type: q.type,
+                                  timeLimit: q.timeLimit,
+                                  points: q.points,
+                                  answers: q.answers,
+                                );
+                                quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Media subida para la pregunta')));
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error subiendo media: $e')));
+                              }
                             }),
 
                             SizedBox(height: constraints.maxHeight * 0.01),
@@ -417,7 +544,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                               ],
                             ),
 
-                            // Actions: duplicate or delete question
+                            // Acciontes: duplica o elimina un pregunta
                             Row(children: [
                               OutlinedButton.icon(onPressed: (){
                                 final q = selectedQuestion;
@@ -456,7 +583,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                   itemBuilder: (contact, index){
                     if(index == slides.length){
                       return IconButton(
-                        onPressed: (){
+                        onPressed: () async {
                           if (quizBloc.currentQuiz == null){
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guarda el quiz primero (Paso 1)')));
                             return;
@@ -479,6 +606,13 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
                           quizBloc.insertQuestionAt(quizBloc.currentQuiz!.questions.length, newQ);
                           setState(()=> _selectedIndex = quizBloc.currentQuiz!.questions.length - 1);
+
+                          try {
+                            await quizBloc.saveCurrentQuiz();
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pregunta creada en el servidor')));
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear pregunta: $e')));
+                          }
                         },
                         icon: Icon(Icons.add),
                         iconSize: constraints.maxWidth * 0.06);
