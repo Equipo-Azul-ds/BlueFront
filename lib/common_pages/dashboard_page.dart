@@ -1,16 +1,56 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart' as staggered;
-// imports removed: provider and bloc not used in this page
+import 'package:provider/provider.dart';
 import '../core/constants/colors.dart';
+import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import '../features/kahoot/domain/entities/Quiz.dart';
 import '../common_widgets/kahoot_card.dart';
-// removed unused staggered_grid import
 
-class DashboardPage extends StatelessWidget{
+class DashboardPage extends StatefulWidget{
+  @override
+  _DashboardPageState createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  bool _loadingUserQuizzes = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load user quizzes on enter (uses a placeholder author id)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+      if (quizBloc.userQuizzes == null) {
+        // Only call backend if we have a valid authorId (UUID v4). Otherwise skip to avoid
+        // server errors when a placeholder is used.
+        final authorIdCandidate = quizBloc.currentQuiz?.authorId ?? '';
+        final uuidV4 = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
+        if (uuidV4.hasMatch(authorIdCandidate)) {
+          setState(() => _loadingUserQuizzes = true);
+          try {
+            await quizBloc.loadUserQuizzes(authorIdCandidate);
+          } catch (_) {}
+          if (mounted) setState(() => _loadingUserQuizzes = false);
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context){
     // Obtener el bloc si es necesario en el futuro
+    final quizBloc = Provider.of<QuizEditorBloc>(context);
+    // If navigator passed a created quiz as an argument, insert it into userQuizzes so
+    // it is visible immediately without calling the backend.
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Quiz) {
+      quizBloc.userQuizzes ??= [];
+      final exists = quizBloc.userQuizzes!.any((q) => q.quizId == args.quizId && q.title == args.title);
+      if (!exists) {
+        quizBloc.userQuizzes!.insert(0, args);
+      }
+    }
 
     //Datos simualdos que posteriormente se reemplazaran con la api
       final recentKahoots = [
@@ -61,6 +101,8 @@ class DashboardPage extends StatelessWidget{
 
       final TextEditingController pinController = TextEditingController();
 
+    
+
     return Scaffold(
     backgroundColor: AppColor.background,
     body: SafeArea(
@@ -91,10 +133,12 @@ class DashboardPage extends StatelessWidget{
                         bottomRight: Radius.circular(40),
                       ),
                     ),
+
+                    
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: headerHeight * 0.06), // Responsive height based on header
+                        SizedBox(height: headerHeight * 0.06),
                         // Colocar el logo arriba del saludo y alineado a la izquierda
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,6 +245,59 @@ class DashboardPage extends StatelessWidget{
                       ],
                     ),
                   ),
+                ),
+              ),
+
+              // Tus Quizzes section (top-level sliver)
+              SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.01),
+                sliver: SliverToBoxAdapter(
+                  child: Builder(builder: (ctx) {
+                    final userQuizzes = quizBloc.userQuizzes ?? [];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Tus Quizzes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: constraints.maxWidth * 0.045)),
+                        SizedBox(height: 8),
+                        if (_loadingUserQuizzes) Center(child: CircularProgressIndicator()),
+                        if (!_loadingUserQuizzes && userQuizzes.isEmpty)
+                          Text('No tienes quizzes aún. Crea uno con el botón +', style: TextStyle(color: Colors.grey[700])),
+                        if (userQuizzes.isNotEmpty)
+                          Column(
+                            children: userQuizzes.map((q) => Container(
+                              margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
+                              padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: screenSize.height * 0.015),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border(left: BorderSide(color: AppColor.primary, width: 4)),
+                              ),
+                              child: Row(
+                                children: [
+                                  // Cover image if available
+                                  Container(
+                                    width: constraints.maxWidth * 0.18,
+                                    height: constraints.maxWidth * 0.12,
+                                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Colors.grey[200]),
+                                    clipBehavior: Clip.hardEdge,
+                                    child: q.coverImageUrl != null && q.coverImageUrl!.startsWith('http')
+                                      ? Image.network(q.coverImageUrl!, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.broken_image))
+                                      : Center(child: Icon(Icons.image, color: Colors.grey[600])),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text(q.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.bold, fontSize: constraints.maxWidth * 0.04)),
+                                    SizedBox(height: 4),
+                                    Text('Creado ${q.createdAt.toLocal().toString().split(' ').first} • ${q.questions.length} preguntas', style: TextStyle(color: Colors.grey[700], fontSize: constraints.maxWidth * 0.03)),
+                                  ])),
+                                  IconButton(onPressed: () => Navigator.pushNamed(context, '/create', arguments: q), icon: Icon(Icons.edit)),
+                                ],
+                              ),
+                            )).toList(),
+                          ),
+                      ],
+                    );
+                  }),
                 ),
               ),
 

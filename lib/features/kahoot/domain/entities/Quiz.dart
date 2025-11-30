@@ -9,6 +9,8 @@ class Quiz {
   String? status; // 'draft' | 'published'
   String? category;
   String themeId;
+  // Optional local template id (not sent to backend). Used for client-side previews.
+  String? templateId;
   String? coverImageUrl;
   final DateTime createdAt;
   List<Question> questions;
@@ -22,6 +24,7 @@ class Quiz {
     this.status,
     this.category,
     required this.themeId,
+    this.templateId,
     this.coverImageUrl,
     required this.createdAt,
     required this.questions,
@@ -37,6 +40,7 @@ class Quiz {
       status: json['status'],
       category: json['category'],
       themeId: json['themeId'],
+      templateId: json['templateId'],
       coverImageUrl: json['coverImageUrl'] ?? json['coverImage'] ?? json['cover_image'],
       createdAt: DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
       questions: (json['questions'] as List).map((q) => Question.fromJson(q as Map<String, dynamic>)).toList(),

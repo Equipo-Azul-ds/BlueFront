@@ -19,7 +19,7 @@ import 'core/constants/colors.dart';
 import 'features/kahoot/domain/entities/Quiz.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
-// Por defecto apunta al backend desplegado en Railway (ajusta si necesitas otro entorno)
+// Por defecto apunta al backend desplegado en Railway
 const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://backcomun-production.up.railway.app');
 
 

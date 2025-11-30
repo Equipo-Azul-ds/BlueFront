@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../media/presentation/blocs/media_editor_bloc.dart';
@@ -8,6 +7,7 @@ import '../blocs/quiz_editor_bloc.dart';
 import '../../domain/entities/Question.dart' as Q;
 import '../../domain/entities/Answer.dart' as A;
 import '../../domain/entities/Quiz.dart';
+ 
 import '../../../../common_widgets/media_upload.dart' as media;
 import '../../application/dtos/create_quiz_dto.dart';
 
@@ -52,8 +52,8 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
           );
         }).toList();
 
-            final newQuiz = Quiz(
-              quizId: '',
+        final newQuiz = Quiz(
+          quizId: '',
           authorId: quizBloc.currentQuiz?.authorId ?? 'author-id-placeholder',
           title: tpl.title,
           description: tpl.description,
@@ -74,6 +74,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
             _visibility = tpl.visibility;
             _status = tpl.status ?? 'draft';
             _category = tpl.category ?? 'Tecnología';
+            _selectedThemeId = tpl.themeId;
           });
           quizBloc.setCurrentQuiz(newQuiz);
         });
@@ -99,6 +100,17 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
   String _visibility = 'private';
   String _status = 'draft';
   String _category = 'Tecnología';
+  // Lista local de temas disponibles para selección en la UI
+  final List<Map<String, String>> _availableThemes = [
+    {'id': 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4', 'name': 'Estándar', 'color': '7B1FA2'},
+    {'id': 'd2ad3a12-4f1b-4c3e-9f2a-1a2b3c4d5e6f', 'name': 'Summer', 'color': '00BFA5'},
+    {'id': 'a3b9c8d7-1234-4ef0-9abc-0d1e2f3a4b5c', 'name': 'Spring', 'color': 'FFCDD2'},
+    {'id': 'b4c2d1e0-5678-49ab-8cde-9f0a1b2c3d4e', 'name': 'Winter', 'color': '90CAF9'},
+    {'id': 'c5d3e2f1-9abc-4def-8a1b-2c3d4e5f6a7b', 'name': 'Autumn', 'color': 'FFB74D'},
+    {'id': 'e6f4a3b2-0f1e-4a5b-9cde-3b4c5d6e7f8a', 'name': 'Support Ukraine', 'color': 'FFD54F'},
+  ];
+  String? _selectedThemeId;
+  
 
   Future<void> _saveQuiz() async {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
@@ -127,11 +139,30 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
       } else {
         await quizBloc.updateQuiz(quizBloc.currentQuiz!.quizId, dto);
       }
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz guardado correctamente')));
+      // Prefer not to call backend with placeholder author id. If we have a valid UUID v4
+      // authorId, refresh the list; otherwise pass the created quiz to the dashboard via
+      // route arguments so it can be shown immediately without hitting the API.
+      final created = quizBloc.currentQuiz;
+      final authorIdCandidate = created?.authorId ?? dto.authorId ?? '';
+      final uuidV4 = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
+      if (uuidV4.hasMatch(authorIdCandidate)) {
+        try {
+          await quizBloc.loadUserQuizzes(authorIdCandidate);
+        } catch (_) {}
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz guardado correctamente')));
+        Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
+      } else {
+        // No valid author id available; navigate to dashboard and pass the created quiz
+        // so the UI can display it immediately without calling the API.
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz guardado correctamente')));
+        Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false, arguments: created);
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
     }
   }
+
+  // (Template preview and apply removed; use TemplateSelectorPage instead)
 
   @override
   Widget build(BuildContext context){
@@ -140,6 +171,9 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     final quiz = quizBloc.currentQuiz;
     final slides = quiz?.questions ?? [];
     final selectedQuestion = (slides.isNotEmpty && _selectedIndex < slides.length) ? slides[_selectedIndex] : null;
+
+    // Asegurar que el selector local de tema tenga el valor actual del quiz al construir
+    _selectedThemeId ??= quiz?.themeId;
 
     // Sincronizar controller cuando cambie la pregunta seleccionada
     if (selectedQuestion != null) {
@@ -198,6 +232,46 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                       style: TextStyle(fontSize: constraints.maxWidth * 0.04),
                     ),
                     SizedBox(height: constraints.maxHeight * 0.02),
+                    // Selector de Tema (Tema visual del Kahoot)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Tema', style: TextStyle(fontSize: constraints.maxWidth * 0.04, fontWeight: FontWeight.w600)),
+                        SizedBox(height: constraints.maxHeight * 0.01),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _availableThemes.map((t) {
+                            final tid = t['id']!;
+                            final name = t['name']!;
+                            final colorHex = t['color']!;
+                            final selected = _selectedThemeId == tid;
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedThemeId = tid;
+                                });
+                                if (quizBloc.currentQuiz != null) {
+                                  quizBloc.currentQuiz!.themeId = tid;
+                                  quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                                }
+                              },
+                              child: Container(
+                                width: constraints.maxWidth * 0.28,
+                                padding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                                decoration: BoxDecoration(
+                                  color: Color(int.parse('0xFF$colorHex')),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: selected ? Border.all(color: AppColor.primary, width: 3) : null,
+                                ),
+                                child: Center(child: Text(name, style: TextStyle(color: Colors.white))),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        SizedBox(height: constraints.maxHeight * 0.02),
+                      ],
+                    ),
                     // Estado (status) y categoria del quiz
                     Row(children: [
                       Expanded(
@@ -265,6 +339,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                           quizBloc.currentQuiz!.status = _status;
                           quizBloc.currentQuiz!.category = _category;
                           quizBloc.currentQuiz!.coverImageUrl = _coverImagePath;
+                          quizBloc.currentQuiz!.themeId = (_selectedThemeId ?? quizBloc.currentQuiz!.themeId).toString();
                           quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
                         }
                         setState(()=>_step = 2);
@@ -330,7 +405,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                   mediaUrl: null,
                                   type: 'quiz',
                                   timeLimit: 30,
-                                  points: 100,
+                                  points: 1000,
                                   answers: [a1, a2],
                                 );
 
@@ -419,26 +494,29 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                 },
                               )),
                               SizedBox(width: 8),
-                              Container(width: 100, child: TextFormField(
-                                initialValue: selectedQuestion.points.toString(),
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(labelText: 'Puntos'),
-                                onChanged: (val){
-                                  final q = selectedQuestion;
-                                  final parsed = int.tryParse(val) ?? q.points;
-                                  final updated = Q.Question(
-                                    questionId: q.questionId,
-                                    quizId: q.quizId,
-                                    text: q.text,
-                                    mediaUrl: q.mediaUrl,
-                                    type: q.type,
-                                    timeLimit: q.timeLimit,
-                                    points: parsed,
-                                    answers: q.answers,
-                                  );
-                                  quizBloc.updateQuestionAt(_selectedIndex, updated);
-                                },
-                              )),
+                              Container(
+                                width: 100,
+                                child: DropdownButtonFormField<int>(
+                                  value: selectedQuestion.points,
+                                  decoration: InputDecoration(labelText: 'Puntos'),
+                                  items: [0, 1000, 2000].map((p) => DropdownMenuItem(value: p, child: Text(p.toString()))).toList(),
+                                  onChanged: (val){
+                                    if (val == null) return;
+                                    final q = selectedQuestion;
+                                    final updated = Q.Question(
+                                      questionId: q.questionId,
+                                      quizId: q.quizId,
+                                      text: q.text,
+                                      mediaUrl: q.mediaUrl,
+                                      type: q.type,
+                                      timeLimit: q.timeLimit,
+                                      points: val,
+                                      answers: q.answers,
+                                    );
+                                    quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                  },
+                                ),
+                              ),
                             ]),
                             SizedBox(height: constraints.maxHeight * 0.01),
 
@@ -600,7 +678,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                             mediaUrl: null,
                             type: 'quiz',
                             timeLimit: 30,
-                            points: 100,
+                            points: 1000,
                             answers: [a1, a2],
                           );
 

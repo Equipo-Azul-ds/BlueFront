@@ -30,8 +30,11 @@ class QuizEditorBloc extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final prevTemplate = currentQuiz?.templateId;
       final useCase = CreateQuizUsecase(repository);
       final created = await useCase.run(dto);
+      // preserve client-side template association if present
+      if (prevTemplate != null) created.templateId = prevTemplate;
       currentQuiz = created;
     } catch (e) {
       errorMessage = 'Error al crear el Quiz: $e';
@@ -66,8 +69,10 @@ class QuizEditorBloc extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final prevTemplate = currentQuiz?.templateId;
       final useCase = UpdateKahootUseCase(repository);
       final updated = await useCase.run(quizId, dto);
+      if (prevTemplate != null) updated.templateId = prevTemplate;
       currentQuiz = updated;
     } catch (e) {
       errorMessage = 'Error al actualizar el Quiz: $e';
@@ -157,7 +162,9 @@ class QuizEditorBloc extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final prevTemplate = currentQuiz!.templateId;
       final saved = await repository.save(currentQuiz!);
+      if (prevTemplate != null) saved.templateId = prevTemplate;
       currentQuiz = saved;
     } catch (e) {
       errorMessage = 'Error al persistir el quiz: $e';
