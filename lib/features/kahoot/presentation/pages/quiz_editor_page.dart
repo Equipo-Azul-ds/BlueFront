@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:typed_data';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
@@ -10,6 +11,7 @@ import '../../domain/entities/Quiz.dart';
  
 import '../../../../common_widgets/media_upload.dart' as media;
 import '../../application/dtos/create_quiz_dto.dart';
+import 'package:uuid/uuid.dart';
 
 class QuizEditorPage extends StatefulWidget{
   final Quiz? template;
@@ -52,9 +54,10 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
           );
         }).toList();
 
+        const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
         final newQuiz = Quiz(
-          quizId: '',
-          authorId: quizBloc.currentQuiz?.authorId ?? 'author-id-placeholder',
+          quizId: Uuid().v4(),
+          authorId: (quizBloc.currentQuiz?.authorId == null || (quizBloc.currentQuiz!.authorId.contains('placeholder'))) ? defaultTestAuthorId : quizBloc.currentQuiz!.authorId,
           title: tpl.title,
           description: tpl.description,
           visibility: tpl.visibility,
@@ -62,6 +65,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
           category: tpl.category,
           themeId: tpl.themeId,
           coverImageUrl: tpl.coverImageUrl,
+          isLocal: true,
           createdAt: DateTime.now(),
           questions: copiedQuestions,
         );
@@ -78,6 +82,31 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
           });
           quizBloc.setCurrentQuiz(newQuiz);
         });
+      });
+    } else {
+      // Si no hay plantilla, asegurarse de que el BLoC tenga una instancia local
+      // vacía para evitar reusar un `currentQuiz` previo (que provocaría UPDATE en vez
+      // de CREATE). Usamos `quizId` vacío y `isLocal=true` para forzar POST.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+        const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+        final newQuiz = Quiz(
+          quizId: '',
+          authorId: (quizBloc.currentQuiz?.authorId == null || (quizBloc.currentQuiz!.authorId.contains('placeholder'))) ? defaultTestAuthorId : quizBloc.currentQuiz!.authorId,
+          title: '',
+          description: '',
+          visibility: 'private',
+          status: 'draft',
+          category: 'Tecnología',
+          themeId: _selectedThemeId ?? defaultTestAuthorId,
+          coverImageUrl: null,
+          isLocal: true,
+          createdAt: DateTime.now(),
+          questions: [],
+        );
+
+        if (!mounted) return;
+        quizBloc.setCurrentQuiz(newQuiz);
       });
     }
   }
@@ -97,6 +126,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
   // Estado temporal para elementos que antes se pasaban directo al BLoC
   String? _coverImagePath;
+  Uint8List? _coverImageBytes;
   String _visibility = 'private';
   String _status = 'draft';
   String _category = 'Tecnología';
@@ -116,13 +146,45 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
     // Guardar valores del formulario
     _formKey.currentState?.save();
+    // Validate form and bail out if not valid (title length, etc.)
+    final valid = _formKey.currentState?.validate() ?? true;
+    if (!valid) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Corrige los errores del formulario antes de guardar')));
+      return;
+    }
     final values = _formKey.currentState?.value ?? {};
     final title = values['title'] as String? ?? '';
     final description = values['description'] as String? ?? '';
 
     // Construir DTO (questions se dejan vacías en esta integración mínima;
+    // Mapear preguntas y respuestas desde el currentQuiz si existen
+    List<CreateQuestionDto> mappedQuestions = [];
+    if (quizBloc.currentQuiz != null && quizBloc.currentQuiz!.questions.isNotEmpty) {
+      mappedQuestions = quizBloc.currentQuiz!.questions.map((q) {
+        final answers = q.answers.map((a) => CreateAnswerDto(
+          answerText: a.text,
+          answerImage: a.mediaUrl,
+          isCorrect: a.isCorrect,
+        )).toList();
+        return CreateQuestionDto(
+          questionText: q.text,
+          mediaUrl: q.mediaUrl,
+          questionType: q.type,
+          timeLimit: q.timeLimit,
+          points: q.points,
+          answers: answers,
+        );
+      }).toList();
+    }
+
     final dto = CreateQuizDto(
-      authorId: quizBloc.currentQuiz?.authorId ?? 'author-id-placeholder',
+      // Use a default author id for testing when currentQuiz has no valid author
+      authorId: (() {
+        const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+        final aid = quizBloc.currentQuiz?.authorId ?? '';
+        if (aid.isEmpty || aid.contains('placeholder')) return defaultTestAuthorId;
+        return aid;
+      })(),
       title: title,
       description: description,
       coverImage: _coverImagePath,
@@ -130,32 +192,136 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
       status: _status,
       category: _category,
       themeId: quizBloc.currentQuiz?.themeId, // mantiene tema si existe
-      questions: [], 
+      questions: mappedQuestions,
     );
 
     try {
-      if (quizBloc.currentQuiz == null) {
+      // Decide create vs update based on whether the current quiz is a
+      // local (unsaved/duplicated/template) instance. Local quizzes should
+      // be POSTed (create). Persisted quizzes (isLocal == false) are PUT.
+      if (quizBloc.currentQuiz == null || quizBloc.currentQuiz!.isLocal == true) {
+        print('[editor] performing CREATE (currentQuiz is local or null)');
         await quizBloc.createQuiz(dto);
+        if (quizBloc.errorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear: ${quizBloc.errorMessage}')));
+          return;
+        }
       } else {
+        print('[editor] performing UPDATE for id=${quizBloc.currentQuiz!.quizId}');
         await quizBloc.updateQuiz(quizBloc.currentQuiz!.quizId, dto);
+        if (quizBloc.errorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: ${quizBloc.errorMessage}')));
+          return;
+        }
       }
       // Prefer not to call backend with placeholder author id. If we have a valid UUID v4
       // authorId, refresh the list; otherwise pass the created quiz to the dashboard via
       // route arguments so it can be shown immediately without hitting the API.
       final created = quizBloc.currentQuiz;
-      final authorIdCandidate = created?.authorId ?? dto.authorId ?? '';
-      final uuidV4 = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
-      if (uuidV4.hasMatch(authorIdCandidate)) {
+      final authorIdCandidate = created?.authorId ?? '';
+      const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+      // Try to refresh user quizzes for a good UX. If the provided authorId
+      // is missing or is a placeholder, retry/load using the default test
+      // author id to avoid backend validation errors during testing.
+      var loaded = false;
+      if (authorIdCandidate.isNotEmpty && !authorIdCandidate.contains('placeholder')) {
         try {
           await quizBloc.loadUserQuizzes(authorIdCandidate);
-        } catch (_) {}
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz guardado correctamente')));
+          loaded = true;
+        } catch (e) {
+          print('[editor] loadUserQuizzes failed for author=$authorIdCandidate -> $e');
+        }
+      }
+
+      if (!loaded) {
+        try {
+          print('[editor] attempting loadUserQuizzes with default test author id');
+          await quizBloc.loadUserQuizzes(defaultTestAuthorId);
+          loaded = true;
+        } catch (e) {
+          print('[editor] loadUserQuizzes with default author failed -> $e');
+        }
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz guardado correctamente')));
+      print('[editor] save completed; created=${created != null ? created.quizId + " / " + created.title : "<null>"} loaded=$loaded authorCandidate=$authorIdCandidate');
+      // Normalize the quiz we pass to the dashboard: do not mark as local
+      // when returning via navigation after a successful save.
+      Quiz? nonLocalCreated;
+      if (created != null) {
+        nonLocalCreated = Quiz(
+          quizId: created.quizId,
+          authorId: created.authorId,
+          title: created.title,
+          description: created.description,
+          visibility: created.visibility,
+          status: created.status,
+          category: created.category,
+          themeId: created.themeId,
+          templateId: created.templateId,
+          coverImageUrl: created.coverImageUrl,
+          isLocal: false,
+          createdAt: created.createdAt,
+          questions: created.questions,
+        );
+        // Ensure bloc also reflects non-local state when possible
+        quizBloc.setCurrentQuiz(nonLocalCreated);
+      }
+      // If we couldn't load the remote list, pass the created quiz so dashboard
+      // can show it immediately; otherwise navigate normally.
+      if (loaded) {
+        // Ensure the created quiz is present in the loaded list; if backend
+        // didn't include it, insert it locally so Dashboard shows it.
+        if (created != null) {
+          quizBloc.userQuizzes ??= [];
+          final exists = quizBloc.userQuizzes!.any((q) => q.quizId == created.quizId || (q.title == created.title && q.createdAt.toIso8601String() == created.createdAt.toIso8601String()));
+          if (!exists) {
+            // If the created has empty quizId, keep it as local (isLocal true)
+            final toInsert = created.quizId.isEmpty
+                ? Quiz(
+                    quizId: created.quizId,
+                    authorId: created.authorId,
+                    title: created.title,
+                    description: created.description,
+                    visibility: created.visibility,
+                    status: created.status,
+                    category: created.category,
+                    themeId: created.themeId,
+                    templateId: created.templateId,
+                    coverImageUrl: created.coverImageUrl,
+                    isLocal: true,
+                    createdAt: created.createdAt,
+                    questions: created.questions,
+                  )
+                : created;
+            // If we have normalized nonLocalCreated, insert that so dashboard shows
+            // a non-local card for the newly created quiz.
+            // Always insert a fresh instance into the list to avoid later
+            // in-editor mutations modifying the list item by reference.
+            final chosen = (nonLocalCreated != null && !nonLocalCreated.quizId.isEmpty) ? nonLocalCreated : toInsert;
+            final localId = (chosen.quizId.isEmpty) ? Uuid().v4() : chosen.quizId;
+            final toStore = Quiz(
+              quizId: localId,
+              authorId: chosen.authorId,
+              title: chosen.title,
+              description: chosen.description,
+              visibility: chosen.visibility,
+              status: chosen.status,
+              category: chosen.category,
+              themeId: chosen.themeId,
+              templateId: chosen.templateId,
+              coverImageUrl: chosen.coverImageUrl,
+              isLocal: chosen.isLocal,
+              createdAt: chosen.createdAt,
+              questions: List.from(chosen.questions),
+            );
+            quizBloc.userQuizzes!.insert(0, toStore);
+            print('[editor] inserted created quiz into userQuizzes after load: id=${toStore.quizId} title=${toStore.title} isLocal=${toStore.isLocal}');
+          }
+        }
         Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false);
       } else {
-        // No valid author id available; navigate to dashboard and pass the created quiz
-        // so the UI can display it immediately without calling the API.
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz guardado correctamente')));
-        Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false, arguments: created);
+        Navigator.pushNamedAndRemoveUntil(context, '/dashboard', (route) => false, arguments: (nonLocalCreated != null && nonLocalCreated.quizId.isNotEmpty) ? nonLocalCreated : created);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
@@ -199,28 +365,72 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                 key: _formKey,
                 child: Column(
                   children:[
-                    //Subir imagen -> subimos al backend y guardamos el mediaId
-                    media.MediaUpload(onMediaSelected: (file) async {
-                      final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
-                      try {
-                        final uploaded = await mediaBloc.uploadFromXFile(file);
-                        // Guardar el id devuelto por el backend. Conservamos la variable name por compatibilidad.
-                        setState(()=> _coverImagePath = (uploaded as dynamic).id ?? (uploaded as dynamic).mediaId ?? null);
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Imagen subida')));
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error subiendo imagen: $e')));
+                    //Subir imagen -> mostramos vista previa local, subimos al backend y guardamos el mediaId o path
+                    media.MediaUpload(
+                      previewBytes: _coverImageBytes,
+                      previewUrl: (_coverImagePath != null && (_coverImagePath!.startsWith('http'))) ? _coverImagePath : null,
+                      onMediaSelected: (file) async {
+                        final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
+                        try {
+                          final bytes = await file.readAsBytes();
+                          setState((){
+                            _coverImageBytes = bytes; // show immediate local preview
+                          });
+
+                          final uploaded = await mediaBloc.uploadFromXFile(file);
+                          // uploaded may contain id and/or path/url. Prefer path if it's a URL.
+                          final uploadedMap = uploaded as dynamic;
+                          final returnedPath = (uploadedMap.path ?? uploadedMap.url ?? uploadedMap.previewPath) as String?;
+                          final returnedId = (uploadedMap.id ?? uploadedMap.mediaId) as String?;
+
+                          if (returnedPath != null && returnedPath.startsWith('http')) {
+                            // backend returned a usable public URL
+                            setState((){
+                              _coverImagePath = returnedPath;
+                              _coverImageBytes = null; // use network image
+                            });
+                            if (quizBloc.currentQuiz != null) {
+                              quizBloc.currentQuiz!.coverImageUrl = returnedPath;
+                              quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                            }
+                          } else if (returnedId != null && returnedId.isNotEmpty) {
+                            // backend returned only an id — store it and keep local preview
+                            setState(()=> _coverImagePath = returnedId);
+                            if (quizBloc.currentQuiz != null) {
+                              quizBloc.currentQuiz!.coverImageUrl = returnedId;
+                              quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                            }
+                            // Optionally try to fetch stored bytes from server (not necessary for immediate preview)
+                          } else if (returnedPath != null) {
+                            setState(()=> _coverImagePath = returnedPath);
+                            if (quizBloc.currentQuiz != null) {
+                              quizBloc.currentQuiz!.coverImageUrl = returnedPath;
+                              quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                            }
+                          }
+
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Imagen subida')));
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error subiendo imagen: $e')));
+                        }
                       }
-                    }),
+                    ),
                     SizedBox(height: constraints.maxHeight * 0.02),
                         FormBuilderTextField(
-                      name: 'title',
+                          name: 'title',
                           initialValue: quiz?.title ?? '',
-                      decoration: InputDecoration(
-                        labelText:'Titulo',
-                        contentPadding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: constraints.maxHeight * 0.015),
-                      ),
-                      style: TextStyle(fontSize: constraints.maxWidth * 0.04),
-                    ),
+                          decoration: InputDecoration(
+                            labelText:'Titulo',
+                            contentPadding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: constraints.maxHeight * 0.015),
+                          ),
+                          style: TextStyle(fontSize: constraints.maxWidth * 0.04),
+                          validator: (val) {
+                            final s = (val ?? '').toString().trim();
+                            if (s.isEmpty) return 'El título es obligatorio';
+                            if (s.length > 95) return 'El título no puede tener más de 95 caracteres';
+                            return null;
+                          },
+                        ),
                     SizedBox(height: constraints.maxHeight * 0.02),
                         FormBuilderTextField(
                       name: 'description',
@@ -378,6 +588,56 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                 child: ListView(
                   padding: EdgeInsets.all(constraints.maxWidth * 0.04),
                   children: [
+                    // Strip de slides: tarjetas grandes tipo Kahoot. Tocar selecciona para editar.
+                    if (slides.isNotEmpty)
+                      Container(
+                        height: constraints.maxHeight * 0.18,
+                        margin: EdgeInsets.only(bottom: constraints.maxHeight * 0.02),
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: slides.length,
+                          itemBuilder: (_, idx) {
+                            final s = slides[idx];
+                            final selected = idx == _selectedIndex;
+                            return GestureDetector(
+                              onTap: () => setState(() => _selectedIndex = idx),
+                              child: Container(
+                                width: constraints.maxWidth * 0.38,
+                                margin: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.02),
+                                child: Card(
+                                  color: selected ? AppColor.primary.withOpacity(0.12) : Colors.white,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: selected ? BorderSide(color: AppColor.primary, width: 2) : BorderSide(color: Colors.grey.shade200)),
+                                  child: Padding(
+                                    padding: EdgeInsets.all(constraints.maxWidth * 0.03),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            s.text,
+                                            maxLines: 3,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(fontSize: constraints.maxWidth * 0.035, fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                        SizedBox(height: constraints.maxHeight * 0.01),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('${s.answers.length} respuestas', style: TextStyle(fontSize: constraints.maxWidth * 0.03, color: Colors.grey[700])),
+                                            Icon(Icons.edit, size: constraints.maxWidth * 0.05, color: selected ? AppColor.primary : Colors.grey)
+                                          ],
+                                        )
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
                     // Formulario de slide actual con controles completos
                     Container(
                       padding: EdgeInsets.all(constraints.maxWidth * 0.04),
@@ -389,7 +649,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                             Text('Seleccione o cree una pregunta', style: TextStyle(fontSize: constraints.maxWidth * 0.045)),
                             SizedBox(height: constraints.maxHeight * 0.02),
                             ElevatedButton.icon(
-                              onPressed: () async {
+                              onPressed: () {
                                 if (quizBloc.currentQuiz == null){
                                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guarda el quiz primero (Paso 1)')));
                                   return;
@@ -409,15 +669,11 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                   answers: [a1, a2],
                                 );
 
+                                // Insert locally only; do not persist until the user saves the whole quiz
                                 quizBloc.insertQuestionAt(quizBloc.currentQuiz!.questions.length, newQ);
                                 setState(()=> _selectedIndex = quizBloc.currentQuiz!.questions.length - 1);
 
-                                try {
-                                  await quizBloc.saveCurrentQuiz();
-                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pregunta creada en el servidor')));
-                                } catch (e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear pregunta: $e')));
-                                }
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pregunta creada (local). Guarda el quiz para persistirla')));
                               },
                               icon: Icon(Icons.add),
                               label: Text('Crear pregunta'),
@@ -625,21 +881,22 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                             // Acciontes: duplica o elimina un pregunta
                             Row(children: [
                               OutlinedButton.icon(onPressed: (){
-                                final q = selectedQuestion;
-                                final now = DateTime.now().microsecondsSinceEpoch;
-                                final copied = Q.Question(
-                                  questionId: 'q_copy_$now',
-                                  quizId: quizBloc.currentQuiz!.quizId,
-                                  text: q.text,
-                                  mediaUrl: q.mediaUrl,
-                                  type: q.type,
-                                  timeLimit: q.timeLimit,
-                                  points: q.points,
-                                  answers: q.answers.map((a) => A.Answer(answerId: 'a_copy_${now}_${a.answerId}', questionId: 'q_copy_$now', isCorrect: a.isCorrect, text: a.text, mediaUrl: a.mediaUrl)).toList(),
-                                );
-                                quizBloc.insertQuestionAt(_selectedIndex+1, copied);
-                                setState(()=> _selectedIndex = _selectedIndex+1);
-                              }, icon: Icon(Icons.copy), label: Text('Duplicar')),
+                                  final q = selectedQuestion;
+                                  final now = DateTime.now().microsecondsSinceEpoch;
+                                  final copied = Q.Question(
+                                    questionId: 'q_copy_$now',
+                                    quizId: quizBloc.currentQuiz!.quizId,
+                                    text: q.text,
+                                    mediaUrl: q.mediaUrl,
+                                    type: q.type,
+                                    timeLimit: q.timeLimit,
+                                    points: q.points,
+                                    answers: q.answers.map((a) => A.Answer(answerId: 'a_copy_${now}_${a.answerId}', questionId: 'q_copy_$now', isCorrect: a.isCorrect, text: a.text, mediaUrl: a.mediaUrl)).toList(),
+                                  );
+                                  // Insert locally only
+                                  quizBloc.insertQuestionAt(_selectedIndex+1, copied);
+                                  setState(()=> _selectedIndex = _selectedIndex+1);
+                                }, icon: Icon(Icons.copy), label: Text('Duplicar')),
                               SizedBox(width: 8),
                               OutlinedButton.icon(onPressed: (){
                                 quizBloc.removeQuestionAt(_selectedIndex);
@@ -661,7 +918,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                   itemBuilder: (contact, index){
                     if(index == slides.length){
                       return IconButton(
-                        onPressed: () async {
+                        onPressed: () {
                           if (quizBloc.currentQuiz == null){
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guarda el quiz primero (Paso 1)')));
                             return;
@@ -684,13 +941,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
                           quizBloc.insertQuestionAt(quizBloc.currentQuiz!.questions.length, newQ);
                           setState(()=> _selectedIndex = quizBloc.currentQuiz!.questions.length - 1);
-
-                          try {
-                            await quizBloc.saveCurrentQuiz();
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pregunta creada en el servidor')));
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear pregunta: $e')));
-                          }
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pregunta creada (local). Guarda el quiz para persistirla')));
                         },
                         icon: Icon(Icons.add),
                         iconSize: constraints.maxWidth * 0.06);

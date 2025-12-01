@@ -109,7 +109,72 @@ class QuizEditorBloc extends ChangeNotifier {
 
     try {
       final useCase = ListUserKahootsUseCase(repository);
-      userQuizzes = await useCase.run(authorId);
+      final fetched = await useCase.run(authorId);
+
+      // Merge fetched quizzes with any existing local list to avoid
+      // losing items that might be client-only or not returned by the
+      // backend in every response. Matching strategy:
+      // - If both have non-empty quizId, match by quizId and prefer server version.
+      // - For empty ids (local items), match by title+createdAt signature.
+      userQuizzes ??= [];
+
+      // Build maps for quick lookup
+      final existingById = <String, Quiz>{};
+      final existingBySig = <String, Quiz>{};
+      for (final q in userQuizzes!) {
+        if (q.quizId.isNotEmpty) existingById[q.quizId] = q;
+        final sig = '${q.title.trim()}|${q.createdAt.toIso8601String()}|${q.coverImageUrl ?? ''}';
+        existingBySig[sig] = q;
+      }
+
+      // Start with server list, but ensure local-only items are preserved
+      final merged = <Quiz>[];
+      for (final s in fetched) {
+        if (s.quizId.isNotEmpty && existingById.containsKey(s.quizId)) {
+          // prefer server version but keep local reference semantics minimal
+          merged.add(s);
+          existingById.remove(s.quizId);
+        } else {
+          final sig = '${s.title.trim()}|${s.createdAt.toIso8601String()}|${s.coverImageUrl ?? ''}';
+          if (existingBySig.containsKey(sig)) {
+            // server returned an item that matches a local signature — prefer server
+            merged.add(s);
+            existingBySig.remove(sig);
+          } else {
+            // new server item
+            merged.add(s);
+          }
+        }
+      }
+
+      // Append any remaining local-only items that the server didn't return
+      for (final leftover in existingById.values) {
+        merged.insert(0, leftover);
+      }
+      for (final leftover in existingBySig.values) {
+        merged.insert(0, leftover);
+      }
+
+      // Deduplicate the merged list: prefer unique `quizId` when present,
+      // otherwise use a signature based on title+createdAt+cover to identify local items.
+      final seenIds = <String>{};
+      final seenSigs = <String>{};
+      final deduped = <Quiz>[];
+      for (final q in merged) {
+        final id = q.quizId;
+        final sig = '${q.title.trim()}|${q.createdAt.toIso8601String()}|${q.coverImageUrl ?? ''}';
+        if (id.isNotEmpty) {
+          if (seenIds.contains(id)) continue;
+          seenIds.add(id);
+          deduped.add(q);
+        } else {
+          if (seenSigs.contains(sig)) continue;
+          seenSigs.add(sig);
+          deduped.add(q);
+        }
+      }
+
+      userQuizzes = deduped;
     } catch (e) {
       errorMessage = 'Error al listar quizzes: $e';
     } finally {

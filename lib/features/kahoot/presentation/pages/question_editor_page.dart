@@ -1,11 +1,9 @@
 // lib/features/kahoot/presentation/pages/question_editor_page.dart
 import 'dart:io';
-import 'dart:typed_data';
-
+ 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../../common_widgets/media_upload.dart' as media_widget;
 import '../../application/dtos/create_quiz_dto.dart';
 import '../../application/dtos/create_quiz_dto.dart' show CreateQuestionDto, CreateAnswerDto;
 import '../blocs/quiz_editor_bloc.dart';
@@ -38,10 +36,13 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
     super.didChangeDependencies();
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
     final quiz = quizBloc.currentQuiz;
-    final q = quiz?.questions.firstWhere((q) => q.questionId == widget.questionId, orElse: () => null as dynamic);
-    if (q != null) {
-      _textController.text = q.text ?? '';
-      _mediaPath = q.mediaUrl;
+    if (quiz != null) {
+      final idx = quiz.questions.indexWhere((qq) => qq.questionId == widget.questionId);
+      if (idx != -1) {
+        final q = quiz.questions[idx];
+        _textController.text = q.text;
+        _mediaPath = q.mediaUrl;
+      }
     }
   }
 
@@ -171,14 +172,21 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
   Widget build(BuildContext context) {
     final quizBloc = Provider.of<QuizEditorBloc>(context);
     final quiz = quizBloc.currentQuiz;
-    final question = quiz?.questions.firstWhere((q) => q.questionId == widget.questionId, orElse: () => null as dynamic);
-
-    if (quiz == null || question == null) {
+    if (quiz == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Editor de Pregunta')),
         body: const Center(child: Text('Pregunta o Quiz no encontrados')),
       );
     }
+
+    final idx = quiz.questions.indexWhere((qq) => qq.questionId == widget.questionId);
+    if (idx == -1) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Editor de Pregunta')),
+        body: const Center(child: Text('Pregunta o Quiz no encontrados')),
+      );
+    }
+
 
     return Scaffold(
       appBar: AppBar(title: const Text('Editor de Pregunta')),

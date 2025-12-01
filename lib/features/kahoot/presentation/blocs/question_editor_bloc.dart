@@ -1,11 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../domain/entities/Quiz.dart';
-import '../../domain/entities/Question.dart' as Q;
-import '../../domain/entities/Answer.dart' as A;
+// Domain entity types are accessed via the QuizEditorBloc; no direct imports needed here.
 import '../../application/dtos/create_quiz_dto.dart';
 import '../../application/dtos/create_quiz_dto.dart' show CreateQuestionDto, CreateAnswerDto;
 import '../blocs/quiz_editor_bloc.dart';
@@ -43,10 +39,11 @@ class QuestionEditorBloc extends ChangeNotifier {
     final quiz = quizBloc.currentQuiz;
     if (quiz == null || questionId == null) return;
 
-    final q = quiz.questions.firstWhere((qq) => qq.questionId == questionId, orElse: () => null as dynamic);
-    if (q == null) return;
+    final idx = quiz.questions.indexWhere((qq) => qq.questionId == questionId);
+    if (idx == -1) return;
+    final q = quiz.questions[idx];
 
-    text = q.text ?? '';
+    text = q.text;
     mediaUrl = q.mediaUrl;
     answers = q.answers.map((a) => _EditableAnswer(
       answerId: a.answerId,

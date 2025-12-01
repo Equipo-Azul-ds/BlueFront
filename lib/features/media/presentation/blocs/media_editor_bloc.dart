@@ -7,8 +7,7 @@ import '../../application/dtos/upload_media_dto.dart';
 import '../../application/upload_media_usecase.dart';
 import '../../application/get_media_usecase.dart';
 import '../../application/delete_media_usecase.dart';
-import '../../infrastructure/repositories/Media_Repository_Impl.dart';
-import '../../infrastructure/repositories/Storage_Provider_Repository_Impl.dart';
+// repository implementations are injected via usecases/providers; do not import here.
 
 /// Bloc responsable de operaciones de media (upload / get / delete).
 /// Inyecta las implementaciones de repositorios (o sus interfaces).

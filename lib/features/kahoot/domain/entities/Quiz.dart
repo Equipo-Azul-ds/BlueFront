@@ -9,6 +9,8 @@ class Quiz {
   String? status; // 'draft' | 'published'
   String? category;
   String themeId;
+  // Marca explícita para indicar que este quiz es local/no persistido aún.
+  final bool isLocal;
   // Optional local template id (not sent to backend). Used for client-side previews.
   String? templateId;
   String? coverImageUrl;
@@ -26,6 +28,7 @@ class Quiz {
     required this.themeId,
     this.templateId,
     this.coverImageUrl,
+    this.isLocal = false,
     required this.createdAt,
     required this.questions,
   });
@@ -40,6 +43,7 @@ class Quiz {
       status: json['status'],
       category: json['category'],
       themeId: json['themeId'],
+      isLocal: false,
       templateId: json['templateId'],
       coverImageUrl: json['coverImageUrl'] ?? json['coverImage'] ?? json['cover_image'],
       createdAt: DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
@@ -58,6 +62,9 @@ class Quiz {
       'category': category,
       'themeId': themeId,
       'coverImageUrl': coverImageUrl,
+      // isLocal is client-only and deliberately not sent to backend by default,
+      // but we include it here for completeness in local storage scenarios.
+      'isLocal': isLocal,
       'createdAt': createdAt.toIso8601String(),
       'questions': questions.map((q) => q.toJson()).toList(),
     };

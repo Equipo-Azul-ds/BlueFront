@@ -73,7 +73,19 @@ class MyApp extends StatelessWidget {
             '/create': (context) {
               final args = ModalRoute.of(context)?.settings.arguments;
               Quiz? template;
+              bool explicitClear = false;
               if (args is Quiz) template = args;
+              if (args is Map && args['clear'] == true) explicitClear = true;
+              // Si no se pasa plantilla, limpiamos cualquier quiz en edición previo
+              // cuando se pida explícitamente limpiar (via FAB / create),
+              // o cuando no haya un `currentQuiz` establecido, o cuando el
+              // `currentQuiz` tenga un id vacío (indica una instancia local
+              // que no debe reutilizarse para una nueva creación).
+              final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+              final shouldClear = template == null && (explicitClear || quizBloc.currentQuiz == null || (quizBloc.currentQuiz?.quizId.isEmpty ?? false));
+              if (shouldClear) {
+                quizBloc.clear();
+              }
               return QuizEditorPage(template: template);
             },
             '/questionEditor': (context) {

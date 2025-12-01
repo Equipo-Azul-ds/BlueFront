@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../core/constants/colors.dart';
 import '../features/kahoot/domain/entities/Quiz.dart';
+import 'package:uuid/uuid.dart';
 
 /// Página que muestra plantillas visuales para que el usuario elija
 /// Al seleccionar "Usar plantilla" devuelve por `Navigator.pop(context, Quiz)`
@@ -57,9 +57,9 @@ class TemplateSelectorPage extends StatelessWidget {
           TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Cerrar')),
           ElevatedButton(onPressed: () {
             Navigator.of(context).pop();
-            // Build a Quiz instance populated with template metadata and return it
+            // Cree una instancia de Quiz rellena con metadatos de plantilla y devuélvala
             final quiz = Quiz(
-              quizId: '',
+              quizId: Uuid().v4(),
               authorId: 'author-id-placeholder',
               title: tpl['title'] ?? '',
               description: tpl['description'] ?? '',
@@ -69,6 +69,7 @@ class TemplateSelectorPage extends StatelessWidget {
               themeId: tpl['themeId'] ?? '',
               templateId: tpl['id'],
               coverImageUrl: tpl['image'],
+              isLocal: true,
               createdAt: DateTime.now(),
               questions: [],
             );
@@ -119,7 +120,7 @@ class TemplateSelectorPage extends StatelessWidget {
                           TextButton(onPressed: () => _showPreview(context, tpl), child: Text('Vista previa')),
                           ElevatedButton(onPressed: () {
                             final quiz = Quiz(
-                              quizId: '',
+                              quizId: Uuid().v4(),
                               authorId: 'author-id-placeholder',
                               title: tpl['title'] ?? '',
                               description: tpl['description'] ?? '',
@@ -129,6 +130,7 @@ class TemplateSelectorPage extends StatelessWidget {
                               themeId: tpl['themeId'] ?? '',
                               templateId: tpl['id'],
                               coverImageUrl: tpl['image'],
+                              isLocal: true,
                               createdAt: DateTime.now(),
                               questions: [],
                             );

@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class Answer{
   final String answerId;
   final String questionId;
