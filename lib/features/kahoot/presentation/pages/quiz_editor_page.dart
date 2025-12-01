@@ -144,17 +144,27 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
   Future<void> _saveQuiz() async {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
-    // Guardar valores del formulario
-    _formKey.currentState?.save();
-    // Validate form and bail out if not valid (title length, etc.)
-    final valid = _formKey.currentState?.validate() ?? true;
-    if (!valid) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Corrige los errores del formulario antes de guardar')));
-      return;
+    // Try to read form values if the form is present (step 1). If the form
+    // is not mounted (we're in step 2), fall back to the values already stored
+    // in `quizBloc.currentQuiz` so saving still works.
+    String title = '';
+    String description = '';
+    // Attempt to save/validate only if the form exists in the tree
+    if (_formKey.currentState != null) {
+      _formKey.currentState?.save();
+      final valid = _formKey.currentState?.validate() ?? true;
+      if (!valid) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Corrige los errores del formulario antes de guardar')));
+        return;
+      }
+      final values = _formKey.currentState?.value ?? {};
+      title = values['title'] as String? ?? '';
+      description = values['description'] as String? ?? '';
     }
-    final values = _formKey.currentState?.value ?? {};
-    final title = values['title'] as String? ?? '';
-    final description = values['description'] as String? ?? '';
+
+    // If form didn't provide values (e.g., user is on step 2), use currentQuiz fields
+    if (title.isEmpty) title = quizBloc.currentQuiz?.title ?? '';
+    if (description.isEmpty) description = quizBloc.currentQuiz?.description ?? '';
 
     // Construir DTO (questions se dejan vacías en esta integración mínima;
     // Mapear preguntas y respuestas desde el currentQuiz si existen
@@ -187,11 +197,11 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
       })(),
       title: title,
       description: description,
-      coverImage: _coverImagePath,
-      visibility: _visibility,
-      status: _status,
-      category: _category,
-      themeId: quizBloc.currentQuiz?.themeId, // mantiene tema si existe
+      coverImage: quizBloc.currentQuiz?.coverImageUrl ?? _coverImagePath,
+      visibility: quizBloc.currentQuiz?.visibility ?? _visibility,
+      status: quizBloc.currentQuiz?.status ?? _status,
+      category: quizBloc.currentQuiz?.category ?? _category,
+      themeId: quizBloc.currentQuiz?.themeId ?? _selectedThemeId, // mantiene tema si existe
       questions: mappedQuestions,
     );
 
@@ -201,6 +211,11 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
       // be POSTed (create). Persisted quizzes (isLocal == false) are PUT.
       if (quizBloc.currentQuiz == null || quizBloc.currentQuiz!.isLocal == true) {
         print('[editor] performing CREATE (currentQuiz is local or null)');
+        try {
+          // Debug: log DTO contents to ensure fields from the form are captured
+          print('[editor][DEBUG] DTO title raw: "${dto.title}" length=${dto.title.length}');
+          print('[editor][DEBUG] DTO preview JSON: ${dto.toJson()}');
+        } catch (_) {}
         await quizBloc.createQuiz(dto);
         if (quizBloc.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al crear: ${quizBloc.errorMessage}')));
