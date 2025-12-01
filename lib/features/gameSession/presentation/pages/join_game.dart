@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '/features/challenge/presentation/pages/single_player_lobby.dart'; // Asegurate de tener esta pantalla creada
+import 'fake_quiz_data_temporary.dart';
 
 class JoinGameScreen extends StatefulWidget {
   // Se removera despues al elaborar las rutas
@@ -15,12 +16,17 @@ class JoinGameScreenState extends State<JoinGameScreen> {
     // Logica de presionar PIN - por ahora va a pantallas de challenge
     // No deberia de hacer esto pero es para propositos de demostracion hasta que la pantalla de liberia o discovery existan
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const SinglePlayerLobbyScreen()),
-    );
+      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
   }
 
   void onScanQrPressed() {
-    print('siuuuuuuuu');
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      );
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => const SinglePlayerLobbyScreen()),
+    );  
   }
 
   @override
@@ -149,7 +155,7 @@ class JoinGameScreenState extends State<JoinGameScreen> {
                       ),
                       icon: const Icon(Icons.qr_code_scanner, size: 22),
                       label: const Text(
-                        "Escanear código QR",
+                        "(Temporal) Prueba de Single Player",
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,

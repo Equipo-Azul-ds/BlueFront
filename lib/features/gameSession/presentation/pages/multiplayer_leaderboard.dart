@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 const Color purpleDark = Color(0xFF4B0082);
 const Color purpleLight = Color(0xFF8A2BE2);
 
-class SinglePlayerLeaderboardScreen extends StatelessWidget {
+class MultiplayerLeaderboardScreen extends StatelessWidget {
   final String nickname;
   final int finalScore;
   final int totalQuestions;
   final int correctAnswers;
 
-  const SinglePlayerLeaderboardScreen({
+  const MultiplayerLeaderboardScreen({
     super.key,
     required this.nickname,
     required this.finalScore,

@@ -1,0 +1,101 @@
+import 'package:flutter/foundation.dart';
+
+enum GameStateType {
+  lobby,
+  questions,
+  results,
+  end,
+}
+
+// AGGREGATE
+class MultiplayerSession {
+  final MultiplayerSessionId sessionId;
+  final UserId hostId;
+  final QuizId quizId;
+  final GamePin gamePin;
+  final DateTime startedAt;
+  final GameState gameState;
+  final int numberOfSlides;
+  final int currentSlideIndex;
+  
+  final Map<UserId, Player> players;
+  final Map<QuestionId, QuestionResults> sessionAnswers;
+
+  const MultiplayerSession({
+    required this.sessionId,
+    required this.hostId,
+    required this.quizId,
+    required this.gamePin,
+    required this.startedAt,
+    required this.gameState,
+    required this.numberOfSlides,
+    required this.currentSlideIndex,
+    required this.players,
+    required this.sessionAnswers,
+  });
+}
+
+// VALUE OBJECTS & ENTITIES
+class GamePin {
+  final int pin;
+
+  const GamePin({required this.pin});
+}
+
+class GameState {
+  final GameStateType state;
+
+  const GameState({required this.state});
+}
+
+class PlayerAnswer {
+  final UserId playerId;
+  final QuestionId questionId;
+  final int? answerIndex;
+  final int timeUsedMs;
+
+  const PlayerAnswer({
+    required this.playerId,
+    required this.questionId,
+    this.answerIndex,
+    required this.timeUsedMs,
+  });
+}
+
+class EvaluatedAnswer {
+  final UserId playerId;
+  final bool wasCorrect;
+  final int pointsEarned;
+
+  const EvaluatedAnswer({
+    required this.playerId,
+    required this.wasCorrect,
+    required this.pointsEarned,
+  });
+}
+
+class QuestionResults {
+  final QuestionId questionId;
+  final Map<UserId, PlayerAnswer> answers;
+  final Map<UserId, EvaluatedAnswer> evaluatedAnswers;
+
+  const QuestionResults({
+    required this.questionId,
+    required this.answers,
+    required this.evaluatedAnswers,
+  });
+}
+
+class Player {
+  final UserId playerId;
+  final String nickname;
+  final int score;
+  final int streak;
+
+  const Player({
+    required this.playerId,
+    required this.nickname,
+    this.score = 0,
+    this.streak = 0,
+  });
+}

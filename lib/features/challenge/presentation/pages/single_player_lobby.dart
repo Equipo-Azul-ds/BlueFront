@@ -14,7 +14,6 @@ class SinglePlayerLobbyScreen extends StatefulWidget {
 class SinglePlayerLobbyScreenState extends State<SinglePlayerLobbyScreen> {
   final TextEditingController nicknameController = TextEditingController();
   // Mock de Jugadores
-  final List<String> examplePlayers = ['Nancy', 'Robyn', 'Shima', 'Mal'];
   String nickname = '';
 
   void onStartPressed() {
@@ -150,22 +149,6 @@ class SinglePlayerLobbyScreenState extends State<SinglePlayerLobbyScreen> {
                           ),
                         ),
                         const SizedBox(height: 40),
-
-                        // Mock para mostrar los nicknames de jugadores
-                        Wrap(
-                          spacing: 12.0,
-                          runSpacing: 12.0,
-                          alignment: WrapAlignment.center,
-                          children: examplePlayers.map((name) {
-                            return Chip(
-                              label: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              backgroundColor: Colors.white,
-                              labelStyle: const TextStyle(color: purpleDark),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                            );
-                          }).toList(),
-                        ),
                       ],
                     ),
 
@@ -174,14 +157,6 @@ class SinglePlayerLobbyScreenState extends State<SinglePlayerLobbyScreen> {
                       padding: const EdgeInsets.only(bottom: 50.0),
                       child: Column(
                         children: [
-                          const Text(
-                            'Unirse al juego',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
                           const SizedBox(height: 15),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
