@@ -84,11 +84,13 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
         });
       });
     } else {
-      // Si no hay plantilla, asegurarse de que el BLoC tenga una instancia local
-      // vacía para evitar reusar un `currentQuiz` previo (que provocaría UPDATE en vez
-      // de CREATE). Usamos `quizId` vacío y `isLocal=true` para forzar POST.
+      // Si no hay plantilla, sólo inicializar un quiz local vacío si el BLoC
+      // no tiene ya un `currentQuiz` (por ejemplo cuando venimos del flujo
+      // de edición y ya cargamos el quiz remoto). Esto evita sobreescribir
+      // la entidad cargada que debe editarse.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+        if (quizBloc.currentQuiz != null) return; // ya hay un quiz cargado -> no sobrescribir
         const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
         final newQuiz = Quiz(
           quizId: '',
@@ -166,6 +168,13 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     if (title.isEmpty) title = quizBloc.currentQuiz?.title ?? '';
     if (description.isEmpty) description = quizBloc.currentQuiz?.description ?? '';
 
+    // Normalize title (trim) and refuse to save empty titles early with a clear UI message.
+    title = title.trim();
+    if (title.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El título no puede estar vacío')));
+      return;
+    }
+
     // Construir DTO (questions se dejan vacías en esta integración mínima;
     // Mapear preguntas y respuestas desde el currentQuiz si existen
     List<CreateQuestionDto> mappedQuestions = [];
@@ -223,9 +232,21 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
         }
       } else {
         print('[editor] performing UPDATE for id=${quizBloc.currentQuiz!.quizId}');
-        await quizBloc.updateQuiz(quizBloc.currentQuiz!.quizId, dto);
-        if (quizBloc.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: ${quizBloc.errorMessage}')));
+        try {
+          // Always log DTO for updates as well — helps debug title/fields sent to backend.
+          try {
+            print('[editor][DEBUG] DTO title raw: "${dto.title}" length=${dto.title.length}');
+            print('[editor][DEBUG] DTO preview JSON: ${dto.toJson()}');
+          } catch (_) {}
+
+          await quizBloc.updateQuiz(quizBloc.currentQuiz!.quizId, dto);
+          if (quizBloc.errorMessage != null) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: ${quizBloc.errorMessage}')));
+            return;
+          }
+        } catch (e) {
+          // If update fails with a validation message coming from usecase/repo, surface it
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
           return;
         }
       }

@@ -233,11 +233,22 @@ class _DashboardPageState extends State<DashboardPage> {
                                 Expanded(child: Text(q.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
                                 IconButton(
                                   icon: Icon(Icons.edit),
-                                  onPressed: () {
-                                    // Prepare editor with the selected quiz and navigate
-                                    quizBloc.setCurrentQuiz(q);
+                                  onPressed: () async {
+                                    // Close the bottom sheet first to avoid triggering bloc notifications
                                     Navigator.of(ctx).pop();
-                                    Navigator.pushNamed(context, '/create');
+                                    try {
+                                      if (q.quizId.isNotEmpty && !q.isLocal) {
+                                        // Load full quiz into the bloc (will update currentQuiz)
+                                        await quizBloc.loadQuiz(q.quizId);
+                                      } else {
+                                        // Use provided object for local items; schedule setCurrentQuiz after frame
+                                        WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
+                                      }
+                                      Navigator.pushNamed(context, '/create');
+                                    } catch (e) {
+                                      print('[dashboard] failed to load quiz for edit id=${q.quizId} -> $e');
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando el quiz para edición: $e')));
+                                    }
                                   },
                                 ),
                               ],
@@ -264,10 +275,20 @@ class _DashboardPageState extends State<DashboardPage> {
                         child: SizedBox(
                           height: 48,
                           child: ElevatedButton.icon(
-                            onPressed: () {
-                              quizBloc.setCurrentQuiz(q);
+                            onPressed: () async {
+                              // Close bottom sheet first to avoid notifyDuringBuild
                               Navigator.of(ctx).pop();
-                              Navigator.pushNamed(context, '/create');
+                              try {
+                                if (q.quizId.isNotEmpty && !q.isLocal) {
+                                  await quizBloc.loadQuiz(q.quizId);
+                                } else {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
+                                }
+                                Navigator.pushNamed(context, '/create');
+                              } catch (e) {
+                                print('[dashboard] failed to load quiz for edit (button) id=${q.quizId} -> $e');
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando el quiz para edición: $e')));
+                              }
                             },
                             icon: Icon(Icons.edit, size: 20),
                             label: Text('Editar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
