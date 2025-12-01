@@ -9,6 +9,7 @@ class Kahoot{
   final List<String> themes;
   final String authorId;
   final DateTime createdAt;
+  final int? playCount;
 
   Kahoot({
     required this.id,
@@ -20,6 +21,7 @@ class Kahoot{
     required this.themes,
     required this.authorId,
     required this.createdAt,
+    this.playCount
 });
 
     //Metodo para copiar con cambios (inmutable)
