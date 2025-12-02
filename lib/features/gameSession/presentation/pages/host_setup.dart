@@ -21,10 +21,18 @@ class HostSetupScreen extends StatelessWidget {
           Expanded(
             child: PageView(
               children: [
-                _buildModeCard("Classic mode", "Competition",
-                    "Player vs Player", Icons.devices),
                 _buildModeCard(
-                    "Team mode", "Collaboration", "Team vs Team", Icons.groups),
+                  "Classic mode",
+                  "Competition",
+                  "Player vs Player",
+                  Icons.devices,
+                ),
+                _buildModeCard(
+                  "Team mode",
+                  "Collaboration",
+                  "Team vs Team",
+                  Icons.groups,
+                ),
               ],
             ),
           ),
@@ -38,58 +46,69 @@ class HostSetupScreen extends StatelessWidget {
                   backgroundColor: Colors.white,
                   foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 onPressed: () {
                   Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const HostLobbyScreen()));
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HostLobbyScreen(),
+                    ),
+                  );
                 },
-                child: const Text("Start",
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  "Start",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildModeCard(
-      String title, String tag, String desc, IconData icon) {
+  Widget _buildModeCard(String title, String tag, String desc, IconData icon) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-          color: kDarkPurple.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(20),
-          image: const DecorationImage(
-            image: NetworkImage(
-                "https://picsum.photos/seed/kahoot/400/300"), // Placeholder for the classroom BG
-            fit: BoxFit.cover,
-            opacity: 0.4,
-          )),
+        color: kDarkPurple.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(20),
+        image: const DecorationImage(
+          image: NetworkImage("https://picsum.photos/seed/kahoot/400/300"),
+          fit: BoxFit.cover,
+          opacity: 0.4,
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold)),
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 10),
-          Row(children: [
-            Chip(
+          Row(
+            children: [
+              Chip(
                 label: Text(tag),
-                backgroundColor: Colors.white.withOpacity(0.2),
-                labelStyle: const TextStyle(color: Colors.white)),
-          ]),
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                labelStyle: const TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
-          Text(desc,
-              style: const TextStyle(color: Colors.white70, fontSize: 16)),
+          Text(
+            desc,
+            style: const TextStyle(color: Colors.white70, fontSize: 16),
+          ),
         ],
       ),
     );

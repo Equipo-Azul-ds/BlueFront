@@ -12,34 +12,43 @@ class HostLobbyScreen extends StatelessWidget {
       backgroundColor: kPurple,
       body: Stack(
         children: [
-          // Background Animation effect placeholder
           Column(
             children: [
               const SizedBox(height: 60),
               // PIN Banner
               Center(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(4)),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
                   child: Column(
                     children: [
-                      const Text("Game PIN:",
-                          style: TextStyle(
-                              color: Colors.grey, fontWeight: FontWeight.bold)),
-                      const Text("572 5069",
-                          style: TextStyle(
-                              color: kPurple,
-                              fontSize: 40,
-                              fontWeight: FontWeight.w900)),
+                      const Text(
+                        "Game PIN:",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Text(
+                        "572 5069",
+                        style: TextStyle(
+                          color: kPurple,
+                          fontSize: 40,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
               const Spacer(),
-              // Player Grid (Mock)
+              // Player Grid
               Wrap(
                 spacing: 20,
                 runSpacing: 20,
@@ -58,20 +67,24 @@ class HostLobbyScreen extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const HostGameScreen()));
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HostGameScreen(),
+                  ),
+                );
               },
               icon: const Icon(Icons.play_arrow),
               label: const Text("Start"),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 15,
+                ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -81,13 +94,18 @@ class HostLobbyScreen extends StatelessWidget {
     return Column(
       children: [
         const CircleAvatar(
-            backgroundColor: Colors.white,
-            radius: 25,
-            child: Icon(Icons.emoji_emotions, color: kPurple)),
+          backgroundColor: Colors.white,
+          radius: 25,
+          child: Icon(Icons.emoji_emotions, color: kPurple),
+        ),
         const SizedBox(height: 5),
-        Text(name,
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+        Text(
+          name,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }

@@ -14,19 +14,23 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
     required this.nickname,
     required this.finalScore,
     required this.totalQuestions,
-    required this.correctAnswers, 
+    required this.correctAnswers,
   });
 
-// Prefijos
+  // Prefijos
   String getOrdinal(int n) {
     if (n >= 11 && n <= 13) {
       return 'vo';
     }
     switch (n % 10) {
-      case 1: return 'er';
-      case 2: return 'do';
-      case 3: return 'ro';
-      default: return 'to';
+      case 1:
+        return 'er';
+      case 2:
+        return 'do';
+      case 3:
+        return 'ro';
+      default:
+        return 'to';
     }
   }
 
@@ -63,22 +67,28 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
   Map<String, dynamic> getUserData(List<Map<String, dynamic>> fullLeaderboard) {
     return fullLeaderboard.firstWhere(
       (p) => p['name'] == nickname && p['score'] == finalScore,
-      orElse: () => {'name': nickname, 'score': finalScore, 'rank': fullLeaderboard.length, 'correct': correctAnswers},
+      orElse: () => {
+        'name': nickname,
+        'score': finalScore,
+        'rank': fullLeaderboard.length,
+        'correct': correctAnswers,
+      },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
     // 1. Genera el leaderboard completo y dinámico
     final List<Map<String, dynamic>> fullLeaderboard = dynamicLeaderboard;
-    
+
     // 2. Obtiene los datos específicos para el usuario
     final Map<String, dynamic> userData = getUserData(fullLeaderboard);
     final int userRank = userData['rank'];
-    
+
     // 3. Extrae un top 3
-    final List<Map<String, dynamic>> topPlayers = fullLeaderboard.take(3).toList();
+    final List<Map<String, dynamic>> topPlayers = fullLeaderboard
+        .take(3)
+        .toList();
 
     // 4. Ordena los widgets por orden de top ranking y guarda el orden
     List<Widget> podiumColumns = [];
@@ -87,22 +97,39 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
     const int firstPlaceIndex = 0;
     const int secondPlaceIndex = 1;
     const int thirdPlaceIndex = 2;
-    
+
     // Verifica el 2do Lugar (índice 1) - VISUALMENTE IZQUIERDA
     if (topPlayers.length > secondPlaceIndex) {
-      podiumColumns.add(buildPodiumColumn(context, topPlayers[secondPlaceIndex], heightFactor: 0.8)); 
-    }
-    
-    // Verifica el 1er Lugar (índice 0) - VISUALMENTE CENTRO
-    if (topPlayers.length > firstPlaceIndex) {
-      podiumColumns.add(buildPodiumColumn(context, topPlayers[firstPlaceIndex], heightFactor: 1.0));
-    }
-    
-    // Verifica el 3er Lugar (index 2) - VISUALEMNTE DERECHA
-    if (topPlayers.length > thirdPlaceIndex) {
-      podiumColumns.add(buildPodiumColumn(context, topPlayers[thirdPlaceIndex], heightFactor: 0.6));
+      podiumColumns.add(
+        buildPodiumColumn(
+          context,
+          topPlayers[secondPlaceIndex],
+          heightFactor: 0.8,
+        ),
+      );
     }
 
+    // Verifica el 1er Lugar (índice 0) - VISUALMENTE CENTRO
+    if (topPlayers.length > firstPlaceIndex) {
+      podiumColumns.add(
+        buildPodiumColumn(
+          context,
+          topPlayers[firstPlaceIndex],
+          heightFactor: 1.0,
+        ),
+      );
+    }
+
+    // Verifica el 3er Lugar (index 2) - VISUALEMNTE DERECHA
+    if (topPlayers.length > thirdPlaceIndex) {
+      podiumColumns.add(
+        buildPodiumColumn(
+          context,
+          topPlayers[thirdPlaceIndex],
+          heightFactor: 0.6,
+        ),
+      );
+    }
 
     return Scaffold(
       body: Container(
@@ -134,7 +161,10 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
                     const SizedBox(height: 10),
                     // Titulo del Quiz
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(5),
@@ -165,7 +195,10 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(bottom: 20.0),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(50),
@@ -173,15 +206,24 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
                         child: Text.rich(
                           TextSpan(
                             text: "Estas en ",
-                            style: const TextStyle(color: Colors.white, fontSize: 18),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                            ),
                             children: [
                               TextSpan(
                                 text: '$userRank${getOrdinal(userRank)} lugar',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 20,
+                                ),
                               ),
                               TextSpan(
                                 text: ' con $finalScore puntos!',
-                                style: const TextStyle(color: Colors.white, fontSize: 18),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                ),
                               ),
                             ],
                           ),
@@ -196,18 +238,25 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           // Navegar de regreso a la pantalla de unión o al menú principal
-                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          Navigator.of(
+                            context,
+                          ).popUntil((route) => route.isFirst);
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: purpleDark,
                           minimumSize: const Size(200, 50),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           elevation: 10,
                         ),
                         child: const Text(
                           'Jugar otra vez',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -222,14 +271,27 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
   }
 
   // Construye los podiums individuales
-  Widget buildPodiumColumn(BuildContext context, Map<String, dynamic> player, {required double heightFactor}) {
+  Widget buildPodiumColumn(
+    BuildContext context,
+    Map<String, dynamic> player, {
+    required double heightFactor,
+  }) {
     final int rank = player['rank'];
-    final Color rankColor = rank == 1 ? const Color(0xFFFFCC00) : rank == 2 ? const Color(0xFFC0C0C0) : const Color(0xFFCD7F32);
-    final IconData rankIcon = rank == 1 ? Icons.looks_one_rounded : rank == 2 ? Icons.looks_two_rounded : Icons.looks_3_rounded;
+    final Color rankColor = rank == 1
+        ? const Color(0xFFFFCC00)
+        : rank == 2
+        ? const Color(0xFFC0C0C0)
+        : const Color(0xFFCD7F32);
+    final IconData rankIcon = rank == 1
+        ? Icons.looks_one_rounded
+        : rank == 2
+        ? Icons.looks_two_rounded
+        : Icons.looks_3_rounded;
     final int columnHeight = (300 * heightFactor).round();
-    
+
     // Chequea si el podium que se esta construyendo es el usuario actual y asigna un color distinto si es el caso
-    final bool isUser = player['name'] == nickname && player['score'] == finalScore;
+    final bool isUser =
+        player['name'] == nickname && player['score'] == finalScore;
     final Color nameTagColor = isUser ? const Color(0xFF40E0D0) : Colors.white;
 
     return Padding(
@@ -261,7 +323,9 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
             height: columnHeight.toDouble(),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isUser ? const Color(0xFF40E0D0).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.25),
+              color: isUser
+                  ? const Color(0xFF40E0D0).withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.25),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8),
                 topRight: Radius.circular(8),
@@ -283,13 +347,9 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: Icon(
-                    rankIcon,
-                    color: Colors.white,
-                    size: 30,
-                  ),
+                  child: Icon(rankIcon, color: Colors.white, size: 30),
                 ),
-                
+
                 // Detalles de puntaje y respuestas correctas
                 Column(
                   children: [

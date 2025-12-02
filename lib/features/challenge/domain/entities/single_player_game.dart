@@ -4,11 +4,11 @@ enum GameProgressStatus {
   COMPLETED;
 
   String toJson() => name;
-  
+
   static GameProgressStatus fromJson(String json) {
     return GameProgressStatus.values.firstWhere(
-      (e) => e.name == json, 
-      orElse: () => GameProgressStatus.IN_PROGRESS
+      (e) => e.name == json,
+      orElse: () => GameProgressStatus.IN_PROGRESS,
     );
   }
 }
@@ -43,15 +43,12 @@ class SinglePlayerGame {
       quizId: json['quizId'],
       totalQuestions: json['totalQuestions'],
       playerId: json['playerId'],
-      // Parsing nested objects
       gameProgress: GameProgress.fromJson(json['gameProgress']),
       gameScore: GameScore.fromJson(json['gameScore']),
-      // Parsing Dates (assuming ISO8601 string from API)
       startedAt: DateTime.parse(json['startedAt']),
-      completedAt: json['completedAt'] != null 
-          ? DateTime.parse(json['completedAt']) 
+      completedAt: json['completedAt'] != null
+          ? DateTime.parse(json['completedAt'])
           : null,
-      // Parsing Lists of Objects
       gameAnswers: (json['gameAnswers'] as List<dynamic>)
           .map((e) => QuestionResult.fromJson(e))
           .toList(),
@@ -79,10 +76,7 @@ class GameProgress {
   final GameProgressStatus state;
   final double progress;
 
-  GameProgress({
-    required this.state,
-    required this.progress,
-  });
+  GameProgress({required this.state, required this.progress});
 
   factory GameProgress.fromJson(Map<String, dynamic> json) {
     return GameProgress(
@@ -92,10 +86,7 @@ class GameProgress {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'state': state.toJson(),
-      'progress': progress,
-    };
+    return {'state': state.toJson(), 'progress': progress};
   }
 }
 
@@ -105,9 +96,7 @@ class GameScore {
   GameScore({required this.score});
 
   factory GameScore.fromJson(Map<String, dynamic> json) {
-    return GameScore(
-      score: json['score'] as int,
-    );
+    return GameScore(score: json['score'] as int);
   }
 
   Map<String, dynamic> toJson() => {'score': score};
@@ -142,32 +131,24 @@ class QuestionResult {
 }
 
 class PlayerAnswer {
-  
-  final List<int>? answerIndex; 
+  final List<int>? answerIndex;
   final int timeUsedMs;
 
-  PlayerAnswer({
-    this.answerIndex,
-    required this.timeUsedMs,
-  });
+  PlayerAnswer({this.answerIndex, required this.timeUsedMs});
 
   factory PlayerAnswer.fromJson(Map<String, dynamic> json) {
     return PlayerAnswer(
-      
-      answerIndex: json['answerIndex'] == null 
-          ? null 
+      answerIndex: json['answerIndex'] == null
+          ? null
           : (json['answerIndex'] is List)
-              ? List<int>.from(json['answerIndex']) 
-              : [json['answerIndex'] as int],       
+          ? List<int>.from(json['answerIndex'])
+          : [json['answerIndex'] as int],
       timeUsedMs: json['timeUsedMs'] as int,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'answerIndex': answerIndex, 
-      'timeUsedMs': timeUsedMs,
-    };
+    return {'answerIndex': answerIndex, 'timeUsedMs': timeUsedMs};
   }
 }
 
@@ -175,10 +156,7 @@ class EvaluatedAnswer {
   final bool wasCorrect;
   final int pointsEarned;
 
-  EvaluatedAnswer({
-    required this.wasCorrect,
-    required this.pointsEarned,
-  });
+  EvaluatedAnswer({required this.wasCorrect, required this.pointsEarned});
 
   factory EvaluatedAnswer.fromJson(Map<String, dynamic> json) {
     return EvaluatedAnswer(
@@ -188,9 +166,6 @@ class EvaluatedAnswer {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'wasCorrect': wasCorrect,
-      'pointsEarned': pointsEarned,
-    };
+    return {'wasCorrect': wasCorrect, 'pointsEarned': pointsEarned};
   }
 }
