@@ -36,6 +36,9 @@ class QuizEditorBloc extends ChangeNotifier {
       // preserve client-side template association if present
       if (prevTemplate != null) created.templateId = prevTemplate;
       currentQuiz = created;
+      // Ensure the newly created/returned quiz is reflected in the
+      // user's quiz list so the dashboard (portada) shows updates.
+      _upsertIntoUserQuizzes(created);
     } catch (e) {
       errorMessage = 'Error al crear el Quiz: $e';
     } finally {
@@ -74,6 +77,8 @@ class QuizEditorBloc extends ChangeNotifier {
       final updated = await useCase.run(quizId, dto);
       if (prevTemplate != null) updated.templateId = prevTemplate;
       currentQuiz = updated;
+      // Keep the user list in sync so the dashboard reflects edits immediately
+      _upsertIntoUserQuizzes(updated);
     } catch (e) {
       errorMessage = 'Error al actualizar el Quiz: $e';
     } finally {
@@ -231,6 +236,8 @@ class QuizEditorBloc extends ChangeNotifier {
       final saved = await repository.save(currentQuiz!);
       if (prevTemplate != null) saved.templateId = prevTemplate;
       currentQuiz = saved;
+      // Update/insert into the userQuizzes cache so UI lists show the saved state
+      _upsertIntoUserQuizzes(saved);
     } catch (e) {
       errorMessage = 'Error al persistir el quiz: $e';
       rethrow;
@@ -238,5 +245,34 @@ class QuizEditorBloc extends ChangeNotifier {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Upsert helper: inserts or replaces the quiz in `userQuizzes` so
+  // UI views (dashboard/portada) immediately reflect changes made in the editor.
+  void _upsertIntoUserQuizzes(Quiz q) {
+    userQuizzes ??= [];
+
+    // Prefer matching by non-empty quizId
+    if (q.quizId.isNotEmpty) {
+      final idx = userQuizzes!.indexWhere((x) => x.quizId.isNotEmpty && x.quizId == q.quizId);
+      if (idx != -1) {
+        userQuizzes![idx] = q;
+        return;
+      }
+    }
+
+    // Fallback: match by signature (title + createdAt + cover) for local items
+    final sig = '${q.title.trim()}|${q.createdAt.toIso8601String()}|${q.coverImageUrl ?? ''}';
+    final idxSig = userQuizzes!.indexWhere((x) {
+      final xsig = '${x.title.trim()}|${x.createdAt.toIso8601String()}|${x.coverImageUrl ?? ''}';
+      return xsig == sig;
+    });
+    if (idxSig != -1) {
+      userQuizzes![idxSig] = q;
+      return;
+    }
+
+    // Otherwise insert at the front so the updated/created quiz is visible
+    userQuizzes!.insert(0, q);
   }
 }

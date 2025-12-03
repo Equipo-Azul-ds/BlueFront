@@ -142,13 +142,17 @@ class QuizRepositoryImpl implements QuizRepository {
       return s;
     }
 
+    // Normalize visibility: backend expects either 'public' or 'private'.
+    var vis = _safeString(quiz.visibility).toLowerCase().trim();
+    if (vis != 'public' && vis != 'private') vis = 'private';
+
     return {
       'authorId': authorId,
       'title': _safeString(quiz.title),
       'description': _safeString(quiz.description),
       // El backend espera 'coverImageId' (id de recurso). Si no existe, enviar cadena vacía en lugar de null.
       'coverImageId': _maybeMediaId(quiz.coverImageUrl) ?? '',
-      'visibility': _safeString(quiz.visibility),
+      'visibility': vis,
       // Usar los valores del quiz si existen, de lo contrario dejar valores por defecto
       'status': _safeString(quiz.status ?? 'draft'),
       'category': _safeString(quiz.category ?? 'Tecnología'),
@@ -220,13 +224,23 @@ class QuizRepositoryImpl implements QuizRepository {
 
     try { print('QuizRepositoryImpl.searchByAuthor -> Response status: ${response.statusCode}'); } catch (_) {}
 
-    if (response.statusCode == 200){
+    if (response.statusCode == 200) {
       final List<dynamic> jsonResponse = jsonDecode(response.body);
       try { print('QuizRepositoryImpl.searchByAuthor -> Fetched ${jsonResponse.length} quizzes'); } catch (_) {}
       return jsonResponse.map((json) => Quiz.fromJson(Map<String, dynamic>.from(json as Map))).toList();
-    }else {
+    } else {
       final msg = 'Error al buscar quizzes por autor: ${response.statusCode} - ${response.body}';
       try { print('QuizRepositoryImpl.searchByAuthor -> $msg'); } catch (_) {}
+
+      // If the server returned a 5xx, treat it as a backend transient error
+      // and return an empty list so the UI can continue to operate using
+      // any locally-cached items. For 4xx errors we rethrow so callers can
+      // surface auth/validation issues explicitly.
+      if (response.statusCode >= 500 && response.statusCode < 600) {
+        try { print('QuizRepositoryImpl.searchByAuthor -> Backend 5xx detected, returning empty list as fallback'); } catch (_) {}
+        return <Quiz>[];
+      }
+
       throw Exception(msg);
     }
   }
