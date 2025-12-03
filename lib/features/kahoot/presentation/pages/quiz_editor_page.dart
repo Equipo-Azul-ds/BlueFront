@@ -862,7 +862,10 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                       );
                                       quizBloc.updateQuestionAt(_selectedIndex, updated);
                                     }),
-                                    Expanded(child: TextFormField(initialValue: ans.text ?? '', onChanged: (v){
+                                    Expanded(child: TextFormField(
+                                      key: ValueKey(ans.answerId),
+                                      initialValue: ans.text ?? '',
+                                      onChanged: (v){
                                       final q = selectedQuestion;
                                       final newAnswers = q.answers.map((a) => a.answerId == ans.answerId ? A.Answer(answerId: a.answerId, questionId: a.questionId, isCorrect: a.isCorrect, text: v, mediaUrl: a.mediaUrl) : a).toList();
                                       final updated = Q.Question(
