@@ -126,6 +126,11 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
   late TextEditingController _questionController;
   String? _currentEditingQuestionId;
 
+  // Inline answer editing state: set of answerIds currently being edited
+  final Set<String> _editingAnswerIds = {};
+  // store original text when start editing to allow cancel
+  final Map<String, String> _editingInitialValues = {};
+
   // Estado temporal para elementos que antes se pasaban directo al BLoC
   String? _coverImagePath;
   Uint8List? _coverImageBytes;
@@ -839,81 +844,277 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
                             SizedBox(height: constraints.maxHeight * 0.01),
 
-                            // Answers list
+                            // Answers list (visual, wider tiles + inline edit)
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text('Respuestas', style: TextStyle(fontWeight: FontWeight.bold)),
-                                ...selectedQuestion.answers.asMap().entries.map((entry) {
-                                  final ans = entry.value;
-                                  return Row(children: [
-                                    Checkbox(value: ans.isCorrect, onChanged: (v){
-                                      final q = selectedQuestion;
-                                      final newAnswers = q.answers.map((a) => a.answerId == ans.answerId ? A.Answer(answerId: a.answerId, questionId: a.questionId, isCorrect: v ?? false, text: a.text, mediaUrl: a.mediaUrl) : a).toList();
-                                      final updated = Q.Question(
-                                        questionId: q.questionId,
-                                        quizId: q.quizId,
-                                        text: q.text,
-                                        mediaUrl: q.mediaUrl,
-                                        type: q.type,
-                                        timeLimit: q.timeLimit,
-                                        points: q.points,
-                                        answers: newAnswers,
+                                SizedBox(height: constraints.maxHeight * 0.01),
+
+                                // True/False tiles (editable inline)
+                                if (selectedQuestion.type == 'true_false')
+                                  Builder(builder: (_) {
+                                    final q = selectedQuestion;
+                                    final now = DateTime.now().microsecondsSinceEpoch;
+                                    final trueAns = q.answers.isNotEmpty
+                                        ? q.answers[0]
+                                        : A.Answer(answerId: 'a_tf_true_$now', questionId: q.questionId, isCorrect: true, text: 'Verdadero');
+                                    final falseAns = q.answers.length > 1
+                                        ? q.answers[1]
+                                        : A.Answer(answerId: 'a_tf_false_$now', questionId: q.questionId, isCorrect: false, text: 'Falso');
+
+                                    Widget buildTile(A.Answer ans, Color bg, EdgeInsets margin) {
+                                      return Expanded(
+                                        child: GestureDetector(
+                                          onTap: (){
+                                            // don't toggle correctness while editing
+                                            if (_editingAnswerIds.contains(ans.answerId)) return;
+                                            // Mark the tapped tile as correct, the other as incorrect
+                                            final updatedTrue = A.Answer(
+                                              answerId: trueAns.answerId,
+                                              questionId: trueAns.questionId,
+                                              isCorrect: ans.answerId == trueAns.answerId,
+                                              text: trueAns.text,
+                                              mediaUrl: trueAns.mediaUrl,
+                                            );
+                                            final updatedFalse = A.Answer(
+                                              answerId: falseAns.answerId,
+                                              questionId: falseAns.questionId,
+                                              isCorrect: ans.answerId == falseAns.answerId,
+                                              text: falseAns.text,
+                                              mediaUrl: falseAns.mediaUrl,
+                                            );
+                                            final qUpdated = Q.Question(
+                                              questionId: selectedQuestion.questionId,
+                                              quizId: selectedQuestion.quizId,
+                                              text: selectedQuestion.text,
+                                              mediaUrl: selectedQuestion.mediaUrl,
+                                              type: selectedQuestion.type,
+                                              timeLimit: selectedQuestion.timeLimit,
+                                              points: selectedQuestion.points,
+                                              answers: [updatedTrue, updatedFalse],
+                                            );
+                                            quizBloc.updateQuestionAt(_selectedIndex, qUpdated);
+                                          },
+                                          child: Container(
+                                            constraints: BoxConstraints(minHeight: constraints.maxHeight * 0.12),
+                                            margin: margin,
+                                            padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                                            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12), border: (ans.isCorrect) ? Border.all(color: Colors.white, width: 3) : null),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Flexible(
+                                                  child: _editingAnswerIds.contains(ans.answerId)
+                                                      ? TextFormField(
+                                                          initialValue: ans.text ?? '',
+                                                          maxLines: 3,
+                                                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: constraints.maxWidth * 0.04),
+                                                          decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                                                          onChanged: (txt){
+                                                            final q = selectedQuestion;
+                                                            final newTrue = q.answers.isNotEmpty ? (q.answers[0].answerId == ans.answerId ? A.Answer(answerId: q.answers[0].answerId, questionId: q.answers[0].questionId, isCorrect: q.answers[0].isCorrect, text: txt, mediaUrl: q.answers[0].mediaUrl) : A.Answer(answerId: q.answers[0].answerId, questionId: q.answers[0].questionId, isCorrect: q.answers[0].isCorrect, text: q.answers[0].text, mediaUrl: q.answers[0].mediaUrl)) : (ans.text == 'Verdadero' ? A.Answer(answerId: ans.answerId, questionId: ans.questionId, isCorrect: ans.isCorrect, text: txt, mediaUrl: ans.mediaUrl) : A.Answer(answerId: 'a_tf_true_$now', questionId: q.questionId, isCorrect: true, text: txt));
+                                                            final newFalse = q.answers.length > 1 ? (q.answers[1].answerId == ans.answerId ? A.Answer(answerId: q.answers[1].answerId, questionId: q.answers[1].questionId, isCorrect: q.answers[1].isCorrect, text: txt, mediaUrl: q.answers[1].mediaUrl) : A.Answer(answerId: q.answers[1].answerId, questionId: q.answers[1].questionId, isCorrect: q.answers[1].isCorrect, text: q.answers[1].text, mediaUrl: q.answers[1].mediaUrl)) : (ans.text == 'Falso' ? A.Answer(answerId: ans.answerId, questionId: ans.questionId, isCorrect: ans.isCorrect, text: txt, mediaUrl: ans.mediaUrl) : A.Answer(answerId: 'a_tf_false_$now', questionId: q.questionId, isCorrect: false, text: txt));
+                                                            final updated = Q.Question(
+                                                              questionId: q.questionId,
+                                                              quizId: q.quizId,
+                                                              text: q.text,
+                                                              mediaUrl: q.mediaUrl,
+                                                              type: q.type,
+                                                              timeLimit: q.timeLimit,
+                                                              points: q.points,
+                                                              answers: [newTrue, newFalse],
+                                                            );
+                                                            quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                                          },
+                                                        )
+                                                      : Center(child: Text(ans.text ?? (ans == trueAns ? 'Verdadero' : 'Falso'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: constraints.maxWidth * 0.045), textAlign: TextAlign.center)),
+                                                ),
+                                                Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                                                  if (!_editingAnswerIds.contains(ans.answerId))
+                                                    IconButton(onPressed: (){ setState(()=> _editingAnswerIds.add(ans.answerId)); _editingInitialValues[ans.answerId] = ans.text ?? ''; }, icon: Icon(Icons.edit, color: Colors.white70, size: constraints.maxWidth * 0.06))
+                                                  else
+                                                    Row(children: [
+                                                      IconButton(onPressed: (){ setState(()=> _editingAnswerIds.remove(ans.answerId)); _editingInitialValues.remove(ans.answerId); }, icon: Icon(Icons.check, color: Colors.white70, size: constraints.maxWidth * 0.06)),
+                                                      IconButton(onPressed: (){
+                                                        final orig = _editingInitialValues[ans.answerId] ?? '';
+                                                        final q = selectedQuestion;
+                                                        final newTrue = q.answers.isNotEmpty ? A.Answer(answerId: q.answers[0].answerId, questionId: q.answers[0].questionId, isCorrect: q.answers[0].isCorrect, text: q.answers[0].answerId == ans.answerId ? orig : q.answers[0].text, mediaUrl: q.answers[0].mediaUrl) : (ans.text == 'Verdadero' ? A.Answer(answerId: ans.answerId, questionId: ans.questionId, isCorrect: ans.isCorrect, text: orig, mediaUrl: ans.mediaUrl) : A.Answer(answerId: 'a_tf_true_$now', questionId: q.questionId, isCorrect: true, text: orig));
+                                                        final newFalse = q.answers.length > 1 ? A.Answer(answerId: q.answers[1].answerId, questionId: q.answers[1].questionId, isCorrect: q.answers[1].isCorrect, text: q.answers[1].answerId == ans.answerId ? orig : q.answers[1].text, mediaUrl: q.answers[1].mediaUrl) : (ans.text == 'Falso' ? A.Answer(answerId: ans.answerId, questionId: ans.questionId, isCorrect: ans.isCorrect, text: orig, mediaUrl: ans.mediaUrl) : A.Answer(answerId: 'a_tf_false_$now', questionId: q.questionId, isCorrect: false, text: orig));
+                                                        final updated = Q.Question(
+                                                          questionId: q.questionId,
+                                                          quizId: q.quizId,
+                                                          text: q.text,
+                                                          mediaUrl: q.mediaUrl,
+                                                          type: q.type,
+                                                          timeLimit: q.timeLimit,
+                                                          points: q.points,
+                                                          answers: [newTrue, newFalse],
+                                                        );
+                                                        quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                                        setState(()=> _editingAnswerIds.remove(ans.answerId));
+                                                        _editingInitialValues.remove(ans.answerId);
+                                                      }, icon: Icon(Icons.close, color: Colors.white70, size: constraints.maxWidth * 0.06)),
+                                                    ])
+                                                ])
+                                              ],
+                                            ),
+                                          ),
+                                        ),
                                       );
-                                      quizBloc.updateQuestionAt(_selectedIndex, updated);
-                                    }),
-                                    Expanded(child: TextFormField(
-                                      key: ValueKey(ans.answerId),
-                                      initialValue: ans.text ?? '',
-                                      onChanged: (v){
-                                      final q = selectedQuestion;
-                                      final newAnswers = q.answers.map((a) => a.answerId == ans.answerId ? A.Answer(answerId: a.answerId, questionId: a.questionId, isCorrect: a.isCorrect, text: v, mediaUrl: a.mediaUrl) : a).toList();
-                                      final updated = Q.Question(
-                                        questionId: q.questionId,
-                                        quizId: q.quizId,
-                                        text: q.text,
-                                        mediaUrl: q.mediaUrl,
-                                        type: q.type,
-                                        timeLimit: q.timeLimit,
-                                        points: q.points,
-                                        answers: newAnswers,
-                                      );
-                                      quizBloc.updateQuestionAt(_selectedIndex, updated);
-                                    })),
-                                    IconButton(icon: Icon(Icons.delete), onPressed: (){
-                                      final q = selectedQuestion;
-                                      final newAnswers = q.answers.where((a)=>a.answerId!=ans.answerId).toList();
-                                      final updated = Q.Question(
-                                        questionId: q.questionId,
-                                        quizId: q.quizId,
-                                        text: q.text,
-                                        mediaUrl: q.mediaUrl,
-                                        type: q.type,
-                                        timeLimit: q.timeLimit,
-                                        points: q.points,
-                                        answers: newAnswers,
-                                      );
-                                      quizBloc.updateQuestionAt(_selectedIndex, updated);
-                                    }),
-                                  ]);
-                                }).toList(),
-                                TextButton.icon(onPressed: (){
-                                  final q = selectedQuestion;
-                                  if (q.type == 'true_false' && q.answers.length >=2) return; // keep two
-                                  final now = DateTime.now().microsecondsSinceEpoch;
-                                  final newAns = A.Answer(answerId: 'a_$now', questionId: q.questionId, isCorrect: false, text: 'Nueva respuesta');
-                                  final updated = Q.Question(
-                                    questionId: q.questionId,
-                                    quizId: q.quizId,
-                                    text: q.text,
-                                    mediaUrl: q.mediaUrl,
-                                    type: q.type,
-                                    timeLimit: q.timeLimit,
-                                    points: q.points,
-                                    answers: [...q.answers, newAns],
-                                  );
-                                  quizBloc.updateQuestionAt(_selectedIndex, updated);
-                                }, icon: Icon(Icons.add), label: Text('Agregar respuesta')),
+                                    }
+
+                                    return Row(children: [
+                                      buildTile(trueAns, Colors.blue, EdgeInsets.only(right: 8)),
+                                      buildTile(falseAns, Colors.red, EdgeInsets.only(left: 8)),
+                                    ]);
+                                  }),
+
+                                // Quiz type: wide colorful tiles with inline editing
+                                if (selectedQuestion.type != 'true_false')
+                                  Column(
+                                    children: [
+                                      ...selectedQuestion.answers.asMap().entries.map((entry) {
+                                        final idx = entry.key;
+                                        final ans = entry.value;
+                                        final colors = [Colors.blue, Colors.red, Colors.orange.shade700, Colors.green];
+                                        final bg = colors[idx % colors.length];
+                                        return GestureDetector(
+                                          onTap: (){
+                                            final q = selectedQuestion;
+                                            final newAnswers = q.answers.map((a) => a.answerId == ans.answerId ? A.Answer(answerId: a.answerId, questionId: a.questionId, isCorrect: !a.isCorrect, text: a.text, mediaUrl: a.mediaUrl) : a).toList();
+                                            final updated = Q.Question(
+                                              questionId: q.questionId,
+                                              quizId: q.quizId,
+                                              text: q.text,
+                                              mediaUrl: q.mediaUrl,
+                                              type: q.type,
+                                              timeLimit: q.timeLimit,
+                                              points: q.points,
+                                              answers: newAnswers,
+                                            );
+                                            quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                          },
+                                          child: Container(
+                                            width: constraints.maxWidth * 0.94,
+                                            margin: EdgeInsets.symmetric(vertical: constraints.maxHeight * 0.008),
+                                            padding: EdgeInsets.symmetric(vertical: constraints.maxHeight * 0.02, horizontal: constraints.maxWidth * 0.03),
+                                            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12), border: ans.isCorrect ? Border.all(color: Colors.white, width: 3) : null),
+                                            child: Row(
+                                              children: [
+                                                Expanded(child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    if (_editingAnswerIds.contains(ans.answerId))
+                                                      TextFormField(
+                                                        initialValue: ans.text ?? '',
+                                                        maxLines: 3,
+                                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: constraints.maxWidth * 0.04),
+                                                        decoration: const InputDecoration(border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.zero),
+                                                        onChanged: (txt){
+                                                          final q = selectedQuestion;
+                                                          final newAnswers = q.answers.map((a) => a.answerId == ans.answerId ? A.Answer(answerId: a.answerId, questionId: a.questionId, isCorrect: a.isCorrect, text: txt, mediaUrl: a.mediaUrl) : a).toList();
+                                                          final updated = Q.Question(
+                                                            questionId: q.questionId,
+                                                            quizId: q.quizId,
+                                                            text: q.text,
+                                                            mediaUrl: q.mediaUrl,
+                                                            type: q.type,
+                                                            timeLimit: q.timeLimit,
+                                                            points: q.points,
+                                                            answers: newAnswers,
+                                                          );
+                                                          quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                                        },
+                                                      )
+                                                    else
+                                                      Text(ans.text ?? '', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: constraints.maxWidth * 0.04), maxLines: 3, overflow: TextOverflow.ellipsis),
+                                                    SizedBox(height: 6),
+                                                    Wrap(spacing: 12, runSpacing: 6, children: [
+                                                      GestureDetector(onTap: (){
+                                                        // start inline edit
+                                                        setState((){
+                                                          _editingAnswerIds.add(ans.answerId);
+                                                          _editingInitialValues[ans.answerId] = ans.text ?? '';
+                                                        });
+                                                      }, child: Row(children: [Icon(Icons.edit, color: Colors.white70, size: constraints.maxWidth * 0.04), SizedBox(width: 6), Text('Editar', style: TextStyle(color: Colors.white70))])),
+                                                      GestureDetector(onTap: (){
+                                                        final q = selectedQuestion;
+                                                        final newAnswers = q.answers.where((a)=>a.answerId!=ans.answerId).toList();
+                                                        final updated = Q.Question(
+                                                          questionId: q.questionId,
+                                                          quizId: q.quizId,
+                                                          text: q.text,
+                                                          mediaUrl: q.mediaUrl,
+                                                          type: q.type,
+                                                          timeLimit: q.timeLimit,
+                                                          points: q.points,
+                                                          answers: newAnswers,
+                                                        );
+                                                        quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                                      }, child: Row(children: [Icon(Icons.delete, color: Colors.white70, size: constraints.maxWidth * 0.04), SizedBox(width: 6), Text('Eliminar', style: TextStyle(color: Colors.white70))])),
+                                                      if (_editingAnswerIds.contains(ans.answerId))
+                                                        Row(children: [
+                                                          IconButton(onPressed: (){ setState(()=> _editingAnswerIds.remove(ans.answerId)); _editingInitialValues.remove(ans.answerId); }, icon: Icon(Icons.check, color: Colors.white70)),
+                                                          IconButton(onPressed: (){
+                                                            final orig = _editingInitialValues[ans.answerId] ?? '';
+                                                            final q = selectedQuestion;
+                                                            final newAnswers = q.answers.map((a) => a.answerId == ans.answerId ? A.Answer(answerId: a.answerId, questionId: a.questionId, isCorrect: a.isCorrect, text: orig, mediaUrl: a.mediaUrl) : a).toList();
+                                                            final updated = Q.Question(
+                                                              questionId: q.questionId,
+                                                              quizId: q.quizId,
+                                                              text: q.text,
+                                                              mediaUrl: q.mediaUrl,
+                                                              type: q.type,
+                                                              timeLimit: q.timeLimit,
+                                                              points: q.points,
+                                                              answers: newAnswers,
+                                                            );
+                                                            quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                                            setState(()=> _editingAnswerIds.remove(ans.answerId));
+                                                            _editingInitialValues.remove(ans.answerId);
+                                                          }, icon: Icon(Icons.close, color: Colors.white70)),
+                                                        ])
+                                                    ])
+                                                  ],
+                                                )),
+                                                if (ans.isCorrect)
+                                                  Padding(padding: EdgeInsets.only(left: 8), child: Icon(Icons.check_circle, color: Colors.white, size: constraints.maxWidth * 0.07))
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+
+                                      // Add answer tile
+                                      GestureDetector(
+                                        onTap: (){
+                                          final q = selectedQuestion;
+                                          final now = DateTime.now().microsecondsSinceEpoch;
+                                          final newAns = A.Answer(answerId: 'a_$now', questionId: q.questionId, isCorrect: false, text: 'Nueva respuesta');
+                                          final updated = Q.Question(
+                                            questionId: q.questionId,
+                                            quizId: q.quizId,
+                                            text: q.text,
+                                            mediaUrl: q.mediaUrl,
+                                            type: q.type,
+                                            timeLimit: q.timeLimit,
+                                            points: q.points,
+                                            answers: [...q.answers, newAns],
+                                          );
+                                          quizBloc.updateQuestionAt(_selectedIndex, updated);
+                                        },
+                                        child: Container(
+                                          width: constraints.maxWidth * 0.94,
+                                          margin: EdgeInsets.symmetric(vertical: constraints.maxHeight * 0.008),
+                                          padding: EdgeInsets.symmetric(vertical: constraints.maxHeight * 0.02, horizontal: constraints.maxWidth * 0.03),
+                                          decoration: BoxDecoration(color: Colors.grey[200], borderRadius: BorderRadius.circular(12)),
+                                          child: Center(child: Icon(Icons.add, size: constraints.maxWidth * 0.08)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                               ],
                             ),
 
