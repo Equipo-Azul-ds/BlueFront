@@ -9,8 +9,9 @@ class MockLibraryRepository implements LibraryRepository {
     Kahoot(
       id: 'k1',
       title: 'Principios de Arquitectura Limpia',
-      description: 'Conceptos SOLID y DDD.',
-      authorId: 'user_123', // Creado por el usuario
+      description:
+          'Conceptos SOLID y DDD. Este Kahoot explica los principios fundamentales del diseño de software limpio.',
+      authorId: 'user_123',
       createdAt: DateTime(2025, 1, 1),
       visibility: 'Public',
       status: 'Published',
@@ -19,10 +20,10 @@ class MockLibraryRepository implements LibraryRepository {
       id: 'k2',
       title: 'Física Cuántica Básica',
       description: 'Primeros pasos en el mundo subatómico.',
-      authorId: 'user_123', // Creado por el usuario
+      authorId: 'user_123',
       createdAt: DateTime(2025, 10, 20),
       visibility: 'Public',
-      status: 'Draft', // Borrador (H7.1)
+      status: 'Draft',
     ),
     Kahoot(
       id: 'k3',
@@ -35,23 +36,24 @@ class MockLibraryRepository implements LibraryRepository {
     ),
   ];
 
-  final List<KahootProgress> _mockProgress = [
-    // Usuario tiene el k1 como favorito y lo completó
+  // Lista mutable para actualizar el estado de favoritos y progreso
+  List<KahootProgress> _mockProgress = [
+    // Kahoot k1: Completado y Favorito
     KahootProgress(
       kahootId: 'k1',
       userId: 'user_123',
-      isFavorite: true, // Favorito (H7.2)
+      isFavorite: true,
       progressPercentage: 100,
-      lastAttemptAt: DateTime(2025, 1, 10),
-      isCompleted: true, // Completado (H7.4)
+      lastAttemptAt: DateTime(2025, 1, 10), // Requerido
+      isCompleted: true,
     ),
-    // Usuario tiene el k3 en progreso
+    // Kahoot k3: En progreso
     KahootProgress(
       kahootId: 'k3',
       userId: 'user_123',
       isFavorite: false,
-      progressPercentage: 50, // En Progreso (H7.3)
-      lastAttemptAt: DateTime(2025, 11, 20),
+      progressPercentage: 50,
+      lastAttemptAt: DateTime(2025, 11, 20), // Requerido
       isCompleted: false,
     ),
   ];
@@ -60,62 +62,59 @@ class MockLibraryRepository implements LibraryRepository {
   // Implementación de los métodos de la interfaz
   // =======================================================
 
-  // H7.1: Creados y Borradores
   @override
-  Future<List<Kahoot>> getCreatedKahoots({required String userId}) async {
-    // Simula el filtro: quices creados por el usuario
+  Future<List<Kahoot>> getCreatedKahoots({required String userId}) {
     return Future.value(
       _mockKahoots.where((k) => k.authorId == userId).toList(),
     );
   }
 
-  // H7.2: Favoritos
   @override
-  Future<List<Kahoot>> getFavoriteKahoots({required String userId}) async {
+  Future<List<Kahoot>> getFavoriteKahoots({required String userId}) {
     final favoriteProgress = _mockProgress
         .where((p) => p.userId == userId && p.isFavorite)
         .toList();
-
-    // Mapea los IDs de progreso a los objetos Kahoot
     final favoriteKahoots = _mockKahoots
         .where((k) => favoriteProgress.any((p) => p.kahootId == k.id))
         .toList();
-
     return Future.value(favoriteKahoots);
   }
 
-  // H7.3: En Progreso
   @override
-  Future<List<Kahoot>> getInProgressKahoots({required String userId}) async {
+  Future<List<Kahoot>> getInProgressKahoots({required String userId}) {
     final inProgress = _mockProgress
         .where(
           (p) =>
               p.userId == userId && p.progressPercentage > 0 && !p.isCompleted,
         )
         .toList();
-
     final inProgressKahoots = _mockKahoots
         .where((k) => inProgress.any((p) => p.kahootId == k.id))
         .toList();
-
     return Future.value(inProgressKahoots);
   }
 
-  // H7.4: Completados
   @override
-  Future<List<Kahoot>> getCompletedKahoots({required String userId}) async {
+  Future<List<Kahoot>> getCompletedKahoots({required String userId}) {
     final completed = _mockProgress
         .where((p) => p.userId == userId && p.isCompleted)
         .toList();
-
     final completedKahoots = _mockKahoots
         .where((k) => completed.any((p) => p.kahootId == k.id))
         .toList();
-
     return Future.value(completedKahoots);
   }
 
-  // Utilidad
+  @override
+  Future<Kahoot> getKahootById(String id) async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    final kahoot = _mockKahoots.firstWhere(
+      (k) => k.id == id,
+      orElse: () => throw Exception('Kahoot no encontrado con ID: $id'),
+    );
+    return kahoot;
+  }
+
   @override
   Future<KahootProgress?> getProgressForKahoot({
     required String kahootId,
@@ -131,14 +130,46 @@ class MockLibraryRepository implements LibraryRepository {
     }
   }
 
+  // =======================================================
+  // Implementación de la Mutación (TOGGLE FAVORITE)
+  // =======================================================
   @override
-  Future<Kahoot> getKahootById(String id) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+  Future<void> toggleFavoriteStatus({
+    required String kahootId,
+    required String userId,
+    required bool isFavorite,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
 
-    final kahoot = _mockKahoots.firstWhere(
-      (k) => k.id == id,
-      orElse: () => throw Exception('Kahoot no encontrado con ID: $id'),
+    final index = _mockProgress.indexWhere(
+      (p) => p.kahootId == kahootId && p.userId == userId,
     );
-    return kahoot;
+
+    if (index != -1) {
+      // 1. Si ya existe un progreso, lo actualizamos (creando una nueva instancia).
+      final oldProgress = _mockProgress[index];
+
+      _mockProgress[index] = KahootProgress(
+        kahootId: oldProgress.kahootId,
+        userId: oldProgress.userId,
+        isFavorite: isFavorite, // <-- El valor que queremos cambiar
+        progressPercentage: oldProgress.progressPercentage,
+        lastAttemptAt:
+            oldProgress.lastAttemptAt, // Mantenemos el valor original
+        isCompleted: oldProgress.isCompleted,
+      );
+    } else {
+      // 2. Si no existe, creamos un nuevo registro.
+      _mockProgress.add(
+        KahootProgress(
+          kahootId: kahootId,
+          userId: userId,
+          isFavorite: isFavorite,
+          progressPercentage: 0,
+          lastAttemptAt: DateTime.now(), // <-- Valor requerido en la creación
+          isCompleted: false,
+        ),
+      );
+    }
   }
 }

@@ -55,8 +55,13 @@ class _LibraryPageState extends State<LibraryPage> {
           icon: Icons.person_outline,
           title: 'Tus Kahoots',
           onTap: () {
-            // Navegamos a la página con pestañas (KahootsCategoryPage)
-            Navigator.of(context).pushNamed('/kahoots-category');
+            Navigator.of(context).pushNamed('/kahoots-category').then((_) {
+              if (!mounted) return;
+              Provider.of<LibraryProvider>(
+                context,
+                listen: false,
+              ).loadAllLists(userId);
+            });
           },
         ),
 

@@ -23,4 +23,11 @@ abstract class LibraryRepository {
 
   // Obtener un Kahoot por su ID
   Future<Kahoot> getKahootById(String id);
+
+  // Método para cambiar el estado de favorito
+  Future<void> toggleFavoriteStatus({
+    required String kahootId,
+    required String userId,
+    required bool isFavorite,
+  });
 }

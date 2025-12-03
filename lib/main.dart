@@ -9,6 +9,7 @@ import 'features/library/presentation/pages/library_page.dart';
 import 'features/library/presentation/pages/kahoots_category_page.dart';
 import 'common_pages/dashboard_page.dart';
 import 'features/library/presentation/pages/kahoot_detail_page.dart';
+import 'features/library/application/toggle_favorite_use_case.dart';
 
 void main() {
   runApp(const MyApp());
@@ -47,12 +48,20 @@ class MyApp extends StatelessWidget {
             repository: context.read<LibraryRepository>(),
           ),
         ),
-        ChangeNotifierProvider(
+        //Proveedor para el caso de uso de Toggle Favorite
+        Provider<ToggleFavoriteUseCase>(
+          create: (context) => ToggleFavoriteUseCase(
+            repository: context.read<LibraryRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider<LibraryProvider>(
           create: (context) => LibraryProvider(
             getCreated: context.read<GetCreatedKahootsUseCase>(),
             getFavorite: context.read<GetFavoriteKahootsUseCase>(),
             getInProgress: context.read<GetInProgressKahootsUseCase>(),
             getCompleted: context.read<GetCompletedKahootsUseCase>(),
+            toggleFavorite: context.read<ToggleFavoriteUseCase>(),
+            repository: context.read<LibraryRepository>(),
           ),
         ),
       ],

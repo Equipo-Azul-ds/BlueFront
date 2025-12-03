@@ -1,29 +1,35 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/kahoot_model.dart';
+import '../../domain/entities/kahoot_progress_model.dart';
+import '../../domain/repositories/library_repository.dart';
 import '../../application/get_kahoots_use_cases.dart';
+import '../../application/toggle_favorite_use_case.dart';
 
 // Definición de los estados para la interfaz de usuario
 enum LibraryState { initial, loading, loaded, error }
 
 class LibraryProvider with ChangeNotifier {
-  // Los Casos de Uso son inyectados
   final GetCreatedKahootsUseCase _getCreated;
   final GetFavoriteKahootsUseCase _getFavorite;
   final GetInProgressKahootsUseCase _getInProgress;
   final GetCompletedKahootsUseCase _getCompleted;
+  final ToggleFavoriteUseCase _toggleFavorite;
+  final LibraryRepository _repository;
 
-  // El constructor REQUIERE que se inyecten todas las dependencias
   LibraryProvider({
     required GetCreatedKahootsUseCase getCreated,
     required GetFavoriteKahootsUseCase getFavorite,
     required GetInProgressKahootsUseCase getInProgress,
     required GetCompletedKahootsUseCase getCompleted,
+    required ToggleFavoriteUseCase toggleFavorite,
+    required LibraryRepository repository,
   }) : _getCreated = getCreated,
        _getFavorite = getFavorite,
        _getInProgress = getInProgress,
-       _getCompleted = getCompleted;
+       _getCompleted = getCompleted,
+       _toggleFavorite = toggleFavorite,
+       _repository = repository;
 
-  // Variables de Estado
   LibraryState _state = LibraryState.initial;
   LibraryState get state => _state;
 
@@ -39,7 +45,6 @@ class LibraryProvider with ChangeNotifier {
   List<Kahoot> _completedKahoots = [];
   List<Kahoot> get completedKahoots => _completedKahoots;
 
-  // Lógica principal: Cargar todas las listas al mismo tiempo
   Future<void> loadAllLists(String userId) async {
     if (_state == LibraryState.loading) return;
 
@@ -47,7 +52,6 @@ class LibraryProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Usamos Future.wait para cargar las cuatro listas en paralelo
       final results = await Future.wait([
         _getCreated(userId: userId),
         _getFavorite(userId: userId),
@@ -66,5 +70,22 @@ class LibraryProvider with ChangeNotifier {
       debugPrint('Error al cargar listas de la biblioteca: $e');
     }
     notifyListeners();
+  }
+
+  Future<KahootProgress?> getKahootProgress(String kahootId, String userId) {
+    return _repository.getProgressForKahoot(kahootId: kahootId, userId: userId);
+  }
+
+  Future<void> toggleFavoriteStatus({
+    required String kahootId,
+    required bool currentStatus,
+    required String userId,
+  }) async {
+    await _toggleFavorite.execute(
+      kahootId: kahootId,
+      isFavorite: !currentStatus,
+    );
+
+    await loadAllLists(userId);
   }
 }

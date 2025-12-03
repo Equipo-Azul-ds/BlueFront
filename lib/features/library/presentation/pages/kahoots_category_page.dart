@@ -4,9 +4,21 @@ import '../providers/library_provider.dart';
 import '../../domain/entities/kahoot_model.dart';
 import '../../../../common_widgets/subpage_scaffold.dart';
 import 'kahoot_list_page.dart';
+import '../utils/kahoot_list_type.dart';
 
 class KahootsCategoryPage extends StatelessWidget {
   const KahootsCategoryPage({super.key});
+
+  // Helper para mapear el título del ListTile al tipo de lista requerido
+  KahootListType _mapTitleToListType(String title) {
+    return switch (title) {
+      'Creados' => KahootListType.created,
+      'Favoritos' => KahootListType.favorites,
+      'En Progreso' => KahootListType.inProgress,
+      'Completados' => KahootListType.completed,
+      _ => KahootListType.created,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,9 +34,6 @@ class KahootsCategoryPage extends StatelessWidget {
             return const Center(child: Text('Error al cargar Kahoots.'));
           }
 
-          final draftKahoots = provider.createdKahoots
-              .where((k) => k.status == 'Borrador')
-              .toList();
           final publishedKahoots = provider.createdKahoots
               .where((k) => k.status != 'Borrador')
               .toList();
@@ -37,24 +46,21 @@ class KahootsCategoryPage extends StatelessWidget {
                 publishedKahoots,
                 Icons.inventory_2,
               ),
-              _buildCategoryTile(
-                context,
-                'Borradores',
-                draftKahoots,
-                Icons.edit,
-              ),
+
               _buildCategoryTile(
                 context,
                 'Favoritos',
                 provider.favoriteKahoots,
                 Icons.favorite,
               ),
+
               _buildCategoryTile(
                 context,
                 'En Progreso',
                 provider.inProgressKahoots,
                 Icons.trending_up,
               ),
+
               _buildCategoryTile(
                 context,
                 'Completados',
@@ -83,8 +89,10 @@ class KahootsCategoryPage extends StatelessWidget {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) =>
-                    KahootListPage(title: title, kahoots: kahoots),
+                builder: (context) => KahootListPage(
+                  title: title,
+                  listType: _mapTitleToListType(title),
+                ),
               ),
             );
           },
