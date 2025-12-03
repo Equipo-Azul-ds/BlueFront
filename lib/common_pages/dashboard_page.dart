@@ -7,11 +7,10 @@ import 'package:http/http.dart' as http;
 import '../features/media/presentation/blocs/media_editor_bloc.dart';
 import '../core/constants/colors.dart';
 import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
+import '../features/kahoot/application/dtos/create_quiz_dto.dart';
 import '../features/kahoot/domain/entities/Quiz.dart';
-import '../features/kahoot/domain/entities/Question.dart' as Q;
-import '../features/kahoot/domain/entities/Answer.dart' as A;
 import '../common_widgets/kahoot_card.dart';
-import 'package:uuid/uuid.dart';
+
 
 class DashboardPage extends StatefulWidget{
   @override
@@ -306,46 +305,49 @@ class _DashboardPageState extends State<DashboardPage> {
                         width: 72,
                         height: 44,
                         child: OutlinedButton(
-                          onPressed: () {
-                            final now = DateTime.now().microsecondsSinceEpoch;
-                            final copy = Quiz(
-                              quizId: Uuid().v4(),
-                              authorId: q.authorId,
+                          onPressed: () async {
+                            // Perform a real POST to create a duplicated quiz on the backend.
+                            Navigator.of(ctx).pop();
+                            
+                            const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+                            final authorIdCandidate = (q.authorId.isEmpty || q.authorId.contains('placeholder')) ? defaultTestAuthorId : q.authorId;
+
+                            // Map questions & answers into Create* DTOs (new ids are handled server-side, but we generate unique local ids for safety)
+                            final mappedQuestions = q.questions.map((origQ) {
+                              final answers = origQ.answers.map((a) => CreateAnswerDto(answerText: a.text, answerImage: a.mediaUrl, isCorrect: a.isCorrect)).toList();
+                              return CreateQuestionDto(
+                                questionText: origQ.text,
+                                mediaUrl: origQ.mediaUrl,
+                                questionType: origQ.type,
+                                timeLimit: origQ.timeLimit,
+                                points: origQ.points,
+                                answers: answers,
+                              );
+                            }).toList();
+
+                            final dto = CreateQuizDto(
+                              authorId: authorIdCandidate,
                               title: '${q.title} (copia)',
                               description: q.description,
+                              coverImage: q.coverImageUrl,
                               visibility: q.visibility,
                               status: q.status,
                               category: q.category,
                               themeId: q.themeId,
-                              coverImageUrl: q.coverImageUrl,
-                              isLocal: true,
-                              createdAt: DateTime.now(),
-                              questions: q.questions.map((origQ) {
-                                final qid = 'q_${now}_${origQ.questionId}';
-                                final copiedAnswers = origQ.answers.map((a) => A.Answer(
-                                  answerId: 'a_${now}_${a.answerId}',
-                                  questionId: qid,
-                                  isCorrect: a.isCorrect,
-                                  text: a.text,
-                                  mediaUrl: a.mediaUrl,
-                                )).toList();
-                                return Q.Question(
-                                  questionId: qid,
-                                  quizId: '',
-                                  text: origQ.text,
-                                  mediaUrl: origQ.mediaUrl,
-                                  type: origQ.type,
-                                  timeLimit: origQ.timeLimit,
-                                  points: origQ.points,
-                                  answers: copiedAnswers,
-                                );
-                              }).toList(),
+                              questions: mappedQuestions,
                             );
-                            quizBloc.userQuizzes ??= [];
-                            quizBloc.userQuizzes!.insert(0, copy);
-                            Navigator.of(ctx).pop();
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz duplicado')));
-                            if (mounted) setState(() {});
+
+                            try {
+                              await quizBloc.createQuiz(dto);
+                              if (quizBloc.errorMessage != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al duplicar: ${quizBloc.errorMessage}')));
+                                return;
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz duplicado y creado')));
+                              if (mounted) setState(() {});
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al duplicar: $e')));
+                            }
                           },
                           style: OutlinedButton.styleFrom(
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
