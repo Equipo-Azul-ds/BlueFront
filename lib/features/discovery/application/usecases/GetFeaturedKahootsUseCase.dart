@@ -3,7 +3,8 @@ import 'package:equatable/equatable.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/usecase.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
-import '../Repositories/IDiscoverRepository.dart';
+import '../../domain/Repositories/IDiscoverRepository.dart';
+
 
 
 

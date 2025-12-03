@@ -16,6 +16,9 @@ import 'common_pages/template_selector_page.dart';
 import 'features/kahoot/infrastructure/repositories/kahoot_repository_impl.dart';
 import 'features/slide/infrastructure/repositories/slide_repository_impl.dart';
 
+// servidor de prueba mock: https://2368cbc3-b3ca-400c-a146-4b7d409fffea.mock.pstmn.io
+// servidor grupal: https://backcomun-production.up.railway.app
+
 const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://backcomun-production.up.railway.app');
 void main() {
   runApp(MyApp());
@@ -26,6 +29,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<http.Client>(
+          create: (_) => http.Client(),
+        ),
+
         //Estos son los proveedores para los repositorios (inyeccion de dependencias)
         Provider<KahootRepositoryImpl>(create: (_)=> KahootRepositoryImpl()), //Aqui lo que hacemos es registrar el repositorio de Kahoot
         Provider<SlideRepositoryImpl>(create: (_)=> SlideRepositoryImpl()),  //Aqui lo que hacemos es registrar el repositorio de Slide

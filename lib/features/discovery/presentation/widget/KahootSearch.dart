@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/Repositories/IDiscoverRepository.dart';
 import '../../infraestructure/repositories/DiscoverRepository.dart';
 import 'kahootListItem.dart';
 
@@ -53,7 +54,7 @@ class _KahootSearchState extends State<KahootSearch> {
     }
 
     try {
-      final repository = context.read<DiscoverRepository>();
+      final repository = context.read<IDiscoverRepository>();
 
       final result = await repository.getKahoots(
         query: query,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/Repositories/IDiscoverRepository.dart';
 import '../../infraestructure/repositories/DiscoverRepository.dart';
 import 'kahootListItem.dart';
 
@@ -29,7 +30,7 @@ class _FeaturedKahootsState extends State<FeaturedKahoots> {
 
   Future<void> _fetchFeaturedKahoots() async {
     try {
-      final repository = context.read<DiscoverRepository>();
+      final repository = context.read<IDiscoverRepository>();
       const limit = 10;
 
       final result = await repository.getFeaturedKahoots(limit: limit);
