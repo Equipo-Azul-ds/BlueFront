@@ -21,6 +21,9 @@ const List<IconData> optionIcons = [
   Icons.square_outlined,
 ];
 
+// Pantalla principal del desafío single-player.
+// Responsable de mostrar la pregunta actual, temporizador, opciones y el
+// overlay de revisión (reveal) cuando llega la evaluación de la respuesta.
 class SinglePlayerChallengeScreen extends StatefulWidget {
   final String nickname;
   final String quizId;
@@ -56,6 +59,9 @@ class _SinglePlayerChallengeScreenState
   EvaluatedAnswer? _displayedEvaluated;
 
   @override
+  // didChangeDependencies: iniciamos el BLoC y arrancamos/reamos el intento
+  // justo después de que el widget esté montado, para evitar llamadas en
+  // el constructor.
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_blocInitialized) {
@@ -85,6 +91,9 @@ class _SinglePlayerChallengeScreenState
         });
   }
 
+  // _onBlocChanged: callback llamado cuando el BLoC notifica cambios.
+  // Actualiza la slide mostrada o encola la próxima slide si estamos en
+  // la ventana de revisión (answer reveal).
   void _onBlocChanged() {
     final slide = bloc.currentSlide;
     if (!mounted) return;
@@ -106,6 +115,8 @@ class _SinglePlayerChallengeScreenState
     }
   }
 
+  // _startCountdown: inicia un Timer que decrementa el contador cada
+  // segundo y llama a _onTimeExpired cuando llega a 0.
   void _startCountdown(int seconds) {
     _countdownTimer?.cancel();
     _timeRemaining = seconds;
@@ -124,6 +135,7 @@ class _SinglePlayerChallengeScreenState
     });
   }
 
+  // _onTimeExpired: tiempo agotado -> enviamos null como respuesta.
   void _onTimeExpired() {
     _submitAnswer(null);
   }
@@ -139,6 +151,9 @@ class _SinglePlayerChallengeScreenState
     }
   }
 
+  // _submitAnswer: construye PlayerAnswer con el tiempo usado y llama
+  // al BLoC. Muestra la UI de revisión y arranca el AnimationController
+  // que mostrará el progreso circular durante el periodo de review.
   Future<void> _submitAnswer(int? selectedIdx) async {
     final currentDisplayed = _displayedSlide ?? bloc.currentSlide;
     if (bloc.currentGame == null || currentDisplayed == null) return;
@@ -173,6 +188,10 @@ class _SinglePlayerChallengeScreenState
     _reviewController.forward();
   }
 
+  // _applyPendingOrAdvance: llamado cuando finaliza la ventana de
+  // revisión. Si se ha encolado una slide la aplicamos; si el intento
+  // terminó, navegamos a la pantalla de resultados; si no, tomamos la
+  // siguiente slide desde el BLoC.
   void _applyPendingOrAdvance() {
     final currentGame = bloc.currentGame;
 
@@ -239,6 +258,7 @@ class _SinglePlayerChallengeScreenState
           final qText = slide.questionText;
           final mediaUrl = slide.mediaUrl;
 
+          // Construye las opciones
           Widget buildOption(int idx, double optionWidth) {
             final ansText = answers[idx].text ?? '';
             final baseColor = optionColors[idx % optionColors.length];
@@ -308,7 +328,8 @@ class _SinglePlayerChallengeScreenState
               ),
             );
           }
-
+          
+          // Construye el Area de los bloques para preguntas
           Widget buildQuestionArea() {
             return Container(
               width: double.infinity,
@@ -337,6 +358,7 @@ class _SinglePlayerChallengeScreenState
             );
           }
 
+          // Barra para mostrar resultados
           Widget buildReviewBar() {
             final bool isCorrect =
                 _displayedEvaluated?.wasCorrect ??

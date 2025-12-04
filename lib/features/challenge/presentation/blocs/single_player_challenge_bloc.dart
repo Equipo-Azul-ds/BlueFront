@@ -3,6 +3,9 @@ import '../../application/use_cases/single_player_usecases.dart';
 import '../../application/dtos/single_player_dtos.dart';
 import '../../domain/entities/single_player_game.dart';
 
+// BLoC que expone el estado para la pantalla de desafío en modo un jugador.
+// Orquesta los casos de uso: iniciar intento, enviar respuestas y obtener
+// resúmenes. La UI se subscribe a este ChangeNotifier para actualizarse.
 class SinglePlayerChallengeBloc extends ChangeNotifier {
   final StartAttemptUseCase startAttemptUseCase;
   final GetAttemptStateUseCase getAttemptStateUseCase;
@@ -28,6 +31,8 @@ class SinglePlayerChallengeBloc extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Inicia o reanuda un intento: llama al caso de uso que crea/recupera el
+  // agregado y obtiene la primera slide (si existe).
   Future<void> startGame(
     String kahootId,
     String playerId,
@@ -47,6 +52,9 @@ class SinglePlayerChallengeBloc extends ChangeNotifier {
     _setLoading(false);
   }
 
+  // Envía la respuesta del jugador al caso de uso. Actualiza el estado
+  // local con la evaluación y refresca el agregado consultando el estado
+  // del intento para mantener coherencia.
   Future<void> submitAnswer(PlayerAnswer answer) async {
     if (currentGame == null) return;
     _setLoading(true);
@@ -69,6 +77,7 @@ class SinglePlayerChallengeBloc extends ChangeNotifier {
     _setLoading(false);
   }
 
+  // Solicita el resumen final del intento (puntos, respuestas, etc.).
   Future<void> finishGame() async {
     if (currentGame == null) return;
     _setLoading(true);

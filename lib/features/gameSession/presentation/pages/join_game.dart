@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '/features/challenge/presentation/pages/single_player_challenge.dart';
+import 'package:provider/provider.dart';
+import 'package:Trivvy/features/challenge/presentation/pages/single_player_challenge.dart';
+import 'package:Trivvy/features/challenge/application/use_cases/single_player_usecases.dart';
 import 'host_setup.dart';
 
 class JoinGameScreen extends StatefulWidget {
@@ -17,16 +19,45 @@ class JoinGameScreenState extends State<JoinGameScreen> {
     ).push(MaterialPageRoute(builder: (context) => const HostSetupScreen()));
   }
 
+  // Esto es logica que pertenece a un BLoC pero es temporal mientras
+  // Se prepara el overview de un quiz desde otras paginas
   void onScanQrPressed() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const SinglePlayerChallengeScreen(
-          nickname: 'Player',
-          quizId: 'mock_quiz_1',
+    // Usa el caso de uso para iniciar o resumir un intento del juego.
+    () async {
+      final startAttempt = Provider.of<StartAttemptUseCase>(
+        context,
+        listen: false,
+      );
+      try {
+        final res = await startAttempt.execute(
+          kahootId: 'mock_quiz_1',
+          playerId: 'Player',
           totalQuestions: 5,
-        ),
-      ),
-    );
+        );
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => SinglePlayerChallengeScreen(
+              nickname: res.game.playerId,
+              quizId: res.game.quizId,
+              totalQuestions: res.game.totalQuestions,
+            ),
+          ),
+        );
+      } catch (e) {
+        // fallback: Navega a la pantalla de desafio directamente
+        if (!mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const SinglePlayerChallengeScreen(
+              nickname: 'Player',
+              quizId: 'mock_quiz_1',
+              totalQuestions: 5,
+            ),
+          ),
+        );
+      }
+    }();
   }
 
   @override

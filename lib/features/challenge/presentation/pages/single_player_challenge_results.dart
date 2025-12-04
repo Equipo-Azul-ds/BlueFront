@@ -5,11 +5,13 @@ import '../../domain/repositories/single_player_game_repository.dart';
 import '../../application/use_cases/single_player_usecases.dart';
 import '../blocs/single_player_results_bloc.dart';
 import 'single_player_challenge.dart';
-import '../../infrastructure/repositories/single_player_game_repository_impl.dart';
 
 const Color purpleDark = Color(0xFF4B0082);
 const Color purpleLight = Color(0xFF8A2BE2);
 
+// Pantalla de resultados del intento single-player. Muestra el puntaje,
+// número de respuestas correctas y permite iniciar un rematch o volver al
+// inicio.
 class SinglePlayerChallengeResultsScreen extends StatefulWidget {
   final String gameId;
 
@@ -32,6 +34,7 @@ class _SinglePlayerChallengeResultsScreenState
   void initState() {
     super.initState();
 
+    // Controlador de Animacion para la carta de resultados
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
@@ -55,6 +58,7 @@ class _SinglePlayerChallengeResultsScreenState
       getSummaryUseCase: getSummary,
     );
 
+    // Cargamos el resumen del intento al iniciar el estado.
     _bloc.load(widget.gameId);
 
     _controller.forward();
@@ -246,20 +250,10 @@ class _SinglePlayerChallengeResultsScreenState
                         children: [
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () async {
-                                try {
-                                  final repoImpl =
-                                      Provider.of<
-                                        SinglePlayerGameRepositoryImpl
-                                      >(context, listen: false);
-                                  await repoImpl.createFreshAttempt(
-                                    kahootId: game.quizId,
-                                    playerId: nickname,
-                                    totalQuestions: game.totalQuestions,
-                                  );
-                                } catch (e) {
-                                  // ignore errors; fall back to normal flow
-                                }
+                              onPressed: () {
+                                // Navega a la pantalla de desafío. El caso de uso
+                                // `StartAttemptUseCase` se encargará de crear un
+                                // nuevo intento o reanudar si corresponde.
                                 Navigator.of(context).pushReplacement(
                                   MaterialPageRoute(
                                     builder: (_) => SinglePlayerChallengeScreen(

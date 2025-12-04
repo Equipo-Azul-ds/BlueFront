@@ -5,6 +5,8 @@ import '../ports/slide_provider.dart';
 
 // Wrappers
 
+// Resultado devuelto por el caso de uso StartAttemptUseCase.
+// Contiene el agregado (SinglePlayerGame) y la primera slide a mostrar (si existe).
 class StartAttemptResult {
   final SinglePlayerGame game;
   final SlideDTO? firstSlide;
@@ -12,6 +14,8 @@ class StartAttemptResult {
   StartAttemptResult({required this.game, this.firstSlide});
 }
 
+// Resultado de consultar el estado actual de un intento (resumen parcial).
+// Se usa para resumir la partida y conocer la siguiente slide disponible.
 class AttemptStateResult {
   final SinglePlayerGame? game;
   final SlideDTO? nextSlide;
@@ -19,6 +23,9 @@ class AttemptStateResult {
   AttemptStateResult({required this.game, this.nextSlide});
 }
 
+// Resultado del envío de una respuesta: incluye la evaluación de la
+// pregunta enviada y (opcionalmente) la siguiente slide y el índice
+// correcto para mostrar en la UI.
 class SubmitAnswerResult {
   final QuestionResult evaluatedQuestion;
   final SlideDTO? nextSlide;
@@ -31,6 +38,7 @@ class SubmitAnswerResult {
   });
 }
 
+// Resultado del caso de uso que devuelve el resumen final del intento.
 class SummaryResult {
   final SinglePlayerGame summaryGame;
   SummaryResult({required this.summaryGame});
@@ -42,8 +50,13 @@ class SummaryResult {
 class StartAttemptUseCase {
   final SinglePlayerGameRepository repository;
   final SlideProvider slideProvider;
+  final GetAttemptStateUseCase? getAttemptStateUseCase;
 
-  StartAttemptUseCase({required this.repository, required this.slideProvider});
+  StartAttemptUseCase({
+    required this.repository,
+    required this.slideProvider,
+    this.getAttemptStateUseCase,
+  });
 
   Future<StartAttemptResult> execute({
     required String kahootId,
@@ -55,9 +68,34 @@ class StartAttemptUseCase {
       playerId: playerId,
       totalQuestions: totalQuestions,
     );
-    final firstSlide = await slideProvider.getNextSlideDto(game.gameId);
 
-    return StartAttemptResult(game: game, firstSlide: firstSlide);
+    // Intentamos obtener el estado más reciente del intento mediante
+    // `GetAttemptStateUseCase` cuando esté disponible. De esta forma la
+    // capa de aplicación usa explícitamente el caso de uso de consulta para
+    // reanudar en lugar de depender únicamente del comportamiento de
+    // `startAttempt`.
+    SinglePlayerGame latest = game;
+    if (getAttemptStateUseCase != null) {
+      try {
+        final state = await getAttemptStateUseCase!.execute(game.gameId);
+        if (state.game != null) {
+          latest = state.game!;
+        }
+      } catch (_) {
+        // Si falla la consulta de estado, continuamos con la respuesta de
+        // `startAttempt` para no bloquear el inicio.
+      }
+    }
+
+    // Sincronizamos el puntero del proveedor de slides con el número de
+    // respuestas persistidas en el agregado para evitar avances dobles.
+    await slideProvider.ensurePointerSynced(
+      latest.gameId,
+      latest.gameAnswers.length,
+    );
+    final firstSlide = await slideProvider.getNextSlideDto(latest.gameId);
+
+    return StartAttemptResult(game: latest, firstSlide: firstSlide);
   }
 }
 
@@ -77,6 +115,7 @@ class GetAttemptStateUseCase {
 class SubmitAnswerUseCase {
   final SinglePlayerGameRepository repository;
   final SlideProvider slideProvider;
+
   SubmitAnswerUseCase({required this.repository, required this.slideProvider});
 
   Future<SubmitAnswerResult> execute(
@@ -89,6 +128,7 @@ class SubmitAnswerUseCase {
       attemptId,
       evaluated.questionId,
     );
+
     return SubmitAnswerResult(
       evaluatedQuestion: evaluated,
       nextSlide: nextSlide,

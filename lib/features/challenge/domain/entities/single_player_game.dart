@@ -1,4 +1,5 @@
 // ENUM
+// Representa el estado del progreso del juego (en curso o completado).
 enum GameProgressStatus {
   IN_PROGRESS,
   COMPLETED;
@@ -14,6 +15,8 @@ enum GameProgressStatus {
 }
 
 // AGGREGATE ROOT
+// Agregado raíz que representa un intento de juego en modo single-player.
+// Contiene información del jugador, progreso, puntuación y respuestas.
 class SinglePlayerGame {
   final String gameId;
   final String quizId;
@@ -72,6 +75,7 @@ class SinglePlayerGame {
 
 // VALUE OBJECTS
 
+// Objeto de valor que representa el progreso (estado y porcentaje) del intento.
 class GameProgress {
   final GameProgressStatus state;
   final double progress;
@@ -91,6 +95,7 @@ class GameProgress {
 }
 
 class GameScore {
+  // Objeto de valor que encapsula la puntuación acumulada del intento.
   final int score;
 
   GameScore({required this.score});
@@ -103,6 +108,7 @@ class GameScore {
 }
 
 class QuestionResult {
+  // Resultado de una pregunta: ID, respuesta del jugador y evaluación.
   final String questionId;
   final PlayerAnswer playerAnswer;
   final EvaluatedAnswer evaluatedAnswer;
@@ -131,6 +137,7 @@ class QuestionResult {
 }
 
 class PlayerAnswer {
+  // Representa la respuesta enviada por el jugador y el tiempo usado en ms.
   final List<int>? answerIndex;
   final int timeUsedMs;
 
@@ -153,6 +160,7 @@ class PlayerAnswer {
 }
 
 class EvaluatedAnswer {
+  // Resultado de la evaluación de una respuesta: si fue correcta y puntos.
   final bool wasCorrect;
   final int pointsEarned;
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'common_pages/dashboard_page.dart';
 import 'features/challenge/domain/repositories/single_player_game_repository.dart';
 import 'features/challenge/infrastructure/repositories/single_player_game_repository_impl.dart';
+import 'features/challenge/infrastructure/ports/slide_provider_impl.dart';
 import 'features/challenge/application/use_cases/single_player_usecases.dart';
 import 'features/challenge/application/ports/slide_provider.dart';
 import 'features/challenge/presentation/blocs/single_player_challenge_bloc.dart';
@@ -19,24 +20,25 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<SlideProvider>(create: (_) => SlideProviderImpl()),
         Provider<SinglePlayerGameRepositoryImpl>(
-          create: (_) => SinglePlayerGameRepositoryImpl(),
+          create: (context) => SinglePlayerGameRepositoryImpl(
+            slideProvider: context.read<SlideProvider>(),
+          ),
         ),
         Provider<SinglePlayerGameRepository>(
           create: (context) => context.read<SinglePlayerGameRepositoryImpl>(),
         ),
-        Provider<SlideProvider>(
-          create: (context) => context.read<SinglePlayerGameRepositoryImpl>(),
+        Provider<GetAttemptStateUseCase>(
+          create: (context) => GetAttemptStateUseCase(
+            repository: context.read<SinglePlayerGameRepository>(),
+          ),
         ),
         Provider<StartAttemptUseCase>(
           create: (context) => StartAttemptUseCase(
             repository: context.read<SinglePlayerGameRepository>(),
             slideProvider: context.read<SlideProvider>(),
-          ),
-        ),
-        Provider<GetAttemptStateUseCase>(
-          create: (context) => GetAttemptStateUseCase(
-            repository: context.read<SinglePlayerGameRepository>(),
+            getAttemptStateUseCase: context.read<GetAttemptStateUseCase>(),
           ),
         ),
         Provider<SubmitAnswerUseCase>(

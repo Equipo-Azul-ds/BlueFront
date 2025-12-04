@@ -2,86 +2,17 @@ import 'dart:async';
 import '../../domain/entities/single_player_game.dart';
 import '../../domain/repositories/single_player_game_repository.dart';
 import '../../application/ports/slide_provider.dart';
-import '../../application/dtos/single_player_dtos.dart';
 
-class SinglePlayerGameRepositoryImpl
-    implements SinglePlayerGameRepository, SlideProvider {
+class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
+  // Repositorio en memoria que guarda los intentos de juego. Se encarga de
+  // crear, reanudar y persistir respuestas dentro del agregado
+  // `SinglePlayerGame`.
   final Map<String, SinglePlayerGame> _games = {};
-  final Map<String, int> _questionPosition =
-      {};
+  // Puntero interno que indica la "próxima" pregunta a servir por este
+  // repositorio. 
+  final SlideProvider slideProvider;
 
-  // Mock question bank para Slides DTO
-  final List<SlideDTO> _mockSlides = [
-    SlideDTO(
-      slideId: 'q1',
-      questionText: 'What is 2 + 2?',
-      questionType: 'quiz',
-      timeLimitSeconds: 20,
-      options: [
-        SlideOptionDTO(index: 0, text: '3'),
-        SlideOptionDTO(index: 1, text: '4'),
-        SlideOptionDTO(index: 2, text: '5'),
-      ],
-      mediaUrl: null,
-    ),
-    SlideDTO(
-      slideId: 'q2',
-      questionText: 'What is the capital of France?',
-      questionType: 'quiz',
-      timeLimitSeconds: 20,
-      options: [
-        SlideOptionDTO(index: 0, text: 'Paris'),
-        SlideOptionDTO(index: 1, text: 'London'),
-        SlideOptionDTO(index: 2, text: 'Berlin'),
-      ],
-      mediaUrl: null,
-    ),
-    SlideDTO(
-      slideId: 'q3',
-      questionText: 'Which planet is known as the Red Planet?',
-      questionType: 'quiz',
-      timeLimitSeconds: 20,
-      options: [
-        SlideOptionDTO(index: 0, text: 'Earth'),
-        SlideOptionDTO(index: 1, text: 'Mars'),
-        SlideOptionDTO(index: 2, text: 'Venus'),
-      ],
-      mediaUrl: null,
-    ),
-    SlideDTO(
-      slideId: 'q4',
-      questionText: 'What is the boiling point of water (°C)?',
-      questionType: 'quiz',
-      timeLimitSeconds: 20,
-      options: [
-        SlideOptionDTO(index: 0, text: '90'),
-        SlideOptionDTO(index: 1, text: '100'),
-        SlideOptionDTO(index: 2, text: '110'),
-      ],
-      mediaUrl: null,
-    ),
-    SlideDTO(
-      slideId: 'q5',
-      questionText: 'Which language is primary for Flutter development?',
-      questionType: 'quiz',
-      timeLimitSeconds: 20,
-      options: [
-        SlideOptionDTO(index: 0, text: 'Java'),
-        SlideOptionDTO(index: 1, text: 'Dart'),
-        SlideOptionDTO(index: 2, text: 'Kotlin'),
-      ],
-      mediaUrl: null,
-    ),
-  ];
-
-  // Index que tiene el back para determinar la respuesta correcta
-  final Map<String, int> _correctAnswers = {
-    'q1': 1,
-    'q2': 0,
-    'q3': 1,
-    'q4': 1,
-    'q5': 1,
-  };
+  SinglePlayerGameRepositoryImpl({required this.slideProvider});
 
   @override
   Future<SinglePlayerGame> startAttempt({
@@ -89,8 +20,6 @@ class SinglePlayerGameRepositoryImpl
     required String playerId,
     required int totalQuestions,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-
     final now = DateTime.now();
     // Si hay un intento en progreso existente para este jugador+quiz, preferimos
     // el más reciente (por startedAt) y lo reanudamos. Esto evita que
@@ -107,14 +36,9 @@ class SinglePlayerGameRepositoryImpl
     }
 
     if (existing != null) {
-      // Reanuda intento existente
-      final resumeId = existing.gameId;
-      final expectedIdx = existing.gameAnswers.length;
-      final currentPtr = _questionPosition[resumeId] ?? 0;
-      if (currentPtr != expectedIdx) {
-        _questionPosition[resumeId] = expectedIdx;
-
-      }
+      // Reanuda intento existente: devolvemos el agregado tal cual está.
+      // La sincronización del puntero de slides la realiza el
+      // `SlideProviderImpl` a través del caso de uso `StartAttemptUseCase`.
       return existing;
     }
 
@@ -136,14 +60,16 @@ class SinglePlayerGameRepositoryImpl
     );
 
     _games[attemptId] = game;
-    _questionPosition[attemptId] = 0;
 
     return game;
   }
 
   @override
   Future<SinglePlayerGame?> getAttemptState(String attemptId) async {
-    await Future.delayed(const Duration(milliseconds: 120));
+    // getAttemptState: devuelve el agregado `SinglePlayerGame` tal como
+    // está persistido en memoria. El método se usa para recuperar el estado
+    // actual del intento (p. ej. para reanudar una partida) y para refrescar
+    // el agregado después de enviar una respuesta.
     return _games[attemptId];
   }
 
@@ -152,21 +78,22 @@ class SinglePlayerGameRepositoryImpl
     String attemptId,
     PlayerAnswer playerAnswer,
   ) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-
     final game = _games[attemptId];
     if (game == null) throw Exception('Attempt not found');
 
-    // Determina qué pregunta fue la última servida a este intento.
-    // Usamos _questionPosition como el puntero "siguiente a servir", por lo que la pregunta actual que fue respondida es _questionPosition[attemptId] - 1.
-    final nextPos = _questionPosition[attemptId] ?? 0;
-    final currentQuestionIndex = (nextPos - 1) >= 0 ? (nextPos - 1) : 0;
+    // Determina el índice de la pregunta que está siendo respondida usando
+    // el número de respuestas ya persistidas: si `game.gameAnswers.length`
+    // es N significa que el jugador está respondiendo la slide en el índice
+    // `N` (0-based).
+    final currentQuestionIndex = game.gameAnswers.length;
 
-    // Si el dominio no lleva explícitamente los IDs de slide/pregunta,
-    // leemos questionId de la lista mock de slides (solo en infraestructura).
-    final slide = (currentQuestionIndex < _mockSlides.length)
-        ? _mockSlides[currentQuestionIndex]
-        : null;
+    // Obtenemos metadata de la slide desde el SlideProvider sin avanzar el
+    // puntero (peek). Esto evita duplicar el banco de slides dentro del
+    // repositorio.
+    final slide = await slideProvider.peekSlideDto(
+      attemptId,
+      currentQuestionIndex,
+    );
     final questionId =
         slide?.slideId ?? 'unknown_question_$currentQuestionIndex';
 
@@ -175,13 +102,18 @@ class SinglePlayerGameRepositoryImpl
         (playerAnswer.answerIndex == null || playerAnswer.answerIndex!.isEmpty)
         ? null
         : playerAnswer.answerIndex!.first;
-    final correctIndex = _correctAnswers[questionId];
+    final correctIndex = await slideProvider.getCorrectAnswerIndex(
+      attemptId,
+      questionId,
+    );
     final wasCorrect =
         (chosenIndex != null &&
         correctIndex != null &&
         chosenIndex == correctIndex);
 
-    // Calcula puntos basados en corrección y tiempo usado
+    // Calcula puntos basados en corrección y tiempo usado. Las respuestas
+    // correctas obtienen un puntaje entre `baseMin` y `baseMax` proporcional
+    // a la rapidez con la que se respondió.
     final int baseMax = 1000;
     final int baseMin = 200;
     final int timeUsed = playerAnswer.timeUsedMs;
@@ -207,7 +139,8 @@ class SinglePlayerGameRepositoryImpl
       evaluatedAnswer: evaluated,
     );
 
-    // Persiste el agregado en dominio (crea los value objects actualizados)
+    // Persiste el agregado en dominio (se crea una copia inmutable con los
+    // valores actualizados: respuestas, progresión y score).
     final updatedAnswers = List<QuestionResult>.from(game.gameAnswers)..add(qr);
     final updatedScore = game.gameScore.score + evaluated.pointsEarned;
     final progress =
@@ -235,69 +168,14 @@ class SinglePlayerGameRepositoryImpl
 
     _games[attemptId] = updatedGame;
 
-
     return qr;
   }
 
   @override
   Future<SinglePlayerGame> getAttemptSummary(String attemptId) async {
-    await Future.delayed(const Duration(milliseconds: 150));
     final game = _games[attemptId];
     if (game == null) throw Exception('Attempt not found');
     return game;
   }
 
-  // SlideProvider
-
-  @override
-  Future<SlideDTO?> getNextSlideDto(String attemptId) async {
-    final idx = _questionPosition[attemptId] ?? 0;
-    if (idx >= _mockSlides.length) {
-      // No hay mas Slides
-      return null;
-    }
-
-    final slide = _mockSlides[idx];
-    _questionPosition[attemptId] = idx + 1;
-    // Devuelve Slide
-    return slide;
-  }
-
-  @override
-  Future<int?> getCorrectAnswerIndex(
-    String attemptId,
-    String questionId,
-  ) async {
-    return _correctAnswers[questionId];
-  }
-
-  /// Para Rematch
-  Future<SinglePlayerGame> createFreshAttempt({
-    required String kahootId,
-    required String playerId,
-    required int totalQuestions,
-  }) async {
-    final now = DateTime.now();
-    final attemptId = 'attempt_${now.millisecondsSinceEpoch}';
-
-    final game = SinglePlayerGame(
-      gameId: attemptId,
-      quizId: kahootId,
-      totalQuestions: totalQuestions,
-      playerId: playerId,
-      gameProgress: GameProgress(
-        state: GameProgressStatus.IN_PROGRESS,
-        progress: 0.0,
-      ),
-      gameScore: GameScore(score: 0),
-      startedAt: now,
-      completedAt: null,
-      gameAnswers: [],
-    );
-
-    _games[attemptId] = game;
-    _questionPosition[attemptId] = 0;
-
-    return game;
-  }
 }
