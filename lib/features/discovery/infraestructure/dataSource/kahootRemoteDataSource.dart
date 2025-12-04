@@ -36,8 +36,8 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
     String order = 'desc',
   }) async {
     final uri = _buildUri(
-      '/kahoots',
-      {'q': query, 'themes': themes, 'orderBy': orderBy, 'order': order},
+      '/explore',
+      {'q': query, 'categories': themes, 'orderBy': orderBy, 'order': order},
     );
 
     try {
@@ -47,6 +47,7 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
         final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
         return KahootSearchResponseDto.fromJson(jsonResponse);
       } else if (response.statusCode == 400) {
+        // Correcto manejo del 400 Bad Request
         throw ServerException(message: "400: Parámetros de búsqueda inválidos.");
       } else {
         final msg = 'Fallo al cargar Kahoots: ${response.statusCode} - ${response.body}';
@@ -59,32 +60,27 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
   }
 
   @override
-  Future<List<KahootModel>> fetchFeaturedKahoots({
+  Future<KahootSearchResponseDto> fetchFeaturedKahoots({
     int? limit,
   }) async {
     final uri = _buildUri(
-      '/kahoots/featured',
+      '/explore/featured',
       {'limit': limit},
     );
 
     try {
-      print('KahootRemoteDataSourceImpl.fetchFeaturedKahoots -> GET $uri');
       final response = await cliente.get(uri, headers: {'Content-Type': 'application/json'});
-      print('Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = json.decode(response.body);
-        final List<dynamic> dataList = jsonResponse['data'] as List<dynamic>; // Acceder a la clave 'data'
+        final Map<String, dynamic> jsonBody = json.decode(response.body);
 
-        return dataList
-            .map((item) => KahootModel.fromJson(item as Map<String, dynamic>))
-            .toList();
+        // CORRECCIÓN CLAVE: Usar el DTO para parsear la respuesta paginada.
+        return KahootSearchResponseDto.fromJson(jsonBody);
       } else {
         final msg = 'Error al recuperar Kahoots destacados: ${response.statusCode} - ${response.body}';
         throw ServerException(message: msg);
       }
     } catch (e) {
-      print('KahootRemoteDataSourceImpl.fetchFeaturedKahoots -> Error: $e');
       rethrow;
     }
   }

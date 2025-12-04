@@ -12,7 +12,7 @@ class KahootMapper {
       visibility: json['visibility'],
       status:json['status'],
       themes:List<String>.from(json['themes']??[]),
-      authorId: json['authorId'],
+      author: json['authorId'],
       createdAt: DateTime.parse(json['createdAt']),
     );
   }
@@ -28,7 +28,7 @@ static Map<String,dynamic> toJson(Kahoot kahoot){
     'visibility':kahoot.visibility,
     'status':kahoot.status,
     'themes':kahoot.themes,
-    'authorId':kahoot.authorId,
+    'authorId':kahoot.author,
     'createdAt':kahoot.createdAt.toIso8601String(),
   };
 }

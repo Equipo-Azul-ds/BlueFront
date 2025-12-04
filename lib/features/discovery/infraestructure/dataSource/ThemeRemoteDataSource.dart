@@ -14,7 +14,7 @@ class ThemeRemoteDataSource implements IThemeRemoteDataSource {
 
   @override
   Future<ThemeListResponseDto> fetchThemes() async {
-    const String path = '/themes';
+    const String path = '/explore/categories';
     final uri = Uri.parse('$baseUrl$path');
 
     try {

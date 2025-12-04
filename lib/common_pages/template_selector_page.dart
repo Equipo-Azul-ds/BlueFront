@@ -10,12 +10,12 @@ class TemplateSelectorPage extends StatelessWidget {
   Widget build(BuildContext context){
     //Simulo plantillas
     final templates = [
-      Kahoot(id: 't1', title: 'Template 1', visibility: 'publico', status: 'publico', themes: [], authorId: 'System', createdAt: DateTime.now()),
-      Kahoot(id: 't2', title: 'Template 2', visibility: 'publico', status: 'publico', themes: [], authorId: 'System', createdAt: DateTime.now()),
-      Kahoot(id: 't3', title: 'Template 3', visibility: 'publico', status: 'publico', themes: [], authorId: 'System', createdAt: DateTime.now()),
-      Kahoot(id: 't4', title: 'Template 4', visibility: 'publico', status: 'publico', themes: [], authorId: 'System', createdAt: DateTime.now()),
-      Kahoot(id: 't5', title: 'Template 5', visibility: 'publico', status: 'publico', themes: [], authorId: 'System', createdAt: DateTime.now()),
-      Kahoot(id: 't6', title: 'Template 6', visibility: 'publico', status: 'publico', themes: [], authorId: 'System', createdAt: DateTime.now()),
+      Kahoot(id: 't1', title: 'Template 1', visibility: 'publico', status: 'publico', themes: [], author: 'System', createdAt: DateTime.now()),
+      Kahoot(id: 't2', title: 'Template 2', visibility: 'publico', status: 'publico', themes: [], author: 'System', createdAt: DateTime.now()),
+      Kahoot(id: 't3', title: 'Template 3', visibility: 'publico', status: 'publico', themes: [], author: 'System', createdAt: DateTime.now()),
+      Kahoot(id: 't4', title: 'Template 4', visibility: 'publico', status: 'publico', themes: [], author: 'System', createdAt: DateTime.now()),
+      Kahoot(id: 't5', title: 'Template 5', visibility: 'publico', status: 'publico', themes: [], author: 'System', createdAt: DateTime.now()),
+      Kahoot(id: 't6', title: 'Template 6', visibility: 'publico', status: 'publico', themes: [], author: 'System', createdAt: DateTime.now()),
     ];
 
     return Scaffold(

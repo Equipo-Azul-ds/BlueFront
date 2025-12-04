@@ -1,3 +1,4 @@
+import 'package:Trivvy/features/discovery/application/model/Theme_Model.dart';
 import 'package:dartz/dartz.dart';
 import '../../../../core/errors/exception.dart';
 import '../../../../core/errors/failures.dart';

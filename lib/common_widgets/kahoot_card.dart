@@ -37,7 +37,7 @@ class KahootCard extends StatelessWidget{
                     ),
                     SizedBox(height: constraints.maxHeight * 0.005),
                     Text(
-                      '${kahoot.authorId} • ${kahoot.themes.length} preguntas',
+                      '${kahoot.author} • ${kahoot.themes.length} preguntas',
                       style: TextStyle(
                         color: Colors.grey,
                         fontSize: constraints.maxWidth * 0.03

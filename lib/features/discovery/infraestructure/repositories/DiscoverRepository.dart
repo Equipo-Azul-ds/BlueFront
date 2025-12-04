@@ -39,11 +39,12 @@ class DiscoverRepository implements IDiscoverRepository{
     int? limit,
   }) async {
     try {
-      final kahootsModel = await remoteDataSource.fetchFeaturedKahoots(
+
+      final responseDto = await remoteDataSource.fetchFeaturedKahoots(
         limit: limit,
       );
 
-      return Right(kahootsModel);
+      return Right(responseDto.data);
 
     } on ServerException {
       return Left(NetworkFailure());

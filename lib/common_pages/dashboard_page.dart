@@ -20,7 +20,7 @@ class DashboardPage extends StatelessWidget{
             visibility: 'publico', 
             status: 'publico', 
             themes: [], 
-            authorId: 'Massiel', 
+            author: 'Massiel',
             createdAt: DateTime.now()),
         Kahoot(
           id: '2', 
@@ -28,7 +28,7 @@ class DashboardPage extends StatelessWidget{
           visibility: 'publico',
           status: 'publico', 
           themes: [], 
-          authorId: 'Jose', 
+          author: 'Jose',
           createdAt: DateTime.now()),
       ];
 
@@ -39,7 +39,7 @@ class DashboardPage extends StatelessWidget{
           visibility: 'publico', 
           status: 'publico', 
           themes: [], 
-          authorId: 'Massiel', 
+          author: 'Massiel',
           createdAt: DateTime.now()),
         Kahoot(
           id: '4', 
@@ -47,7 +47,7 @@ class DashboardPage extends StatelessWidget{
           visibility: 'publico', 
           status: 'publico', 
           themes: [], 
-          authorId: 'Jose', 
+          author: 'Jose',
           createdAt: DateTime.now()),
       ];
 

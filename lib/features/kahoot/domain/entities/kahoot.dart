@@ -7,7 +7,7 @@ class Kahoot{
   final String visibility; //publico o privado
   final String status; //borrador o publicado
   final List<String> themes;
-  final String authorId;
+  final String author;
   final DateTime createdAt;
   final int? playCount;
 
@@ -19,7 +19,7 @@ class Kahoot{
     required this.visibility,
     required this.status,
     required this.themes,
-    required this.authorId,
+    required this.author,
     required this.createdAt,
     this.playCount
 });
@@ -41,7 +41,7 @@ class Kahoot{
           visibility: visibility ?? this.visibility,
           status: status ?? this.status,
           themes: themes ?? this.themes,
-          authorId: authorId,
+          author: author,
           createdAt: createdAt,
         );
       }

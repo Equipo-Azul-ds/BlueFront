@@ -1,4 +1,7 @@
 import '../../../kahoot/domain/entities/kahoot.dart';
+import 'dart:convert'; // Necesario para DateTime.parse
+
+
 
 class KahootModel extends Kahoot {
   KahootModel({
@@ -9,32 +12,50 @@ class KahootModel extends Kahoot {
     required super.visibility,
     required super.status,
     required super.themes,
-    required super.authorId,
+    required super.author,
     required super.createdAt,
     super.playCount,
   });
 
   factory KahootModel.fromJson(Map<String, dynamic> json) {
-    final themesList = (json['themes'] as List<dynamic>?)?.cast<String>() ?? [];
+
+
+    final id = json['id'] as String?; // id: uuid_kahoot
+    final title = json['title'] as String?;
+    final description = json['description'] as String?;
+    final coverImageId = json['coverImageId'] as String?; // coverImageId (URL)
+
+    final visibility = json['visibility'] as String?; // visibility: “public” | “private”
+    final status = json['status'] as String?; // Status: “draft” | “published”
 
     final authorJson = json['author'] as Map<String, dynamic>?;
-    final authorIdValue = authorJson?['id'] as String? ?? 'Desconocido';
+    final authorId = authorJson?['id'] as String?;
+    final authorName = authorJson?['name'] as String;
 
+    final createdAtString = json['createdAt'] as String?; // createdAt: ISODate
+    final playCount = json['playCount'] as int?;
+
+    // 3. Mapeo de 'category' a 'themes'
+    final category = json['category'] as String?;
+    final themesList = category != null ? [category] : <String>[];
+    final kahootImage = coverImageId;
+
+
+    if (id == null || title == null || authorId == null || createdAtString == null) {
+      throw const FormatException('Kahoot JSON missing required fields: id, title, authorId, createdAt.');
+    }
 
     return KahootModel(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String?,
-      kahootImage: json['kahootImage'] as String?,
-      visibility: json['visibility'] as String? ?? 'public',
-      status: json['status'] as String? ?? 'published',
-
+      id: id,
+      title: title,
+      description: description,
+      kahootImage: kahootImage,
+      visibility: visibility ?? 'public',
+      status: status ?? 'published',
       themes: themesList,
-
-      authorId: authorIdValue,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-
-      playCount: json['playCount'] as int?,
+      author: authorName,
+      createdAt: DateTime.parse(createdAtString),
+      playCount: playCount ?? 0,
     );
   }
 }

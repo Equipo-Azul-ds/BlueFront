@@ -148,7 +148,7 @@ List<Widget> buildKahootWidgets(BuildContext context, List<Kahoot> kahoots) {
         child: KahootListItem(
           number: (index + 1).toString(),
           title: kahoot.title,
-          source: kahoot.authorId,
+          source: kahoot.author,
           image: kahoot.kahootImage,
           onTap: () {
             Navigator.of(context).pushNamed(

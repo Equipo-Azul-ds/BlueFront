@@ -10,9 +10,10 @@ import 'package:Trivvy/core/errors/failures.dart';
 import 'Themetest.mocks.dart';
 
 
+
+
 void main() {
   late ThemeRepository repository;
-  // Usamos el mock de la interfaz del Data Source
   late MockThemeRemoteDataSource mockRemoteDataSource;
 
   setUp(() {
@@ -20,16 +21,17 @@ void main() {
     repository = ThemeRepository(remoteDataSource: mockRemoteDataSource);
   });
 
-  // Datos de prueba
   final tThemeModel = ThemeModel(
-    id: '1', name: 'Science', description: 'Desc', kahootCount: 10,
+    name: 'Science',
   );
+
+
   final tThemeEntity = tThemeModel.toEntity();
   final tThemeListDto = ThemeListResponseDto(data: [tThemeModel]);
 
   group('getThemes', () {
     test('debe retornar List<ThemeEntity> si la llamada al DataSource es exitosa', () async {
-      // Arrange: Simular el éxito del Data Source
+
       when(mockRemoteDataSource.fetchThemes())
           .thenAnswer((_) async => tThemeListDto);
 
@@ -43,9 +45,9 @@ void main() {
     });
 
     test('debe retornar NetworkFailure si la llamada falla con ServerException', () async {
-      // Arrange: Simular la falla del Data Source
+
       when(mockRemoteDataSource.fetchThemes())
-          .thenThrow(ServerException(message: 'Error 500'));
+          .thenThrow(ServerException(message: 'Error de servidor'));
 
       // Act
       final result = await repository.getThemes();
