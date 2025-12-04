@@ -27,6 +27,19 @@ class KahootDetailPage extends StatelessWidget {
     );
   }
 
+  // Simula el fin del juego y actualiza el progreso al 100%
+  void _simulateGameCompletion(BuildContext context, String kahootId) async {
+    final manager = context.read<LibraryProvider>();
+
+    // Llamamos al método del Provider, que ejecuta el Use Case y recarga las listas
+    await manager.updateKahootProgress(
+      kahootId: kahootId,
+      userId: _userId,
+      newPercentage: 100,
+      isCompleted: true,
+    );
+  }
+
   // Widget para mostrar el estado y progreso
   Widget _buildStatusIndicator(
     BuildContext context,
@@ -86,8 +99,9 @@ class KahootDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final String kahootId =
         ModalRoute.of(context)!.settings.arguments as String;
-    final GetKahootDetailUseCase getKahootDetail = context
-        .read<GetKahootDetailUseCase>();
+    //final GetKahootDetailUseCase getKahootDetail = context
+    //.read<GetKahootDetailUseCase>();
+    final getKahootDetail = context.read<GetKahootDetailUseCase>();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Detalle del Kahoot')),
@@ -118,6 +132,9 @@ class KahootDetailPage extends StatelessWidget {
                   // Obtenemos el estado de favorito y progreso
                   final isFavorite = progressSnapshot.data?.isFavorite ?? false;
                   final progress = progressSnapshot.data;
+                  final isCurrentlyLoading =
+                      progressSnapshot.connectionState ==
+                      ConnectionState.waiting;
 
                   return SingleChildScrollView(
                     padding: const EdgeInsets.all(16.0),
@@ -144,9 +161,7 @@ class KahootDetailPage extends StatelessWidget {
                                 size: 30,
                               ),
                               // Deshabilitar si aún está cargando el progreso
-                              onPressed:
-                                  progressSnapshot.connectionState ==
-                                      ConnectionState.waiting
+                              onPressed: isCurrentlyLoading
                                   ? null
                                   : () => _toggleFavorite(
                                       context,
@@ -169,11 +184,37 @@ class KahootDetailPage extends StatelessWidget {
                         _buildStatusIndicator(context, kahoot, progress),
                         const Divider(height: 16),
 
+                        // === BOTÓN SIMULACIÓN DE FINALIZACIÓN ===
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed:
+                                isCurrentlyLoading ||
+                                    (progress?.progressPercentage ?? 0) == 100
+                                ? null
+                                : () => _simulateGameCompletion(
+                                    context,
+                                    kahootId,
+                                  ),
+                            icon: const Icon(Icons.check_circle_outline),
+                            label: Text(
+                              'Simular Finalización (100%)',
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              backgroundColor: Colors.blue.shade700,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // === BOTÓN JUGAR ===
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
-                            onPressed: () {},
+                            onPressed: () {}, // Lógica real de juego iría aquí
                             icon: const Icon(Icons.play_arrow),
                             label: Text(
                               (progress?.progressPercentage ?? 0) > 0 &&

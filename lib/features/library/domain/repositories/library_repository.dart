@@ -30,4 +30,11 @@ abstract class LibraryRepository {
     required String userId,
     required bool isFavorite,
   });
+
+  Future<void> updateProgress({
+    required String kahootId,
+    required String userId,
+    required double newPercentage,
+    required bool isCompleted,
+  });
 }

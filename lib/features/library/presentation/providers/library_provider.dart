@@ -1,9 +1,10 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/kahoot_model.dart';
 import '../../domain/entities/kahoot_progress_model.dart';
-import '../../domain/repositories/library_repository.dart';
 import '../../application/get_kahoots_use_cases.dart';
 import '../../application/toggle_favorite_use_case.dart';
+import '../../application/update_kahoot_progress_usecase.dart';
+import '../../application/get_kahoot_progress_usecase.dart';
 
 // Definición de los estados para la interfaz de usuario
 enum LibraryState { initial, loading, loaded, error }
@@ -14,7 +15,8 @@ class LibraryProvider with ChangeNotifier {
   final GetInProgressKahootsUseCase _getInProgress;
   final GetCompletedKahootsUseCase _getCompleted;
   final ToggleFavoriteUseCase _toggleFavorite;
-  final LibraryRepository _repository;
+  final UpdateKahootProgressUseCase _updateProgress;
+  final GetKahootProgressUseCase _getKahootProgress;
 
   LibraryProvider({
     required GetCreatedKahootsUseCase getCreated,
@@ -22,13 +24,15 @@ class LibraryProvider with ChangeNotifier {
     required GetInProgressKahootsUseCase getInProgress,
     required GetCompletedKahootsUseCase getCompleted,
     required ToggleFavoriteUseCase toggleFavorite,
-    required LibraryRepository repository,
+    required UpdateKahootProgressUseCase updateProgress,
+    required GetKahootProgressUseCase getKahootProgress,
   }) : _getCreated = getCreated,
        _getFavorite = getFavorite,
        _getInProgress = getInProgress,
        _getCompleted = getCompleted,
        _toggleFavorite = toggleFavorite,
-       _repository = repository;
+       _updateProgress = updateProgress,
+       _getKahootProgress = getKahootProgress;
 
   LibraryState _state = LibraryState.initial;
   LibraryState get state => _state;
@@ -73,7 +77,7 @@ class LibraryProvider with ChangeNotifier {
   }
 
   Future<KahootProgress?> getKahootProgress(String kahootId, String userId) {
-    return _repository.getProgressForKahoot(kahootId: kahootId, userId: userId);
+    return _getKahootProgress.execute(kahootId: kahootId, userId: userId);
   }
 
   Future<void> toggleFavoriteStatus({
@@ -86,6 +90,23 @@ class LibraryProvider with ChangeNotifier {
       isFavorite: !currentStatus,
     );
 
+    await loadAllLists(userId);
+  }
+
+  Future<void> updateKahootProgress({
+    required String kahootId,
+    required String userId,
+    required double newPercentage,
+    required bool isCompleted,
+  }) async {
+    await _updateProgress.execute(
+      kahootId: kahootId,
+      userId: userId,
+      newPercentage: newPercentage,
+      isCompleted: isCompleted,
+    );
+
+    // Recargar todas las listas para reflejar el cambio en la UI
     await loadAllLists(userId);
   }
 }

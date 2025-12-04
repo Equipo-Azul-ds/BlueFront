@@ -172,4 +172,45 @@ class MockLibraryRepository implements LibraryRepository {
       );
     }
   }
+
+  @override
+  Future<void> updateProgress({
+    required String kahootId,
+    required String userId,
+    required double newPercentage,
+    required bool isCompleted,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    final index = _mockProgress.indexWhere(
+      (p) => p.kahootId == kahootId && p.userId == userId,
+    );
+
+    if (index != -1) {
+      // 1. Si ya existe un progreso, lo actualizamos y reemplazamos.
+      final oldProgress = _mockProgress[index];
+
+      // Creamos una nueva instancia de progreso con los nuevos valores
+      _mockProgress[index] = KahootProgress(
+        kahootId: oldProgress.kahootId,
+        userId: oldProgress.userId,
+        isFavorite: oldProgress.isFavorite,
+        progressPercentage: newPercentage.toInt(),
+        lastAttemptAt: DateTime.now(),
+        isCompleted: isCompleted,
+      );
+    } else {
+      // 2. Si no existe, creamos un nuevo registro.
+      _mockProgress.add(
+        KahootProgress(
+          kahootId: kahootId,
+          userId: userId,
+          isFavorite: false, // Por defecto, al empezar un Kahoot no es favorito
+          progressPercentage: newPercentage.toInt(),
+          lastAttemptAt: DateTime.now(),
+          isCompleted: isCompleted,
+        ),
+      );
+    }
+  }
 }
