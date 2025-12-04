@@ -109,11 +109,10 @@ class MediaRepositoryImpl implements MediaRepository {
   }
 
   /// Persist metadata-only: currently backend exposes upload endpoint which
-  /// already persists metadata and returns Media. This method will be a no-op
-  /// and return the provided media for compatibility with older flows.
+  /// already persists metadata and returns Media. This method is a no-op
+  /// and returns the provided media for compatibility with older flows.
   Future<Media> save(Media media) async {
-    // If you have an endpoint to save metadata separately, implement it here.
-    // For now, just return the passed media.
+    // No-op: uploadFromBytes already handles persistence on the backend.
     return media;
   }
 
