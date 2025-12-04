@@ -148,6 +148,18 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
   ];
   String? _selectedThemeId;
   
+  // Devuelve el color asociado a un themeId; si no hay match devuelve null
+  Color? _colorForTheme(String? id) {
+    if (id == null) return null;
+    try {
+      final t = _availableThemes.firstWhere((e) => e['id'] == id, orElse: () => {} as Map<String, String>);
+      if (t.isEmpty) return null;
+      return Color(int.parse('0xFF${t['color']}'));
+    } catch (_) {
+      return null;
+    }
+  }
+  
 
   Future<void> _saveQuiz() async {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
@@ -184,6 +196,9 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     // Mapear preguntas y respuestas desde el currentQuiz si existen
     List<CreateQuestionDto> mappedQuestions = [];
     if (quizBloc.currentQuiz != null && quizBloc.currentQuiz!.questions.isNotEmpty) {
+      final allowedPoints = <int>{0, 1000, 2000};
+      int _normalizePoints(int p) => allowedPoints.contains(p) ? p : 1000;
+
       mappedQuestions = quizBloc.currentQuiz!.questions.map((q) {
         final answers = q.answers.map((a) => CreateAnswerDto(
           answerText: a.text,
@@ -195,7 +210,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
           mediaUrl: q.mediaUrl,
           questionType: q.type,
           timeLimit: q.timeLimit,
-          points: q.points,
+          points: _normalizePoints(q.points),
           answers: answers,
         );
       }).toList();
@@ -396,7 +411,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
     if(_step == 1){
       return Scaffold(
-        backgroundColor: AppColor.background,
+        backgroundColor: _colorForTheme(_selectedThemeId) ?? AppColor.background,
         appBar: AppBar(title: Text('Crear nuevo Quiz'), backgroundColor: AppColor.primary),
         body: LayoutBuilder(
           builder: (context, constraints) {
@@ -498,13 +513,23 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                             final colorHex = t['color']!;
                             final selected = _selectedThemeId == tid;
                             return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectedThemeId = tid;
-                                });
-                                if (quizBloc.currentQuiz != null) {
-                                  quizBloc.currentQuiz!.themeId = tid;
-                                  quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                              onTap: () async {
+                                // Mostrar previsualización y preguntar si desea aplicar este tema
+                                final picked = await showDialog<bool>(
+                                  context: context,
+                                  builder: (_) => ThemePreviewDialog(
+                                    themeName: name,
+                                    color: Color(int.parse('0xFF$colorHex')),
+                                  ),
+                                );
+                                if (picked == true) {
+                                  setState(() {
+                                    _selectedThemeId = tid;
+                                  });
+                                  if (quizBloc.currentQuiz != null) {
+                                    quizBloc.currentQuiz!.themeId = tid;
+                                    quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                                  }
                                 }
                               },
                               child: Container(
@@ -614,6 +639,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     }
     //Paso 2: Editor de Slides
     return Scaffold(
+      backgroundColor: _colorForTheme(_selectedThemeId) ?? AppColor.background,
       appBar: AppBar(
         title: Text('Editando'),
         actions: [
@@ -796,7 +822,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                 child: DropdownButtonFormField<int>(
                                   value: selectedQuestion.points,
                                   decoration: InputDecoration(labelText: 'Puntos'),
-                                  items: [0, 1000, 2000].map((p) => DropdownMenuItem(value: p, child: Text(p.toString()))).toList(),
+                                  items: (<int>{selectedQuestion.points, 0, 1000, 2000}).toList().map((p) => DropdownMenuItem(value: p, child: Text(p.toString()))).toList(),
                                   onChanged: (val){
                                     if (val == null) return;
                                     final q = selectedQuestion;
@@ -1202,6 +1228,75 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class ThemePreviewDialog extends StatelessWidget {
+  final String themeName;
+  final Color color;
+  const ThemePreviewDialog({Key? key, required this.themeName, required this.color}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      insetPadding: EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Previsualización', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 8),
+            Text(themeName, style: TextStyle(color: Colors.grey[700])),
+            SizedBox(height: 12),
+            // Mock phone preview
+            Container(
+              width: 220,
+              height: 420,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                color: color,
+                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0,4))],
+              ),
+              child: Stack(
+                children: [
+                  // Simple center content to resemble preview
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 160,
+                          height: 40,
+                          decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(8)),
+                        ),
+                        SizedBox(height: 16),
+                        Container(
+                          width: 120,
+                          height: 40,
+                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.75), borderRadius: BorderRadius.circular(8)),
+                          child: Center(child: Text('OK, go!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text('Cerrar')),
+                SizedBox(width: 8),
+                ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: Text('Seleccionar tema')),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }

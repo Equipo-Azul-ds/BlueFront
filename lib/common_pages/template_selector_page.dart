@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../features/kahoot/domain/entities/Quiz.dart';
+import '../features/kahoot/domain/entities/Question.dart';
+import '../features/kahoot/domain/entities/Answer.dart';
 import 'package:uuid/uuid.dart';
 
 /// Página que muestra plantillas visuales para que el usuario elija
@@ -58,8 +60,9 @@ class TemplateSelectorPage extends StatelessWidget {
           ElevatedButton(onPressed: () {
             Navigator.of(context).pop();
             // Cree una instancia de Quiz rellena con metadatos de plantilla y devuélvala
+            final quizId = Uuid().v4();
             final quiz = Quiz(
-              quizId: Uuid().v4(),
+              quizId: quizId,
               authorId: 'author-id-placeholder',
               title: tpl['title'] ?? '',
               description: tpl['description'] ?? '',
@@ -71,13 +74,111 @@ class TemplateSelectorPage extends StatelessWidget {
               coverImageUrl: tpl['image'],
               isLocal: true,
               createdAt: DateTime.now(),
-              questions: [],
+              questions: _makeTemplateQuestions(tpl['id'] ?? '', quizId),
             );
             Navigator.of(context).pop(quiz);
           }, child: Text('Usar plantilla')),
         ],
       ),
     );
+  }
+
+  List<Question> _makeTemplateQuestions(String templateId, String quizId){
+    switch(templateId){
+      // tpl_001 is explicitly labeled as V o F in the templates list
+      case 'tpl_001':
+        return _generateTrueFalseQuestions(quizId, 10);
+      // tpl_002 (Presentación interactiva) -> multiple choice
+      case 'tpl_002':
+        return _generateMultipleChoiceQuestions(quizId, 5);
+      // tpl_003 (Trivia visual) -> mixed
+      case 'tpl_003':
+        return _generateMixedQuestions(quizId, 5);
+      default:
+        return [];
+    }
+  }
+
+  List<Question> _generateMultipleChoiceQuestions(String quizId, int count){
+    final List<Question> questions = [];
+    for (var i = 0; i < count; i++){
+      final qId = Uuid().v4();
+        questions.add(Question(
+        questionId: qId,
+        quizId: quizId,
+        text: 'Pregunta de opción múltiple ${i+1}',
+        mediaUrl: null,
+        type: 'quiz',
+        timeLimit: 30,
+        points: 1000,
+        answers: [
+          Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: false, text: 'Opción A'),
+          Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: true, text: 'Opción B'),
+          Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: false, text: 'Opción C'),
+        ],
+      ));
+    }
+    return questions;
+  }
+
+  List<Question> _generateTrueFalseQuestions(String quizId, int count){
+    final List<Question> questions = [];
+    for (var i = 0; i < count; i++){
+      final qId = Uuid().v4();
+        questions.add(Question(
+        questionId: qId,
+        quizId: quizId,
+        text: 'Verdadero o Falso ${i+1}: Ejemplo de enunciado',
+        mediaUrl: null,
+        type: 'true_false',
+        timeLimit: 20,
+        points: 1000,
+        answers: [
+          Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: true, text: 'Verdadero'),
+          Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: false, text: 'Falso'),
+        ],
+      ));
+    }
+    return questions;
+  }
+
+  List<Question> _generateMixedQuestions(String quizId, int count){
+    final List<Question> questions = [];
+    for (var i = 0; i < count; i++){
+      final qId = Uuid().v4();
+        if (i % 2 == 0){
+        // multiple choice
+        questions.add(Question(
+          questionId: qId,
+          quizId: quizId,
+          text: 'Mixta MC ${i+1}',
+          mediaUrl: null,
+          type: 'quiz',
+          timeLimit: 25,
+          points: 1000,
+          answers: [
+            Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: true, text: 'Correcta'),
+            Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: false, text: 'Distractor 1'),
+          ],
+        ));
+      } else {
+        // true/false
+        questions.add(Question(
+          questionId: qId,
+          quizId: quizId,
+          text: 'Mixta TF ${i+1}',
+          mediaUrl: null,
+          type: 'true_false',
+          timeLimit: 20,
+          points: 1000,
+          answers: [
+            Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: false, text: 'Verdadero'),
+            Answer(answerId: Uuid().v4(), questionId: qId, isCorrect: true, text: 'Falso'),
+          ],
+        ));
+      }
+    }
+    return questions;
   }
 
   @override
@@ -119,8 +220,9 @@ class TemplateSelectorPage extends StatelessWidget {
                         Column(children: [
                           TextButton(onPressed: () => _showPreview(context, tpl), child: Text('Vista previa')),
                           ElevatedButton(onPressed: () {
+                            final quizId = Uuid().v4();
                             final quiz = Quiz(
-                              quizId: Uuid().v4(),
+                              quizId: quizId,
                               authorId: 'author-id-placeholder',
                               title: tpl['title'] ?? '',
                               description: tpl['description'] ?? '',
@@ -132,7 +234,7 @@ class TemplateSelectorPage extends StatelessWidget {
                               coverImageUrl: tpl['image'],
                               isLocal: true,
                               createdAt: DateTime.now(),
-                              questions: [],
+                              questions: _makeTemplateQuestions(tpl['id'] ?? '', quizId),
                             );
                             Navigator.of(context).pop(quiz);
                           }, child: Text('Usar plantilla')),
