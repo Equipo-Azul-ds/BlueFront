@@ -33,11 +33,11 @@ class QuizEditorBloc extends ChangeNotifier {
       final prevTemplate = currentQuiz?.templateId;
       final useCase = CreateQuizUsecase(repository);
       final created = await useCase.run(dto);
-      // preserve client-side template association if present
+      // preserva la asociación de plantilla del lado del cliente si está presente
       if (prevTemplate != null) created.templateId = prevTemplate;
       currentQuiz = created;
-      // Ensure the newly created/returned quiz is reflected in the
-      // user's quiz list so the dashboard (portada) shows updates.
+      // Aseguro que el quiz recién creado/devuelto se refleje en la
+      // lista de quizzes del usuario para que el dashboard (portada) muestre los cambios.
       _upsertIntoUserQuizzes(created);
     } catch (e) {
       errorMessage = 'Error al crear el Quiz: $e';
@@ -77,7 +77,7 @@ class QuizEditorBloc extends ChangeNotifier {
       final updated = await useCase.run(quizId, dto);
       if (prevTemplate != null) updated.templateId = prevTemplate;
       currentQuiz = updated;
-      // Keep the user list in sync so the dashboard reflects edits immediately
+      // Mantiene la lista de quizzes del usuario sincronizada para que el dashboard refleje los cambios de inmediato
       _upsertIntoUserQuizzes(updated);
     } catch (e) {
       errorMessage = 'Error al actualizar el Quiz: $e';
@@ -116,14 +116,14 @@ class QuizEditorBloc extends ChangeNotifier {
       final useCase = ListUserKahootsUseCase(repository);
       final fetched = await useCase.run(authorId);
 
-      // Merge fetched quizzes with any existing local list to avoid
-      // losing items that might be client-only or not returned by the
-      // backend in every response. Matching strategy:
-      // - If both have non-empty quizId, match by quizId and prefer server version.
-      // - For empty ids (local items), match by title+createdAt signature.
+      // Fusiona los quizzes obtenidos del servidor con la lista local existente para evitar
+      // perder elementos que puedan existir solo en el cliente o que no sean devueltos
+      // por el backend en cada respuesta. Estrategia de coincidencia:
+      // - Si ambos tienen un quizId no vacío, se emparejan por quizId y se prefiere la versión del servidor.
+      // - Para ids vacíos (elementos locales), se emparejan por la firma de título+createdAt.
       userQuizzes ??= [];
 
-      // Build maps for quick lookup
+      // Construye mapas para búsqueda rápida
       final existingById = <String, Quiz>{};
       final existingBySig = <String, Quiz>{};
       for (final q in userQuizzes!) {
@@ -132,27 +132,27 @@ class QuizEditorBloc extends ChangeNotifier {
         existingBySig[sig] = q;
       }
 
-      // Start with server list, but ensure local-only items are preserved
+      // Comienza con la lista del servidor, pero asegúrate de preservar los elementos que existen solo localmente
       final merged = <Quiz>[];
       for (final s in fetched) {
         if (s.quizId.isNotEmpty && existingById.containsKey(s.quizId)) {
-          // prefer server version but keep local reference semantics minimal
+            // preferimos la versión del servidor pero mantenemos la referencia local mínima
           merged.add(s);
           existingById.remove(s.quizId);
         } else {
           final sig = '${s.title.trim()}|${s.createdAt.toIso8601String()}|${s.coverImageUrl ?? ''}';
           if (existingBySig.containsKey(sig)) {
-            // server returned an item that matches a local signature — prefer server
+            // el servidor devolvió un elemento que coincide con una firma local — se prefiere la versión del servidor
             merged.add(s);
             existingBySig.remove(sig);
           } else {
-            // new server item
+            // nuevo elemento recibido del servidor
             merged.add(s);
           }
         }
       }
 
-      // Append any remaining local-only items that the server didn't return
+      // Agrega cualquier elemento restante que exista solo localmente y que el servidor no devolvió
       for (final leftover in existingById.values) {
         merged.insert(0, leftover);
       }
@@ -160,8 +160,8 @@ class QuizEditorBloc extends ChangeNotifier {
         merged.insert(0, leftover);
       }
 
-      // Deduplicate the merged list: prefer unique `quizId` when present,
-      // otherwise use a signature based on title+createdAt+cover to identify local items.
+      // Elimina duplicados de la lista fusionada: se prefiere el `quizId` único cuando está presente,
+      // de lo contrario, se utiliza una firma basada en título+createdAt+cover para identificar elementos locales.
       final seenIds = <String>{};
       final seenSigs = <String>{};
       final deduped = <Quiz>[];
@@ -201,7 +201,7 @@ class QuizEditorBloc extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Local editing helpers used by the UI to mutate the in-memory quiz and notify listeners
+  // Helpers de edición local utilizados por la UI para modificar el quiz en memoria y notificar a los oyentes
   void updateQuestionAt(int index, Question updated) {
     if (currentQuiz == null) return;
     if (index < 0 || index >= currentQuiz!.questions.length) return;
@@ -236,7 +236,7 @@ class QuizEditorBloc extends ChangeNotifier {
       final saved = await repository.save(currentQuiz!);
       if (prevTemplate != null) saved.templateId = prevTemplate;
       currentQuiz = saved;
-      // Update/insert into the userQuizzes cache so UI lists show the saved state
+      // Actualiza o inserta en la caché de userQuizzes para que las listas de la UI reflejen el estado guardado
       _upsertIntoUserQuizzes(saved);
     } catch (e) {
       errorMessage = 'Error al persistir el quiz: $e';
@@ -247,12 +247,12 @@ class QuizEditorBloc extends ChangeNotifier {
     }
   }
 
-  // Upsert helper: inserts or replaces the quiz in `userQuizzes` so
-  // UI views (dashboard/portada) immediately reflect changes made in the editor.
+  // Ayudante de upsert: inserta o reemplaza el quiz en `userQuizzes` para que
+  // las vistas de la UI (dashboard/portada) reflejen inmediatamente los cambios realizados en el editor.
   void _upsertIntoUserQuizzes(Quiz q) {
     userQuizzes ??= [];
 
-    // Prefer matching by non-empty quizId
+    // Preferir coincidencia por quizId no vacío
     if (q.quizId.isNotEmpty) {
       final idx = userQuizzes!.indexWhere((x) => x.quizId.isNotEmpty && x.quizId == q.quizId);
       if (idx != -1) {
@@ -261,7 +261,7 @@ class QuizEditorBloc extends ChangeNotifier {
       }
     }
 
-    // Fallback: match by signature (title + createdAt + cover) for local items
+    // Alternativa: buscar coincidencia por firma (título + createdAt + portada) para elementos locales
     final sig = '${q.title.trim()}|${q.createdAt.toIso8601String()}|${q.coverImageUrl ?? ''}';
     final idxSig = userQuizzes!.indexWhere((x) {
       final xsig = '${x.title.trim()}|${x.createdAt.toIso8601String()}|${x.coverImageUrl ?? ''}';
@@ -272,7 +272,7 @@ class QuizEditorBloc extends ChangeNotifier {
       return;
     }
 
-    // Otherwise insert at the front so the updated/created quiz is visible
+    // Si no se encontró coincidencia, inserta al inicio para que el quiz actualizado/creado sea visible
     userQuizzes!.insert(0, q);
   }
 }

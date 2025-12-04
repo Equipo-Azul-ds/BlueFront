@@ -85,13 +85,13 @@ class TemplateSelectorPage extends StatelessWidget {
 
   List<Question> _makeTemplateQuestions(String templateId, String quizId){
     switch(templateId){
-      // tpl_001 is explicitly labeled as V o F in the templates list
+      // tpl_001 está explícitamente etiquetado como Verdadero o Falso en la lista de plantillas
       case 'tpl_001':
         return _generateTrueFalseQuestions(quizId, 10);
-      // tpl_002 (Presentación interactiva) -> multiple choice
+      // tpl_002 (Presentación interactiva) -> opción múltiple
       case 'tpl_002':
         return _generateMultipleChoiceQuestions(quizId, 5);
-      // tpl_003 (Trivia visual) -> mixed
+      // tpl_003 (Trivia visual) -> preguntas mixtas
       case 'tpl_003':
         return _generateMixedQuestions(quizId, 5);
       default:
@@ -147,7 +147,7 @@ class TemplateSelectorPage extends StatelessWidget {
     for (var i = 0; i < count; i++){
       final qId = Uuid().v4();
         if (i % 2 == 0){
-        // multiple choice
+        // opción múltiple
         questions.add(Question(
           questionId: qId,
           quizId: quizId,

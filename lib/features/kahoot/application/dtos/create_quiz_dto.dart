@@ -7,7 +7,7 @@ class CreateAnswerDto {
   CreateAnswerDto({this.answerText, this.answerImage, required this.isCorrect});
 
   Map<String, dynamic> toJson() => {
-      // Backend may expect 'answerText' or 'text'. Provide both for compatibility.
+      // El backend puede esperar 'answerText' o 'text'
       'answerText': answerText,
       'text': answerText,
       'answerImage': answerImage,
@@ -34,7 +34,7 @@ class CreateQuestionDto {
   });
 
   Map<String, dynamic> toJson() => {
-      // Provide both shapes: 'questionText' (backend examples) and 'text' (internal entities)
+      // Proporciona ambas formas: 'questionText' (ejemplos del backend) y 'text' (entidades internas)
       'questionText': questionText,
       'text': questionText,
       'mediaUrl': mediaUrl,

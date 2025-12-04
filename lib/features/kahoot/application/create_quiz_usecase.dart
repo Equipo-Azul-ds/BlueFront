@@ -14,15 +14,15 @@ class CreateQuizUsecase {
   //y persiste en el repo. Retorna la entidad quiz que es retornada por el repo/back
 
   Future<Quiz> run(CreateQuizDto dto) async {
-    // Build a Quiz entity explicitly for creation.
-    // Use an empty `quizId` so that repository.save() treats it as new and POSTs.
+    // Construye explícitamente la entidad Quiz para su creación.
+    // Usar `quizId` vacío para que repository.save() la trate como nueva y haga un POST.
     final uid = Uuid();
 
     final questions = dto.questions.map((qDto) {
       final qid = 'q_${uid.v4()}';
       final answers = qDto.answers.map((aDto) {
         final aid = 'a_${uid.v4()}';
-        // Map DTO fields (prefer text over image id/path)
+        // Mapea los campos del DTO (prefiere texto sobre id/ruta de imagen)
         final text = aDto.answerText;
         final media = aDto.answerImage;
         return A.Answer(
@@ -66,13 +66,13 @@ class CreateQuizUsecase {
       questions: questions,
     );
 
-    // Persist via repository (will choose POST because quizId is empty)
+    // Persiste a través del repositorio (se usará POST porque quizId está vacío)
     try {
       print('[CreateQuizUsecase] Creating quiz -> title="${quizEntity.title}", author=${quizEntity.authorId}, questions=${quizEntity.questions.length}');
       final created = await repository.save(quizEntity);
       print('[CreateQuizUsecase] Repository returned created -> id=${created.quizId}, title="${created.title}"');
 
-      // Verify persistence: if the created object has an id, try to fetch it from the server
+      // Verifica la persistencia: si el objeto creado tiene un id, intenta recuperarlo del servidor
       if (created.quizId.isNotEmpty) {
         try {
           final fetched = await repository.find(created.quizId);
@@ -81,7 +81,7 @@ class CreateQuizUsecase {
             return fetched;
           }
 
-          // Retry once after a short delay in case of eventual consistency
+            // Reintenta una vez tras una breve espera en caso de consistencia eventual
           await Future.delayed(const Duration(milliseconds: 500));
           final fetchedRetry = await repository.find(created.quizId);
           if (fetchedRetry != null) {
@@ -89,7 +89,7 @@ class CreateQuizUsecase {
             return fetchedRetry;
           }
 
-          // If not found after retry, consider this an error — resource not reachable
+            // Si no se encuentra tras el reintento, considerarlo un error: recurso no accesible
           final msg = 'Creado en respuesta, pero no se pudo verificar la existencia del quiz id=${created.quizId}';
           print('[CreateQuizUsecase] $msg');
           throw Exception(msg);
@@ -100,7 +100,8 @@ class CreateQuizUsecase {
         }
       }
 
-      // If created has no id, return what repository returned (could be local-only)
+      // Si el objeto creado no tiene id, devuelve lo que retornó el repositorio
+      // (podría ser un recurso solo local/temporal)
       return created;
     } catch (e, st) {
       print('[CreateQuizUsecase] Error creating quiz: $e');

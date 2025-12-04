@@ -62,8 +62,8 @@ class Quiz {
       'category': category,
       'themeId': themeId,
       'coverImageUrl': coverImageUrl,
-      // isLocal is client-only and deliberately not sent to backend by default,
-      // but we include it here for completeness in local storage scenarios.
+      // isLocal es solo para uso local en el cliente y normalmente no se envía al backend;
+      // se incluye aquí por si se guarda el quiz en almacenamiento local.
       'isLocal': isLocal,
       'createdAt': createdAt.toIso8601String(),
       'questions': questions.map((q) => q.toJson()).toList(),

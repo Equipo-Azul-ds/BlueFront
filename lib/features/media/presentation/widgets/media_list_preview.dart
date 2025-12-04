@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../domain/entities/Media.dart';
 
-/// Simple widget to show thumbnails/previews for a list of Media.
-/// It expects either `previewPath` or `path` to be an accessible URL.
-/// If your backend returns presigned URLs via an endpoint, call that first
-/// and pass the resulting URLs in the `urls` map.
+/// Widget sencillo para mostrar miniaturas/previsualizaciones de una lista de Media.
+/// Espera que `previewPath` o `path` sean URLs accesibles.
+/// Si tu backend devuelve URLs firmadas mediante un endpoint, obtén esas URLs primero
+/// y pásalas en el mapa `presignedUrls`.
 class MediaListPreview extends StatelessWidget {
   final List<Media> medias;
   final void Function(Media) onTap;

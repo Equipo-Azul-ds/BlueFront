@@ -8,7 +8,7 @@ class GetKahootUseCase {
   Future<Quiz> run(String quizId) async {
     final quiz = await repository.find(quizId);
     if (quiz == null) {
-      throw Exception('Quiz not found'); // tu BLoC/Controller lo mapea a 404
+      throw Exception('Quiz not found'); // BLoC/Controller lo mapea a 404
     }
     return quiz;
   }

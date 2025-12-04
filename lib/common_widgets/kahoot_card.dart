@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-// colors import removed; card uses default colors to preserve visual layout
 import '../features/kahoot/domain/entities/Quiz.dart';
 
 class KahootCard extends StatelessWidget{
@@ -26,7 +25,7 @@ class KahootCard extends StatelessWidget{
         ),
         child: Column(
           children:[
-            // Cover image (if available) or placeholder
+            // Imagen de portada (si está disponible) o marcador de posición
             Container(
               height: base * 0.18,
               decoration: BoxDecoration(

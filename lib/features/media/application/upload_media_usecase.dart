@@ -12,7 +12,7 @@ class UploadMediaUseCase {
 
   /// Devuelve la entidad `Media` creada por el backend.
   Future<Media> run(UploadMediaDTO dto) async {
-    // Upload multipart to backend and obtain created Media metadata
+    // Sube los bytes (multipart) al backend y obtiene los metadatos de la entidad Media creada
     final media = await mediaRepository.uploadFromBytes(dto.fileBytes, dto.fileName, dto.mimeType);
     return media;
   }

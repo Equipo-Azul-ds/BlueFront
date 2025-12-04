@@ -163,12 +163,13 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
   Future<void> _saveQuiz() async {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
-    // Try to read form values if the form is present (step 1). If the form
-    // is not mounted (we're in step 2), fall back to the values already stored
-    // in `quizBloc.currentQuiz` so saving still works.
+    // Intenta leer los valores del formulario si está presente (paso 1). 
+    // Si el formulario no está montado (estamos en el paso 2), 
+    // utiliza los valores ya almacenados en `quizBloc.currentQuiz` 
+    // para que el guardado siga funcionando.
     String title = '';
     String description = '';
-    // Attempt to save/validate only if the form exists in the tree
+    // Intentar guardar/validar sólo si el formulario está montado en el árbol de widgets
     if (_formKey.currentState != null) {
       _formKey.currentState?.save();
       final valid = _formKey.currentState?.validate() ?? true;
@@ -181,11 +182,13 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
       description = values['description'] as String? ?? '';
     }
 
-    // If form didn't provide values (e.g., user is on step 2), use currentQuiz fields
+    // Si el formulario no proporcionó valores (p. ej. estamos en el paso 2),
+    // usamos los campos ya presentes en quizBloc.currentQuiz para continuar.
     if (title.isEmpty) title = quizBloc.currentQuiz?.title ?? '';
     if (description.isEmpty) description = quizBloc.currentQuiz?.description ?? '';
 
-    // Normalize title (trim) and refuse to save empty titles early with a clear UI message.
+    // Normalizar el título (trim) y evitar intentar guardar si queda vacío:
+    // este chequeo temprano proporciona un mensaje claro al usuario antes de construir el DTO.
     title = title.trim();
     if (title.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('El título no puede estar vacío')));
@@ -217,7 +220,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     }
 
     final dto = CreateQuizDto(
-      // Use a default author id for testing when currentQuiz has no valid author
+      // Usar un authorId por defecto para pruebas cuando currentQuiz no tenga un author válido o contenga 'placeholder'
       authorId: (() {
         const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
         final aid = quizBloc.currentQuiz?.authorId ?? '';
@@ -235,13 +238,14 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     );
 
     try {
-      // Decide create vs update based on whether the current quiz is a
-      // local (unsaved/duplicated/template) instance. Local quizzes should
+      // Decidir crear o actualizar según si el quiz actual es local o ya persistido.
+      // Los quizzes locales (por ejemplo copias, plantillas o con isLocal == true o quizId vacío)
       // be POSTed (create). Persisted quizzes (isLocal == false) are PUT.
       if (quizBloc.currentQuiz == null || quizBloc.currentQuiz!.isLocal == true) {
         print('[editor] performing CREATE (currentQuiz is local or null)');
         try {
-          // Debug: log DTO contents to ensure fields from the form are captured
+          // Depuración: registrar contenido del DTO para verificar que los campos del formulario se han capturado correctamente
+          print('[editor][DEBUG] preparando DTO para CREATE: title="${dto.title}", description="${dto.description}", visibility=${dto.visibility}, status=${dto.status}, category=${dto.category}, themeId=${dto.themeId}, questions_count=${dto.questions.length}');
           print('[editor][DEBUG] DTO title raw: "${dto.title}" length=${dto.title.length}');
           print('[editor][DEBUG] DTO preview JSON: ${dto.toJson()}');
         } catch (_) {}
@@ -253,7 +257,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
       } else {
         print('[editor] performing UPDATE for id=${quizBloc.currentQuiz!.quizId}');
         try {
-          // Always log DTO for updates as well — helps debug title/fields sent to backend.
+          // Registrar siempre el DTO también en actualizaciones — esto ayuda a depurar el título y los demás campos enviados al backend.
           try {
             print('[editor][DEBUG] DTO title raw: "${dto.title}" length=${dto.title.length}');
             print('[editor][DEBUG] DTO preview JSON: ${dto.toJson()}');
@@ -265,20 +269,21 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
             return;
           }
         } catch (e) {
-          // If update fails with a validation message coming from usecase/repo, surface it
+          // Si la actualización falla con un mensaje de validación proveniente del caso de uso/repositorio, mostrarlo
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
           return;
         }
       }
-      // Prefer not to call backend with placeholder author id. If we have a valid UUID v4
-      // authorId, refresh the list; otherwise pass the created quiz to the dashboard via
-      // route arguments so it can be shown immediately without hitting the API.
+      // Preferimos no llamar al backend con un authorId "placeholder". Si disponemos de un authorId válido (UUID v4)
+      // intentamos refrescar la lista; en caso contrario pasamos el quiz creado al dashboard mediante
+      // argumentos de la ruta para que se muestre inmediatamente sin hacer la petición a la API.
       final created = quizBloc.currentQuiz;
       final authorIdCandidate = created?.authorId ?? '';
       const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
-      // Try to refresh user quizzes for a good UX. If the provided authorId
-      // is missing or is a placeholder, retry/load using the default test
-      // author id to avoid backend validation errors during testing.
+      // Intentamos refrescar las quizzes del usuario para mejorar la UX.
+      // Si el authorId proporcionado falta o contiene 'placeholder',
+      // reintentamos cargar usando el authorId de prueba por defecto
+      // para evitar errores de validación en el backend durante pruebas.
       var loaded = false;
       if (authorIdCandidate.isNotEmpty && !authorIdCandidate.contains('placeholder')) {
         try {
@@ -301,8 +306,10 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz guardado correctamente')));
       print('[editor] save completed; created=${created != null ? created.quizId + " / " + created.title : "<null>"} loaded=$loaded authorCandidate=$authorIdCandidate');
-      // Normalize the quiz we pass to the dashboard: do not mark as local
-      // when returning via navigation after a successful save.
+      // Normalizar el quiz que pasamos al dashboard:
+      // no marcarlo como local (isLocal = true) al navegar de vuelta
+      // después de un guardado exitoso — si existe una versión no local
+      // (nonLocalCreated) debe usarse en su lugar.
       Quiz? nonLocalCreated;
       if (created != null) {
         nonLocalCreated = Quiz(
@@ -320,19 +327,19 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
           createdAt: created.createdAt,
           questions: created.questions,
         );
-        // Ensure bloc also reflects non-local state when possible
+        // Asegurar que el BLoC también refleje el estado no local cuando sea posible
         quizBloc.setCurrentQuiz(nonLocalCreated);
       }
-      // If we couldn't load the remote list, pass the created quiz so dashboard
-      // can show it immediately; otherwise navigate normally.
+      // Si no pudimos cargar la lista remota, pasamos el quiz creado para que el dashboard
+      // lo muestre inmediatamente; de lo contrario, navegamos normalmente.
       if (loaded) {
-        // Ensure the created quiz is present in the loaded list; if backend
-        // didn't include it, insert it locally so Dashboard shows it.
+        // Asegura que el quiz creado esté presente en la lista cargada; si el backend
+        // no lo incluyó, insértalo localmente para que el Dashboard lo muestre.
         if (created != null) {
           quizBloc.userQuizzes ??= [];
           final exists = quizBloc.userQuizzes!.any((q) => q.quizId == created.quizId || (q.title == created.title && q.createdAt.toIso8601String() == created.createdAt.toIso8601String()));
           if (!exists) {
-            // If the created has empty quizId, keep it as local (isLocal true)
+            // Si el quiz creado tiene un quizId vacío, mantenlo como local (isLocal = true)
             final toInsert = created.quizId.isEmpty
                 ? Quiz(
                     quizId: created.quizId,
@@ -350,10 +357,10 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                     questions: created.questions,
                   )
                 : created;
-            // If we have normalized nonLocalCreated, insert that so dashboard shows
-            // a non-local card for the newly created quiz.
-            // Always insert a fresh instance into the list to avoid later
-            // in-editor mutations modifying the list item by reference.
+            // Si hemos normalizado nonLocalCreated, insertamos ese para que el dashboard muestre
+            // una tarjeta no local para el quiz recién creado.
+            // Siempre insertamos una nueva instancia en la lista para evitar que
+            // futuras modificaciones en el editor alteren el elemento de la lista por referencia.
             final chosen = (nonLocalCreated != null && !nonLocalCreated.quizId.isEmpty) ? nonLocalCreated : toInsert;
             final localId = (chosen.quizId.isEmpty) ? Uuid().v4() : chosen.quizId;
             final toStore = Quiz(
@@ -384,7 +391,6 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     }
   }
 
-  // (Template preview and apply removed; use TemplateSelectorPage instead)
 
   @override
   Widget build(BuildContext context){
@@ -434,30 +440,28 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                           });
 
                           final uploaded = await mediaBloc.uploadFromXFile(file);
-                          // uploaded may contain id and/or path/url. Prefer path if it's a URL.
+                            // 'uploaded' puede contener 'id' y/o 'path/url'. Se prefiere 'path' si es una URL.
                           final uploadedMap = uploaded as dynamic;
                           final returnedPath = (uploadedMap.path ?? uploadedMap.url ?? uploadedMap.previewPath) as String?;
                           final returnedId = (uploadedMap.id ?? uploadedMap.mediaId) as String?;
 
                           if (returnedPath != null && returnedPath.startsWith('http')) {
-                            // backend returned a usable public URL
-                            setState((){
+                            // el backend devolvió una URL pública utilizable
+                            setState(() {
                               _coverImagePath = returnedPath;
-                              _coverImageBytes = null; // use network image
+                              _coverImageBytes = null; // usar imagen de red
                             });
                             if (quizBloc.currentQuiz != null) {
                               quizBloc.currentQuiz!.coverImageUrl = returnedPath;
                               quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
                             }
-                          } else if (returnedId != null && returnedId.isNotEmpty) {
-                            // backend returned only an id — store it and keep local preview
-                            setState(()=> _coverImagePath = returnedId);
+                            } else if (returnedId != null && returnedId.isNotEmpty) {
+                            // el backend devolvió solo un id — lo guardamos y mantenemos la previsualización local
+                            setState(() => _coverImagePath = returnedId);
                             if (quizBloc.currentQuiz != null) {
                               quizBloc.currentQuiz!.coverImageUrl = returnedId;
                               quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
                             }
-                            // Optionally try to fetch stored bytes from server (not necessary for immediate preview)
-                          } else if (returnedPath != null) {
                             setState(()=> _coverImagePath = returnedPath);
                             if (quizBloc.currentQuiz != null) {
                               quizBloc.currentQuiz!.coverImageUrl = returnedPath;
@@ -602,12 +606,12 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                     SizedBox(height: constraints.maxHeight * 0.03),
                     ElevatedButton(
                       onPressed: () {
-                        // Save form values and propagate to currentQuiz before moving to questions
+                        // Guarda los valores del formulario y propaga a currentQuiz antes de pasar a preguntas
                         _formKey.currentState?.save();
                         final values = _formKey.currentState?.value ?? {};
                         final titleVal = values['title'] as String? ?? '';
                         final descriptionVal = values['description'] as String? ?? '';
-                        // Update the in-memory quiz so subsequent saveCurrentQuiz uses updated values
+                        // Actualiza el quiz en memoria para que el siguiente guardado use los valores actualizados
                         if (quizBloc.currentQuiz != null) {
                           quizBloc.currentQuiz!.title = titleVal;
                           quizBloc.currentQuiz!.description = descriptionVal;
@@ -736,7 +740,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                   answers: [a1, a2],
                                 );
 
-                                // Insert locally only; do not persist until the user saves the whole quiz
+                                // Insertar solo localmente; no se persiste hasta que el usuario guarde todo el quiz
                                 quizBloc.insertQuestionAt(quizBloc.currentQuiz!.questions.length, newQ);
                                 setState(()=> _selectedIndex = quizBloc.currentQuiz!.questions.length - 1);
 
@@ -843,7 +847,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                             ]),
                             SizedBox(height: constraints.maxHeight * 0.01),
 
-                            // Media upload for question
+                            // Subir imagen para la pregunta
                             media.MediaUpload(onMediaSelected: (file) async {
                               final q = selectedQuestion;
                               final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
@@ -870,14 +874,14 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
                             SizedBox(height: constraints.maxHeight * 0.01),
 
-                            // Answers list (visual, wider tiles + inline edit)
+                            // Lista de respuestas (tarjetas anchas, edición inline y selección de la respuesta correcta)
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text('Respuestas', style: TextStyle(fontWeight: FontWeight.bold)),
                                 SizedBox(height: constraints.maxHeight * 0.01),
 
-                                // True/False tiles (editable inline)
+                                // Verdadero/Falso: muestra las dos opciones como tarjetas editables en línea
                                 if (selectedQuestion.type == 'true_false')
                                   Builder(builder: (_) {
                                     final q = selectedQuestion;
@@ -893,9 +897,9 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                       return Expanded(
                                         child: GestureDetector(
                                           onTap: (){
-                                            // don't toggle correctness while editing
+                                            // no alternar la respuesta correcta mientras esta respuesta esté en edición
                                             if (_editingAnswerIds.contains(ans.answerId)) return;
-                                            // Mark the tapped tile as correct, the other as incorrect
+                                            // Marcar la tarjeta pulsada como correcta y la otra como incorrecta
                                             final updatedTrue = A.Answer(
                                               answerId: trueAns.answerId,
                                               questionId: trueAns.questionId,
@@ -997,7 +1001,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                     ]);
                                   }),
 
-                                // Quiz type: wide colorful tiles with inline editing
+                                // Tipo 'quiz': tarjetas anchas y coloridas para las respuestas, con edición en línea y acciones (editar / eliminar)
                                 if (selectedQuestion.type != 'true_false')
                                   Column(
                                     children: [
@@ -1059,7 +1063,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                                     SizedBox(height: 6),
                                                     Wrap(spacing: 12, runSpacing: 6, children: [
                                                       GestureDetector(onTap: (){
-                                                        // start inline edit
+                                                        // Iniciar edición en línea: marcar esta respuesta como editable y guardar su texto original para poder confirmar o cancelar cambios
                                                         setState((){
                                                           _editingAnswerIds.add(ans.answerId);
                                                           _editingInitialValues[ans.answerId] = ans.text ?? '';
@@ -1113,7 +1117,8 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                         );
                                       }).toList(),
 
-                                      // Add answer tile
+                                      // Añadir tarjeta de respuesta (espacio entre la lista de respuestas y el botón "Agregar")
+                                      SizedBox(height: constraints.maxHeight * 0.01),
                                       GestureDetector(
                                         onTap: (){
                                           final q = selectedQuestion;
@@ -1159,7 +1164,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                                     points: q.points,
                                     answers: q.answers.map((a) => A.Answer(answerId: 'a_copy_${now}_${a.answerId}', questionId: 'q_copy_$now', isCorrect: a.isCorrect, text: a.text, mediaUrl: a.mediaUrl)).toList(),
                                   );
-                                  // Insert locally only
+                                    // Insertar sólo localmente; no se persistirá en el backend hasta que el usuario guarde el quiz
                                   quizBloc.insertQuestionAt(_selectedIndex+1, copied);
                                   setState(()=> _selectedIndex = _selectedIndex+1);
                                 }, icon: Icon(Icons.copy), label: Text('Duplicar')),

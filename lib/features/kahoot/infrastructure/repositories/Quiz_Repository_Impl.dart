@@ -18,10 +18,9 @@ class QuizRepositoryImpl implements QuizRepository {
 
   @override
   Future<Quiz> save(Quiz quiz) async {
-    // Determine new vs update based on an explicit client flag `isLocal` or empty id.
-    // Avoid inferring backend semantics from UUID patterns on the client.
-      // Consider it new only if the quizId is empty. Avoid inferring UUID validity
-      // or inventing local ids in the repository layer; the server decides.
+    // Determino si es nuevo o actualización basándose solo en que quiz.quizId esté vacío.
+    // Considero que quiz es un objeto nuevo solo si quiz.quizId está vacío. Evito validar UUIDs o
+      // inventar identificadores locales en la capa del repositorio; que sea el servidor quien decida.
       final isNew = quiz.quizId.isEmpty;
     final url = isNew ? '$baseUrl/kahoots' : '$baseUrl/kahoots/${quiz.quizId}';
     final method = isNew ? 'POST' : 'PUT';
@@ -58,7 +57,8 @@ class QuizRepositoryImpl implements QuizRepository {
       print('Response body: ${response.body}');
     } catch (_) {}
 
-    // Also persist a debug file with request/response to help when `flutter logs` isn't available.
+    // También persiste un archivo de depuración con la solicitud y la respuesta
+    // para ayudar cuando `flutter logs` no esté disponible.
     try {
       final debugSb = StringBuffer();
       debugSb.writeln('==== QuizRepositoryImpl DEBUG ====');
@@ -81,16 +81,14 @@ class QuizRepositoryImpl implements QuizRepository {
     } catch (_) {}
 
     if (response.statusCode == 200 || response.statusCode == 201) {
-      // Some backends return the created/updated resource in the body,
-      // others return an empty body and a `Location` header with the resource URI.
       final body = response.body;
       if (body.trim().isNotEmpty) {
         final jsonResponse = jsonDecode(body);
         return Quiz.fromJson(Map<String, dynamic>.from(jsonResponse));
       }
 
-      // Fallback: if there's no body but a Location header, try to fetch the
-      // created resource from that location so callers receive a full `Quiz`.
+      // Fallback: si no hay cuerpo pero hay un encabezado Location, intenta obtener el
+      // recurso creado desde esa ubicación para que los llamadores reciban un `Quiz` completo.
       final locationHeader = response.headers['location'] ?? response.headers['Location'];
       if (locationHeader != null && locationHeader.trim().isNotEmpty) {
         try {
@@ -102,7 +100,7 @@ class QuizRepositoryImpl implements QuizRepository {
             if (fetched != null) return fetched;
           }
         } catch (_) {
-          // ignore parsing/fetch errors and fall through to throwing below
+            // ignoro errores de análisis/recuperación y continuar con la excepción a continuación
         }
       }
 
@@ -204,7 +202,7 @@ class QuizRepositoryImpl implements QuizRepository {
       print('QuizRepositoryImpl.delete -> DELETE $url');
       final response = await cliente.delete(Uri.parse(url));
       print('QuizRepositoryImpl.delete -> Response status: ${response.statusCode} body: ${response.body}');
-      // backend may return 200 or 204
+      // El backend puede devolver 200 o 204
       if (response.statusCode != 204 && response.statusCode != 200){
         throw Exception('Error al eliminar el quiz: ${response.statusCode} - ${response.body}');
       }
@@ -217,7 +215,9 @@ class QuizRepositoryImpl implements QuizRepository {
 
   @override
   Future<List<Quiz>> searchByAuthor(String authorId) async {
-    // backend exposes: GET /kahoots/user/:userId
+    // El backend expone: GET /kahoots/user/:userId
+    // Devuelve un array JSON con los kahoots del autor (200 -> lista de quizzes).
+    // Los errores 5xx se tratan como transitorios y devuelven lista vacía; los 4xx se propagan.
     final url = '$baseUrl/kahoots/user/$authorId';
     try { print('QuizRepositoryImpl.searchByAuthor -> GET $url'); } catch (_) {}
     final response = await cliente.get(Uri.parse(url));
@@ -232,10 +232,10 @@ class QuizRepositoryImpl implements QuizRepository {
       final msg = 'Error al buscar quizzes por autor: ${response.statusCode} - ${response.body}';
       try { print('QuizRepositoryImpl.searchByAuthor -> $msg'); } catch (_) {}
 
-      // If the server returned a 5xx, treat it as a backend transient error
-      // and return an empty list so the UI can continue to operate using
-      // any locally-cached items. For 4xx errors we rethrow so callers can
-      // surface auth/validation issues explicitly.
+      // Si el servidor devolvió un 5xx, lo trato como un error transitorio del backend
+      // y devuelvo una lista vacía para que la UI pueda seguir funcionando con
+      // posibles elementos en caché local. Para errores 4xx propagamos la excepción
+      // para que los llamadores puedan mostrar problemas de autenticación/validación.
       if (response.statusCode >= 500 && response.statusCode < 600) {
         try { print('QuizRepositoryImpl.searchByAuthor -> Backend 5xx detected, returning empty list as fallback'); } catch (_) {}
         return <Quiz>[];

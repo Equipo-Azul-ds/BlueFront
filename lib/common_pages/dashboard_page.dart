@@ -22,20 +22,23 @@ class _DashboardPageState extends State<DashboardPage> {
   final Map<String, Uint8List?> _coverCache = {};
   final Map<String, String?> _coverUrlCache = {};
   final Set<String> _fetchingCover = {};
-  // Signatures of quizzes we've already inserted from navigation args during this session
+
+  // Firmas (identificadores ligeros) de los quizzes que ya se insertaron desde
+  // los argumentos de navegación durante esta sesión. Se usan para evitar insertar
+  // duplicados cuando se navega repetidamente.
   final Set<String> _insertedQuizSignatures = {};
   String _quizCacheKey(String quizId) => '__quiz__${quizId}';
 
   @override
   void initState() {
     super.initState();
-    // Cargar cuestionarios de usuario al ingresar (usa un ID de autor de marcador de posición)
+    // Se cargan los quizzes del usuario al ingresar (usa un ID de autor de marcador de posición)
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
       if (quizBloc.userQuizzes == null) {
-        // Attempt to load user quizzes. If there is no currentQuiz.authorId,
-        // fallback to a default test author id so that the Dashboard shows
-        // quizzes created during development/testing.
+        // Se intenta cargar los quizzes del usuario. Si no hay un authorId en currentQuiz,
+        // utiliza un authorId de prueba por defecto para que el Dashboard muestre
+        // los quizzes creados durante el desarrollo o pruebas.
         const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
         var authorIdCandidate = quizBloc.currentQuiz?.authorId ?? '';
         if (authorIdCandidate.isEmpty) authorIdCandidate = defaultTestAuthorId;
@@ -44,7 +47,7 @@ class _DashboardPageState extends State<DashboardPage> {
         try {
           await quizBloc.loadUserQuizzes(authorIdCandidate);
         } catch (e) {
-          // Log but do not crash the UI if backend rejects the id.
+            // Registrar el error pero no bloqueaa la interfaz si el backend rechaza el authorId.
           print('[dashboard] loadUserQuizzes error for author=$authorIdCandidate -> $e');
         }
         if (mounted) setState(() => _loadingUserQuizzes = false);
@@ -67,7 +70,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _coverUrlCache[mediaId] = mediaPath;
         print('[dashboard] cached url for $mediaId -> $mediaPath');
       } else if (mediaPath is String && mediaPath.isNotEmpty) {
-        // Try candidate URLs constructed from baseUrl providers
+        // Prueba los siguientes URLs candidatas construidas a partir de los baseUrl obtenidos de los providers (mediaRepo/storageRepo)
         String? baseUrl;
         try {
           final mediaRepo = Provider.of<dynamic>(context, listen: false);
@@ -134,18 +137,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
     if (confirmed == true) {
       try {
-        // Only call backend delete if the quiz is not marked local. Frontend should
-        // not infer backend semantics from UUID formats — use explicit `isLocal` flag.
+        // Solo llama al delete en el backend si el quiz no está marcado como local.
+        // El frontend no debe inferir semánticas del backend a partir del formato del UUID — usa la bandera explícita `isLocal`.
         if (q.isLocal) {
-          // Local-only quiz — remove locally without calling API.
-          // Do NOT remove by plain `quizId == ''` because many local items
-          // may have empty ids; prefer identity, then fallback to title+createdAt.
+            // Quiz solo local — eliminar únicamente de la lista local sin llamar a la API.
+            // NO eliminar solo por `quizId == ''` porque muchos elementos locales
+            // pueden tener ids vacíos; prefiera la identidad del objeto y, si no, 
+            // use título + createdAt como heurística de respaldo.
           if (quizBloc.userQuizzes != null) {
             quizBloc.userQuizzes!.removeWhere((item) {
               if (identical(item, q)) return true;
-              // If both have non-empty ids, match by id
+              // Si no son el mismo objeto, se comprobará más abajo por ID:
+              // solo se considera coincidencia cuando ambos quizId no están vacíos.
               if (item.quizId.isNotEmpty && q.quizId.isNotEmpty && item.quizId == q.quizId) return true;
-              // If ids are empty, use a stronger heuristic: title + createdAt timestamp
+                // Si ambos quizId están vacíos, emplear una heurística más robusta:
+                // coincidir por título + createdAt (timestamp) para identificar duplicados.
               if (item.quizId.isEmpty && q.quizId.isEmpty && item.title == q.title && item.createdAt.toIso8601String() == q.createdAt.toIso8601String()) return true;
               return false;
             });
@@ -162,7 +168,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: ${quizBloc.errorMessage}')));
           return;
         }
-        // Remove from local list if present
+        // Elimina de la lista local si está presente (no confiar solo en el quizId; usar mismas heurísticas que más abajo)
         if (quizBloc.userQuizzes != null) {
           quizBloc.userQuizzes!.removeWhere((item) {
             if (item.quizId.isNotEmpty && q.quizId.isNotEmpty && item.quizId == q.quizId) return true;
@@ -233,14 +239,16 @@ class _DashboardPageState extends State<DashboardPage> {
                                 IconButton(
                                   icon: Icon(Icons.edit),
                                   onPressed: () async {
-                                    // Close the bottom sheet first to avoid triggering bloc notifications
+                                    // Cierra primero el bottom sheet para evitar que las notificaciones del Bloc
+                                    // provoquen errores tipo "notifyListeners durante build" o actualizaciones inoportunas.
                                     Navigator.of(ctx).pop();
                                     try {
                                       if (q.quizId.isNotEmpty && !q.isLocal) {
-                                        // Load full quiz into the bloc (will update currentQuiz)
+                                        // Carga el quiz completo en el Bloc (actualiza currentQuiz antes de navegar al editor)
                                         await quizBloc.loadQuiz(q.quizId);
                                       } else {
-                                        // Use provided object for local items; schedule setCurrentQuiz after frame
+                                        // Para elementos locales o sin ID: uso el objeto recibido tal cual;
+                                        // programar setCurrentQuiz después del frame para evitar notifyListeners durante build
                                         WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
                                       }
                                       Navigator.pushNamed(context, '/create');
@@ -265,7 +273,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ],
                   ),
                   SizedBox(height: 16),
-                  // Buttons row (three buttons as requested). For now they perform delete.
+                  // Fila de botones.
                   Row(
                     children: [
                       // Editar: principal
@@ -275,7 +283,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           height: 48,
                           child: ElevatedButton.icon(
                             onPressed: () async {
-                              // Close bottom sheet first to avoid notifyDuringBuild
+                              // Cierra primero el bottom sheet para evitar notifyDuringBuild
                               Navigator.of(ctx).pop();
                               try {
                                 if (q.quizId.isNotEmpty && !q.isLocal) {
@@ -306,13 +314,16 @@ class _DashboardPageState extends State<DashboardPage> {
                         height: 44,
                         child: OutlinedButton(
                           onPressed: () async {
-                            // Perform a real POST to create a duplicated quiz on the backend.
+                            // Realizar una petición POST para crear la copia del quiz en el backend (se construye el DTO a continuación)
                             Navigator.of(ctx).pop();
                             
                             const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
                             final authorIdCandidate = (q.authorId.isEmpty || q.authorId.contains('placeholder')) ? defaultTestAuthorId : q.authorId;
 
-                            // Map questions & answers into Create* DTOs (new ids are handled server-side, but we generate unique local ids for safety)
+                            // Mapear preguntas y respuestas a los DTOs Create* para la petición de duplicado.
+                            // NO se generan ni se reasignan IDs aquí: el backend debe asignar los nuevos identificadores.
+                            // Se copian los campos relevantes (texto, media, tipo, tiempo, puntos) y se mapean
+                            // las respuestas preservando texto, media y la marca de correcta.
                             final mappedQuestions = q.questions.map((origQ) {
                               final answers = origQ.answers.map((a) => CreateAnswerDto(answerText: a.text, answerImage: a.mediaUrl, isCorrect: a.isCorrect)).toList();
                               return CreateQuestionDto(
@@ -422,10 +433,9 @@ class _DashboardPageState extends State<DashboardPage> {
         print('[dashboard] skipping insert: signature already seen');
       } else {
         Quiz toInsert = incoming;
-        // Do NOT mark an incoming quiz as a local copy just because its id
-        // is empty — only treat it as local if it was explicitly created
-        // locally (incoming.isLocal == true). This ensures newly-created
-        // quizzes that come back via navigation are shown as normal items.
+        // NO marca un quiz entrante como copia local solo porque su id esté vacío:
+        // lo trato como local únicamente si incoming.isLocal == true. Esto asegura que
+        // los quizzes recién creados que vuelven vía navegación se muestren como items normales.
         if (incoming.isLocal == true) {
           toInsert = Quiz(
             quizId: incoming.quizId,
@@ -444,8 +454,8 @@ class _DashboardPageState extends State<DashboardPage> {
           );
         }
 
-        // Always insert a fresh instance into the user's list to avoid later
-        // accidental mutations via shared references.
+        // Insertar siempre una instancia nueva en la lista del usuario
+        // para evitar mutaciones accidentales por referencias compartidas.
         final candidate = Quiz(
           quizId: toInsert.quizId,
           authorId: toInsert.authorId,
@@ -669,7 +679,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
 
-              // Tus Quizzes header (non-scrolling content)
+              // Tus Quizzes header 
               SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.01),
                 sliver: SliverToBoxAdapter(
@@ -689,7 +699,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
 
-              // Tus Quizzes grid (as a sliver so following sections remain visible)
+              // Tus Quizzes grid 
               Builder(builder: (ctx) {
                 final userQuizzes = quizBloc.userQuizzes ?? [];
                 return SliverPadding(
@@ -701,7 +711,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     childCount: userQuizzes.length,
                     itemBuilder: (context, index) {
                             final q = userQuizzes[index];
-                            // If coverImageUrl looks like a media id (not a full http url), trigger fetch
+                            // Si coverImageUrl parece un id de media (no una url http completa), desencadena la obtención
                             String? coverId = q.coverImageUrl;
                             Uint8List? cachedBytes;
                             String? cachedUrlOverride;
@@ -710,7 +720,8 @@ class _DashboardPageState extends State<DashboardPage> {
                               cachedUrlOverride = _coverUrlCache[coverId];
                               if (!_fetchingCover.contains(coverId) && cachedBytes == null && cachedUrlOverride == null) {
                                 _fetchingCover.add(coverId);
-                                // fetch asynchronously and setState when ready
+                                // Lanzar la obtención en segundo plano y actualizar el estado cuando termine.
+                                // No espero aquí (estamos en el builder); _fetchingCover evita solicitudes duplicadas.
                                 _fetchCoverIfNeeded(coverId);
                               }
                             }
@@ -844,7 +855,7 @@ class _DashboardPageState extends State<DashboardPage> {
     ),
     floatingActionButton: FloatingActionButton(
       onPressed: () async {
-        // Ensure the editor starts fresh: clear any previous currentQuiz
+        // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo
         final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
         quizBloc.clear();
         // Abrir selector de plantillas; si el usuario elige una, navegar al editor con la plantilla
@@ -852,7 +863,7 @@ class _DashboardPageState extends State<DashboardPage> {
         if (selected != null && selected is Quiz) {
           Navigator.pushNamed(context, '/create', arguments: selected);
         } else {
-          // Explicitly request a cleared editor when creating a new quiz
+            // Solicita explícitamente un editor limpio al crear un nuevo quiz
           Navigator.pushNamed(context, '/create', arguments: {'clear': true});
         }
       },

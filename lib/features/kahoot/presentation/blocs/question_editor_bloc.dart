@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-// Domain entity types are accessed via the QuizEditorBloc; no direct imports needed here.
+// Los tipos de entidades del dominio se obtienen a través de QuizEditorBloc;
 import '../../application/dtos/create_quiz_dto.dart';
 import '../../application/dtos/create_quiz_dto.dart' show CreateQuestionDto, CreateAnswerDto;
 import '../blocs/quiz_editor_bloc.dart';
@@ -102,7 +102,7 @@ class QuestionEditorBloc extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Upload de media usando MediaEditorBloc (helper para XFile)
+  // Subida de archivos multimedia usando MediaEditorBloc (helper para XFile)
   Future<String?> uploadMediaFromPicker() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);

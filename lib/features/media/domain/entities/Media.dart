@@ -20,8 +20,9 @@ class Media {
   });
 
   factory Media.fromJson(Map<String, dynamic> json){
-    // Backend may return 'id' or 'mediaId' depending on implementation.
-    // Use safe fallbacks and convert to string to avoid runtime Null type errors.
+    // El backend puede devolver 'id' o 'mediaId' según la implementación.
+    // Usamos claves alternativas y conversiones seguras a String para evitar
+    // errores por valores nulos o por tipos distintos a String.
     String? _safeStringOrNull(dynamic v) {
       if (v == null) return null;
       if (v is String) return v;
