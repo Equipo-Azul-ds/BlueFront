@@ -6,7 +6,44 @@ import '../../infraestructure/repositories/DiscoverRepository.dart';
 import 'kahootListItem.dart';
 
 
-
+final kDummyKahoots = [
+  Kahoot(
+    id: 'd-001',
+    title: 'Dummy: Matemáticas Básicas',
+    description: 'Quices de prueba para operaciones fundamentales.',
+    kahootImage: 'assets/images/placeholder.png',
+    visibility: 'public',
+    status: 'published',
+    themes: ['Matemáticas'],
+    author: 'auth-dummy',
+    createdAt: DateTime(2025, 11, 25),
+    playCount: 1500,
+  ),
+  Kahoot(
+    id: 'd-002',
+    title: 'Dummy: Historia del Arte',
+    description: 'Viaje por el Renacimiento.',
+    kahootImage: 'assets/images/placeholder.png',
+    visibility: 'public',
+    status: 'published',
+    themes: ['Arte', 'Historia'],
+    author: 'auth-dummy',
+    createdAt: DateTime(2025, 11, 20),
+    playCount: 800,
+  ),
+  Kahoot(
+    id: 'd-003',
+    title: 'Dummy: Ciencia Ficción',
+    description: 'Preguntas sobre los clásicos del género.',
+    kahootImage: 'assets/images/placeholder.png',
+    visibility: 'public',
+    status: 'published',
+    themes: ['Cine', 'Literatura'],
+    author: 'auth-dummy',
+    createdAt: DateTime(2025, 10, 15),
+    playCount: 2200,
+  ),
+];
 
 class FeaturedKahoots extends StatefulWidget {
   const FeaturedKahoots({
@@ -18,14 +55,17 @@ class FeaturedKahoots extends StatefulWidget {
 }
 
 class _FeaturedKahootsState extends State<FeaturedKahoots> {
-  List<Kahoot> _kahoots = [];
+  /*List<Kahoot> _kahoots = [];
   bool _isLoading = true;
+  String? _error;*/
+  List<Kahoot> _kahoots = kDummyKahoots;
+  bool _isLoading = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(_fetchFeaturedKahoots);
+    //Future.microtask(_fetchFeaturedKahoots);
   }
 
   Future<void> _fetchFeaturedKahoots() async {

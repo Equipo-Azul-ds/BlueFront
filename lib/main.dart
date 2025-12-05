@@ -16,11 +16,13 @@ import 'common_pages/template_selector_page.dart';
 import 'features/kahoot/infrastructure/repositories/kahoot_repository_impl.dart';
 import 'features/slide/infrastructure/repositories/slide_repository_impl.dart';
 
-// servidor de prueba mock: https://2368cbc3-b3ca-400c-a146-4b7d409fffea.mock.pstmn.io
+
+
+// servidor de prueba mock: https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 // servidor grupal: https://backcomun-production.up.railway.app
 // servidor deploy: https://superb-success-production-4b0a.up.railway.app/
 
-const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io/');
+const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://superb-success-production-4b0a.up.railway.app/');
 void main() {
   runApp(MyApp());
 }
