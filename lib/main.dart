@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/constants/colors.dart';
+import 'common_pages/dashboard_page.dart';
+import 'features/challenge/domain/repositories/single_player_game_repository.dart';
+import 'features/challenge/infrastructure/repositories/single_player_game_repository_impl.dart';
+import 'features/challenge/infrastructure/ports/slide_provider_impl.dart';
+import 'features/challenge/application/use_cases/single_player_usecases.dart';
+import 'features/challenge/application/ports/slide_provider.dart';
+import 'features/challenge/presentation/blocs/single_player_challenge_bloc.dart';
+import 'features/challenge/presentation/blocs/single_player_results_bloc.dart';
 import 'features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import 'features/media/presentation/blocs/media_editor_bloc.dart';
-import 'common_pages/dashboard_page.dart';
 import 'features/kahoot/presentation/pages/quiz_editor_page.dart';
 import 'features/kahoot/presentation/pages/question_editor_page.dart';
 import 'common_pages/template_selector_page.dart';
@@ -15,7 +23,6 @@ import 'features/media/domain/repositories/Storage_Provider_Repository.dart';
 import 'features/media/application/upload_media_usecase.dart';
 import 'features/media/application/get_media_usecase.dart';
 import 'features/media/application/delete_media_usecase.dart';
-import 'core/constants/colors.dart';
 import 'features/kahoot/domain/entities/Quiz.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
@@ -30,10 +37,58 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<SlideProvider>(create: (_) => SlideProviderImpl()),
+        Provider<SinglePlayerGameRepositoryImpl>(
+          create: (context) => SinglePlayerGameRepositoryImpl(
+            slideProvider: context.read<SlideProvider>(),
+          ),
+        ),
+        Provider<SinglePlayerGameRepository>(
+          create: (context) => context.read<SinglePlayerGameRepositoryImpl>(),
+        ),
+        Provider<GetAttemptStateUseCase>(
+          create: (context) => GetAttemptStateUseCase(
+            repository: context.read<SinglePlayerGameRepository>(),
+          ),
+        ),
+        Provider<StartAttemptUseCase>(
+          create: (context) => StartAttemptUseCase(
+            repository: context.read<SinglePlayerGameRepository>(),
+            slideProvider: context.read<SlideProvider>(),
+            getAttemptStateUseCase: context.read<GetAttemptStateUseCase>(),
+          ),
+        ),
+        Provider<SubmitAnswerUseCase>(
+          create: (context) => SubmitAnswerUseCase(
+            repository: context.read<SinglePlayerGameRepository>(),
+            slideProvider: context.read<SlideProvider>(),
+          ),
+        ),
+        Provider<GetSummaryUseCase>(
+          create: (context) =>
+              GetSummaryUseCase(context.read<SinglePlayerGameRepository>()),
+        ),
+        ChangeNotifierProvider<SinglePlayerChallengeBloc>(
+          create: (context) => SinglePlayerChallengeBloc(
+            startAttemptUseCase: context.read<StartAttemptUseCase>(),
+            getAttemptStateUseCase: context.read<GetAttemptStateUseCase>(),
+            submitAnswerUseCase: context.read<SubmitAnswerUseCase>(),
+            getSummaryUseCase: context.read<GetSummaryUseCase>(),
+          ),
+        ),
+
+        ChangeNotifierProvider<SinglePlayerResultsBloc>(
+          create: (context) => SinglePlayerResultsBloc(
+            repository: context.read<SinglePlayerGameRepository>(),
+            getSummaryUseCase: context.read<GetSummaryUseCase>(),
+          ),
+        ),
         //Estos son los proveedores para los repositorios (inyeccion de dependencias)
         // Repositorios con configuración mínima (ajusta baseUrl según tu entorno)
         Provider<QuizRepository>(create: (_)=> QuizRepositoryImpl(baseUrl: apiBaseUrl)),
@@ -48,9 +103,10 @@ class MyApp extends StatelessWidget {
         )),
       ],
       child: MaterialApp(
-          title: 'Trivvy',
-          theme: ThemeData(
-            fontFamily: 'Onest',
+        debugShowCheckedModeBanner: false,
+        title: 'Trivvy',
+        theme: ThemeData(
+          fontFamily: 'Onest',
             primarySwatch: createMaterialColor(AppColor.primary),
             primaryColor: AppColor.primary,
             scaffoldBackgroundColor: AppColor.background,
@@ -65,6 +121,12 @@ class MyApp extends StatelessWidget {
             ),
             iconTheme: IconThemeData(color: AppColor.primary),
             colorScheme: ColorScheme.fromSwatch(primarySwatch: createMaterialColor(AppColor.primary)).copyWith(secondary: AppColor.accent),
+            pageTransitionsTheme: const PageTransitionsTheme(
+            builders: {
+              TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+              TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+            },
+          ),
           ),
           initialRoute: '/dashboard',
           routes:{
