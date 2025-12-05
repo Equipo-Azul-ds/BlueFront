@@ -4,7 +4,8 @@ import 'dart:typed_data';
 import 'package:Trivvy/features/challenge/application/use_cases/single_player_usecases.dart';
 import 'package:Trivvy/features/challenge/presentation/pages/single_player_challenge.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart' as staggered;
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
+    as staggered;
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
@@ -16,13 +17,10 @@ import '../features/kahoot/application/dtos/create_quiz_dto.dart';
 import '../features/kahoot/domain/entities/Quiz.dart';
 import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import '../features/media/presentation/blocs/media_editor_bloc.dart';
+import '../features/library/presentation/pages/library_page.dart';
 
 final List<Map<String, dynamic>> activeTrivvys = [
-  {
-    'id': 'mock_quiz_1',
-    'title': 'Ciencia y Matemática Básica',
-    'questions': 5,
-  },
+  {'id': 'mock_quiz_1', 'title': 'Ciencia y Matemática Básica', 'questions': 5},
   {
     'id': 'mock_quiz_ddd',
     'title': 'Domain-Driven Design Básico',
@@ -68,7 +66,9 @@ class _HomePageContentState extends State<HomePageContent> {
           await quizBloc.loadUserQuizzes(authorIdCandidate);
         } catch (e) {
           // Registrar el error pero no bloqueaa la interfaz si el backend rechaza el authorId.
-          print('[dashboard] loadUserQuizzes error for author=$authorIdCandidate -> $e');
+          print(
+            '[dashboard] loadUserQuizzes error for author=$authorIdCandidate -> $e',
+          );
         }
         if (mounted) setState(() => _loadingUserQuizzes = false);
       }
@@ -81,11 +81,15 @@ class _HomePageContentState extends State<HomePageContent> {
       final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
       final response = await mediaBloc.getMedia(mediaId);
       final mediaPath = (response.media as dynamic).path ?? '';
-      print('[dashboard] getMedia for $mediaId -> path=$mediaPath fileLen=${response.file?.length ?? 0}');
+      print(
+        '[dashboard] getMedia for $mediaId -> path=$mediaPath fileLen=${response.file?.length ?? 0}',
+      );
 
       if (response.file != null && response.file!.isNotEmpty) {
         _coverCache[mediaId] = response.file;
-        print('[dashboard] cached bytes for $mediaId (len=${response.file!.length})');
+        print(
+          '[dashboard] cached bytes for $mediaId (len=${response.file!.length})',
+        );
       } else if (mediaPath is String && mediaPath.startsWith('http')) {
         _coverUrlCache[mediaId] = mediaPath;
         print('[dashboard] cached url for $mediaId -> $mediaPath');
@@ -107,7 +111,9 @@ class _HomePageContentState extends State<HomePageContent> {
         final candidates = <String>[];
         if (baseUrl != null) {
           candidates.add('$baseUrl/storage/file/$mediaPath');
-          candidates.add('$baseUrl/storage/file/${Uri.encodeComponent(mediaPath)}');
+          candidates.add(
+            '$baseUrl/storage/file/${Uri.encodeComponent(mediaPath)}',
+          );
           candidates.add('$baseUrl/media/$mediaId/file');
           candidates.add('$baseUrl/media/file/$mediaId');
         }
@@ -127,7 +133,8 @@ class _HomePageContentState extends State<HomePageContent> {
           }
         }
 
-        if (!_coverCache.containsKey(mediaId) && !_coverUrlCache.containsKey(mediaId)) {
+        if (!_coverCache.containsKey(mediaId) &&
+            !_coverUrlCache.containsKey(mediaId)) {
           _coverCache[mediaId] = null;
         }
       } else {
@@ -149,9 +156,14 @@ class _HomePageContentState extends State<HomePageContent> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar Quiz'),
-        content: Text('¿Estás seguro que deseas eliminar "${q.title}" de forma permanente?'),
+        content: Text(
+          '¿Estás seguro que deseas eliminar "${q.title}" de forma permanente?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
@@ -173,12 +185,16 @@ class _HomePageContentState extends State<HomePageContent> {
               // Si son exactamente el mismo objeto en memoria, removerlo de inmediato.
               if (identical(item, q)) return true;
               // Si no son el mismo objeto, compara por quizId cuando ambos no están vacíos.
-              if (item.quizId.isNotEmpty && q.quizId.isNotEmpty && item.quizId == q.quizId) return true;
+              if (item.quizId.isNotEmpty &&
+                  q.quizId.isNotEmpty &&
+                  item.quizId == q.quizId)
+                return true;
               // Si ambos quizId están vacíos, emplear título + createdAt para identificar duplicados locales.
               if (item.quizId.isEmpty &&
                   q.quizId.isEmpty &&
                   item.title == q.title &&
-                  item.createdAt.toIso8601String() == q.createdAt.toIso8601String()) {
+                  item.createdAt.toIso8601String() ==
+                      q.createdAt.toIso8601String()) {
                 return true;
               }
               return false;
@@ -195,7 +211,9 @@ class _HomePageContentState extends State<HomePageContent> {
         await quizBloc.deleteQuiz(q.quizId);
         if (quizBloc.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al eliminar: ${quizBloc.errorMessage}')),
+            SnackBar(
+              content: Text('Error al eliminar: ${quizBloc.errorMessage}'),
+            ),
           );
           return;
         }
@@ -203,26 +221,30 @@ class _HomePageContentState extends State<HomePageContent> {
         // Elimina de la lista local si está presente (no confiar solo en el quizId; reutiliza las mismas heurísticas de arriba)
         if (quizBloc.userQuizzes != null) {
           quizBloc.userQuizzes!.removeWhere((item) {
-            if (item.quizId.isNotEmpty && q.quizId.isNotEmpty && item.quizId == q.quizId) return true;
+            if (item.quizId.isNotEmpty &&
+                q.quizId.isNotEmpty &&
+                item.quizId == q.quizId)
+              return true;
             if (identical(item, q)) return true;
             if (item.quizId.isEmpty &&
                 q.quizId.isEmpty &&
                 item.title == q.title &&
-                item.createdAt.toIso8601String() == q.createdAt.toIso8601String()) {
+                item.createdAt.toIso8601String() ==
+                    q.createdAt.toIso8601String()) {
               return true;
             }
             return false;
           });
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Quiz eliminado')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Quiz eliminado')));
         if (mounted) setState(() {});
       } catch (e) {
         print('[dashboard] Exception during delete flow: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al eliminar: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
       }
     }
   }
@@ -231,10 +253,13 @@ class _HomePageContentState extends State<HomePageContent> {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
     final quizKey = _quizCacheKey(q.quizId);
     final mediaKey = q.coverImageUrl;
-    Uint8List? bytes = mediaKey != null && !mediaKey.startsWith('http') ? _coverCache[mediaKey] : null;
+    Uint8List? bytes = mediaKey != null && !mediaKey.startsWith('http')
+        ? _coverCache[mediaKey]
+        : null;
     bytes ??= _coverCache[quizKey];
     String? url = mediaKey != null
-        ? (_coverUrlCache[mediaKey] ?? (mediaKey.startsWith('http') ? mediaKey : null))
+        ? (_coverUrlCache[mediaKey] ??
+              (mediaKey.startsWith('http') ? mediaKey : null))
         : _coverUrlCache[quizKey];
 
     await showModalBottomSheet(
@@ -271,10 +296,16 @@ class _HomePageContentState extends State<HomePageContent> {
                       child: bytes != null
                           ? Image.memory(bytes, fit: BoxFit.cover)
                           : (url != null
-                              ? Image.network(url, fit: BoxFit.cover)
-                              : (q.coverImageUrl != null && q.coverImageUrl!.startsWith('http')
-                                  ? Image.network(q.coverImageUrl!, fit: BoxFit.cover)
-                                  : const Center(child: Icon(Icons.image)))),
+                                ? Image.network(url, fit: BoxFit.cover)
+                                : (q.coverImageUrl != null &&
+                                          q.coverImageUrl!.startsWith('http')
+                                      ? Image.network(
+                                          q.coverImageUrl!,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : const Center(
+                                          child: Icon(Icons.image),
+                                        ))),
                     ),
                     const SizedBox(width: 12),
                     // Editar: principal
@@ -288,7 +319,10 @@ class _HomePageContentState extends State<HomePageContent> {
                               Expanded(
                                 child: Text(
                                   q.title,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ),
                               IconButton(
@@ -300,14 +334,26 @@ class _HomePageContentState extends State<HomePageContent> {
                                     if (q.quizId.isNotEmpty && !q.isLocal) {
                                       await quizBloc.loadQuiz(q.quizId);
                                     } else {
-                                      WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback(
+                                            (_) => quizBloc.setCurrentQuiz(q),
+                                          );
                                     }
-                                    if (mounted) Navigator.pushNamed(context, '/create');
+                                    if (mounted)
+                                      Navigator.pushNamed(context, '/create');
                                   } catch (e) {
-                                    print('[dashboard] failed to load quiz for edit id=${q.quizId} -> $e');
+                                    print(
+                                      '[dashboard] failed to load quiz for edit id=${q.quizId} -> $e',
+                                    );
                                     if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Error cargando el quiz para edición: $e')),
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Error cargando el quiz para edición: $e',
+                                          ),
+                                        ),
                                       );
                                     }
                                   }
@@ -316,13 +362,23 @@ class _HomePageContentState extends State<HomePageContent> {
                             ],
                           ),
                           const SizedBox(height: 6),
-                          Text(q.description, maxLines: 3, overflow: TextOverflow.ellipsis),
+                          Text(
+                            q.description,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           const SizedBox(height: 8),
                           // Template / Theme info
-                          Text('Tema: ${_themeName(q.themeId)}', style: TextStyle(color: Colors.grey[700])),
+                          Text(
+                            'Tema: ${_themeName(q.themeId)}',
+                            style: TextStyle(color: Colors.grey[700]),
+                          ),
                           if (q.templateId != null) ...[
                             const SizedBox(height: 4),
-                            Text('Plantilla: ${q.templateId}', style: TextStyle(color: Colors.grey[700])),
+                            Text(
+                              'Plantilla: ${q.templateId}',
+                              style: TextStyle(color: Colors.grey[700]),
+                            ),
                           ],
                         ],
                       ),
@@ -345,23 +401,40 @@ class _HomePageContentState extends State<HomePageContent> {
                               if (q.quizId.isNotEmpty && !q.isLocal) {
                                 await quizBloc.loadQuiz(q.quizId);
                               } else {
-                                WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
+                                WidgetsBinding.instance.addPostFrameCallback(
+                                  (_) => quizBloc.setCurrentQuiz(q),
+                                );
                               }
-                              if (mounted) Navigator.pushNamed(context, '/create');
+                              if (mounted)
+                                Navigator.pushNamed(context, '/create');
                             } catch (e) {
-                              print('[dashboard] failed to load quiz for edit (button) id=${q.quizId} -> $e');
+                              print(
+                                '[dashboard] failed to load quiz for edit (button) id=${q.quizId} -> $e',
+                              );
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Error cargando el quiz para edición: $e')),
+                                  SnackBar(
+                                    content: Text(
+                                      'Error cargando el quiz para edición: $e',
+                                    ),
+                                  ),
                                 );
                               }
                             }
                           },
                           icon: const Icon(Icons.edit, size: 20),
-                          label: const Text('Editar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                          label: const Text(
+                            'Editar',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColor.primary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                             padding: const EdgeInsets.symmetric(horizontal: 12),
                           ),
                         ),
@@ -378,9 +451,13 @@ class _HomePageContentState extends State<HomePageContent> {
                           // Realizar una petición POST para crear la copia del quiz en el backend (se construye el DTO a continuación)
                           Navigator.of(ctx).pop();
 
-                          const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+                          const defaultTestAuthorId =
+                              'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
                           final authorIdCandidate =
-                              (q.authorId.isEmpty || q.authorId.contains('placeholder')) ? defaultTestAuthorId : q.authorId;
+                              (q.authorId.isEmpty ||
+                                  q.authorId.contains('placeholder'))
+                              ? defaultTestAuthorId
+                              : q.authorId;
 
                           // Mapear preguntas y respuestas a los DTOs Create* para la petición de duplicado.
                           // NO se generan ni se reasignan IDs aquí: el backend debe asignar los nuevos identificadores.
@@ -423,26 +500,37 @@ class _HomePageContentState extends State<HomePageContent> {
                             if (quizBloc.errorMessage != null) {
                               if (mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Error al duplicar: ${quizBloc.errorMessage}')),
+                                  SnackBar(
+                                    content: Text(
+                                      'Error al duplicar: ${quizBloc.errorMessage}',
+                                    ),
+                                  ),
                                 );
                               }
                               return;
                             }
                             if (mounted) {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(const SnackBar(content: Text('Quiz duplicado y creado')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Quiz duplicado y creado'),
+                                ),
+                              );
                             }
                             setState(() {});
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error al duplicar: $e')),
+                                SnackBar(
+                                  content: Text('Error al duplicar: $e'),
+                                ),
                               );
                             }
                           }
                         },
                         style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           side: BorderSide(color: Colors.grey.shade400),
                           padding: const EdgeInsets.symmetric(horizontal: 6),
                         ),
@@ -451,7 +539,12 @@ class _HomePageContentState extends State<HomePageContent> {
                           children: const [
                             Icon(Icons.copy, size: 18),
                             SizedBox(width: 6),
-                            Flexible(child: Text('Dup', style: TextStyle(fontSize: 12))),
+                            Flexible(
+                              child: Text(
+                                'Dup',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -466,10 +559,15 @@ class _HomePageContentState extends State<HomePageContent> {
                           await _confirmAndDelete(context, q);
                         },
                         icon: const Icon(Icons.delete, size: 18),
-                        label: const Text('Eliminar', style: TextStyle(fontSize: 13)),
+                        label: const Text(
+                          'Eliminar',
+                          style: TextStyle(fontSize: 13),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                       ),
@@ -501,7 +599,10 @@ class _HomePageContentState extends State<HomePageContent> {
     BuildContext context,
     Map<String, dynamic> quiz,
   ) async {
-    final startAttempt = Provider.of<StartAttemptUseCase>(context, listen: false);
+    final startAttempt = Provider.of<StartAttemptUseCase>(
+      context,
+      listen: false,
+    );
     try {
       final res = await startAttempt.execute(
         kahootId: quiz['id'] as String,
@@ -543,7 +644,11 @@ class _HomePageContentState extends State<HomePageContent> {
       quizBloc.userQuizzes ??= [];
       final incoming = args;
       // Build a lightweight signature to detectar inserciones repetidas desde navegación.
-      final sigParts = [incoming.title.trim(), incoming.createdAt.toIso8601String(), incoming.coverImageUrl ?? ''];
+      final sigParts = [
+        incoming.title.trim(),
+        incoming.createdAt.toIso8601String(),
+        incoming.coverImageUrl ?? '',
+      ];
       final signature = sigParts.join('|');
 
       if (!_insertedQuizSignatures.contains(signature)) {
@@ -658,7 +763,10 @@ class _HomePageContentState extends State<HomePageContent> {
       builder: (context, constraints) {
         final screenSize = MediaQuery.of(context).size;
         // Limitar la altura del header para evitar tamaños enormes al hacer overscroll
-        double headerHeight = min(constraints.maxHeight * 0.45, screenSize.height * 0.45);
+        double headerHeight = min(
+          constraints.maxHeight * 0.45,
+          screenSize.height * 0.45,
+        );
         // Asegurar un mínimo para que el header no colapse en pantallas pequeñas
         headerHeight = max(headerHeight, screenSize.height * 0.22);
 
@@ -691,12 +799,24 @@ class _HomePageContentState extends State<HomePageContent> {
                         children: [
                           Image.asset(
                             'assets/images/logo.png',
-                            width: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
-                            height: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
+                            width: (constraints.maxWidth * 0.12).clamp(
+                              40.0,
+                              80.0,
+                            ),
+                            height: (constraints.maxWidth * 0.12).clamp(
+                              40.0,
+                              80.0,
+                            ),
                             fit: BoxFit.contain,
                             errorBuilder: (context, error, stack) => Container(
-                              width: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
-                              height: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
+                              width: (constraints.maxWidth * 0.12).clamp(
+                                40.0,
+                                80.0,
+                              ),
+                              height: (constraints.maxWidth * 0.12).clamp(
+                                40.0,
+                                80.0,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white24,
                                 borderRadius: BorderRadius.circular(8),
@@ -739,7 +859,10 @@ class _HomePageContentState extends State<HomePageContent> {
                       Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: constraints.maxWidth * 0.04,
-                          vertical: min(screenSize.height * 0.03, headerHeight * 0.22),
+                          vertical: min(
+                            screenSize.height * 0.03,
+                            headerHeight * 0.22,
+                          ),
                         ),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -761,21 +884,26 @@ class _HomePageContentState extends State<HomePageContent> {
                                   context: context,
                                   isScrollControlled: true,
                                   backgroundColor: Colors.transparent,
-                                  builder: (context) => DraggableScrollableSheet(
-                                    expand: false,
-                                    initialChildSize: 0.6,
-                                    minChildSize: 0.35,
-                                    maxChildSize: 0.95,
-                                    builder: (context, scrollController) {
-                                      return JoinGameScreen(scrollController: scrollController);
-                                    },
-                                  ),
+                                  builder: (context) =>
+                                      DraggableScrollableSheet(
+                                        expand: false,
+                                        initialChildSize: 0.6,
+                                        minChildSize: 0.35,
+                                        maxChildSize: 0.95,
+                                        builder: (context, scrollController) {
+                                          return JoinGameScreen(
+                                            scrollController: scrollController,
+                                          );
+                                        },
+                                      ),
                                 );
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.amber.shade400,
                                 minimumSize: const Size(double.infinity, 48),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
                                 elevation: 6,
                                 shadowColor: Colors.amber.shade300,
                               ),
@@ -849,7 +977,9 @@ class _HomePageContentState extends State<HomePageContent> {
                       if (coverId != null && !coverId.startsWith('http')) {
                         cachedBytes = _coverCache[coverId];
                         cachedUrlOverride = _coverUrlCache[coverId];
-                        if (!_fetchingCover.contains(coverId) && cachedBytes == null && cachedUrlOverride == null) {
+                        if (!_fetchingCover.contains(coverId) &&
+                            cachedBytes == null &&
+                            cachedUrlOverride == null) {
                           _fetchingCover.add(coverId);
                           _fetchCoverIfNeeded(coverId);
                         }
@@ -860,7 +990,11 @@ class _HomePageContentState extends State<HomePageContent> {
                           // Permite reintentar la descarga de la portada almacenada en media service
                           if (coverId != null && !coverId.startsWith('http')) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Reintentando obtener portada...')),
+                              const SnackBar(
+                                content: Text(
+                                  'Reintentando obtener portada...',
+                                ),
+                              ),
                             );
                             if (!_fetchingCover.contains(coverId)) {
                               _fetchingCover.add(coverId);
@@ -868,7 +1002,11 @@ class _HomePageContentState extends State<HomePageContent> {
                             }
                           } else {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('No hay una portada en formato media-id para reintentar')),
+                              const SnackBar(
+                                content: Text(
+                                  'No hay una portada en formato media-id para reintentar',
+                                ),
+                              ),
                             );
                           }
                         },
@@ -887,7 +1025,9 @@ class _HomePageContentState extends State<HomePageContent> {
             ),
             SliverPadding(
               // Sección Recientes
-              padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05),
+              padding: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth * 0.05,
+              ),
               sliver: SliverToBoxAdapter(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -903,7 +1043,10 @@ class _HomePageContentState extends State<HomePageContent> {
                       onPressed: () {},
                       child: Text(
                         'Ver todo',
-                        style: TextStyle(color: AppColor.primary, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: AppColor.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -912,48 +1055,49 @@ class _HomePageContentState extends State<HomePageContent> {
             ),
             SliverPadding(
               // Lista de recientes con porcentaje ficticio
-              padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05),
+              padding: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth * 0.05,
+              ),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final kahoot = recentKahoots[index];
-                    return Container(
-                      margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: constraints.maxWidth * 0.04,
-                        vertical: screenSize.height * 0.015,
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final kahoot = recentKahoots[index];
+                  return Container(
+                    margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: constraints.maxWidth * 0.04,
+                      vertical: screenSize.height * 0.015,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border(
+                        left: BorderSide(color: AppColor.primary, width: 4),
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border(left: BorderSide(color: AppColor.primary, width: 4)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            kahoot.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: constraints.maxWidth * 0.04,
-                            ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          kahoot.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: constraints.maxWidth * 0.04,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Hace 2 días • ${kahoot.questions.length * 20 + 60}% correcto',
-                            style: TextStyle(
-                              fontSize: constraints.maxWidth * 0.03,
-                              color: Colors.grey[700],
-                            ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Hace 2 días • ${kahoot.questions.length * 20 + 60}% correcto',
+                          style: TextStyle(
+                            fontSize: constraints.maxWidth * 0.03,
+                            color: Colors.grey[700],
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                  childCount: recentKahoots.length,
-                ),
+                        ),
+                      ],
+                    ),
+                  );
+                }, childCount: recentKahoots.length),
               ),
             ),
             SliverPadding(
@@ -1032,70 +1176,67 @@ class _HomePageContentState extends State<HomePageContent> {
                 vertical: screenSize.height * 0.005,
               ),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final quiz = activeTrivvys[index];
-                    return Container(
-                      margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final quiz = activeTrivvys[index];
+                  return Container(
+                    margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
                         borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                        onTap: () => _startTrivvy(context, quiz),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: constraints.maxWidth * 0.045,
+                            vertical: screenSize.height * 0.018,
                           ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(14),
-                          onTap: () => _startTrivvy(context, quiz),
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: constraints.maxWidth * 0.045,
-                              vertical: screenSize.height * 0.018,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      quiz['title'] as String,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: constraints.maxWidth * 0.042,
-                                      ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    quiz['title'] as String,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: constraints.maxWidth * 0.042,
                                     ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      '${quiz['questions']} preguntas',
-                                      style: TextStyle(
-                                        color: Colors.grey[700],
-                                        fontSize: constraints.maxWidth * 0.035,
-                                      ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    '${quiz['questions']} preguntas',
+                                    style: TextStyle(
+                                      color: Colors.grey[700],
+                                      fontSize: constraints.maxWidth * 0.035,
                                     ),
-                                  ],
-                                ),
-                                const Icon(
-                                  Icons.play_circle_fill,
-                                  color: AppColor.primary,
-                                  size: 32,
-                                ),
-                              ],
-                            ),
+                                  ),
+                                ],
+                              ),
+                              const Icon(
+                                Icons.play_circle_fill,
+                                color: AppColor.primary,
+                                size: 32,
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    );
-                  },
-                  childCount: activeTrivvys.length,
-                ),
+                    ),
+                  );
+                }, childCount: activeTrivvys.length),
               ),
             ),
             // Espacio inferior para dejar respirar el FAB
@@ -1125,7 +1266,7 @@ class _DashboardPageState extends State<DashboardPage> {
       body: Center(child: Text('Descubre Page')),
     ), // 1: Descubre (Placeholder)
     SizedBox.shrink(), // 2: Placeholder for FAB
-    LibraryPage(), // 3: Biblioteca (Tu Épica 7)
+    LibraryPage(), // 3: Biblioteca (Épica 7)
     Scaffold(
       body: Center(child: Text('Perfil Page')),
     ), // 4: Perfil (Placeholder)
@@ -1147,10 +1288,25 @@ class _DashboardPageState extends State<DashboardPage> {
       backgroundColor: AppColor.background,
       body: IndexedStack(index: _currentIndex, children: _pages),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.pushNamed(context, '/create'),
+        onPressed: () async {
+          // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo
+          final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+          quizBloc.clear();
+          // Abrir selector de plantillas; si el usuario elige una, navegar al editor con la plantilla
+          final selected = await Navigator.pushNamed(
+            context,
+            '/templateSelector',
+          );
+          if (selected != null && selected is Quiz) {
+            Navigator.pushNamed(context, '/create', arguments: selected);
+          } else {
+            // Solicita explícitamente un editor limpio al crear un nuevo quiz
+            Navigator.pushNamed(context, '/create', arguments: {'clear': true});
+          }
+        },
         backgroundColor: Colors.amber.shade400,
+        child: Icon(Icons.add),
         elevation: 6,
-        child: const Icon(Icons.add),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: MainBottomNavBar(

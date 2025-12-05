@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
-import '../../domain/entities/kahoot_model.dart';
-import '../../domain/entities/kahoot_progress_model.dart';
-import '../../application/get_kahoots_use_cases.dart';
-import '../../application/toggle_favorite_use_case.dart';
-import '../../application/update_kahoot_progress_usecase.dart';
-import '../../application/get_kahoot_progress_usecase.dart';
+import 'package:Trivvy/features/library/domain/entities/kahoot_model.dart';
+import 'package:Trivvy/features/library/domain/entities/kahoot_progress_model.dart';
+import 'package:Trivvy/features/library/application/get_kahoots_use_cases.dart';
+import 'package:Trivvy/features/library/application/toggle_favorite_use_case.dart';
+import 'package:Trivvy/features/library/application/update_kahoot_progress_usecase.dart';
+import 'package:Trivvy/features/library/application/get_kahoot_progress_usecase.dart';
 
 // Definición de los estados para la interfaz de usuario
 enum LibraryState { initial, loading, loaded, error }
