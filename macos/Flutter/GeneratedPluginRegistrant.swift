@@ -9,7 +9,6 @@ import file_picker
 import file_selector_macos
 import flutter_secure_storage_macos
 import isar_flutter_libs
-
 import mobile_scanner
 import path_provider_foundation
 import video_player_avfoundation
