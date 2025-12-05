@@ -1,122 +1,107 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
+import 'features/media/presentation/blocs/media_editor_bloc.dart';
+import 'common_pages/dashboard_page.dart';
+import 'features/kahoot/presentation/pages/quiz_editor_page.dart';
+import 'features/kahoot/presentation/pages/question_editor_page.dart';
+import 'common_pages/template_selector_page.dart';
+import 'features/kahoot/infrastructure/repositories/Quiz_Repository_Impl.dart';
+import 'features/media/infrastructure/repositories/Media_Repository_Impl.dart';
+import 'features/media/infrastructure/repositories/Storage_Provider_Repository_Impl.dart';
+import 'features/kahoot/domain/repositories/QuizRepository.dart';
+import 'features/media/domain/repositories/Media_Repository.dart';
+import 'features/media/domain/repositories/Storage_Provider_Repository.dart';
+import 'features/media/application/upload_media_usecase.dart';
+import 'features/media/application/get_media_usecase.dart';
+import 'features/media/application/delete_media_usecase.dart';
+import 'core/constants/colors.dart';
+import 'features/kahoot/domain/entities/Quiz.dart';
+
+// API base URL configurable vía --dart-define=API_BASE_URL
+// Por defecto apunta al backend desplegado en Railway
+const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://backcomun-production.up.railway.app');
+
 
 void main() {
-  runApp(const MyApp());
+  // Mostrar en consola la URL base que la app está usando (útil para depuración)
+  print('API_BASE_URL = $apiBaseUrl');
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+    return MultiProvider(
+      providers: [
+        //Estos son los proveedores para los repositorios (inyeccion de dependencias)
+        // Repositorios con configuración mínima (ajusta baseUrl según tu entorno)
+        Provider<QuizRepository>(create: (_)=> QuizRepositoryImpl(baseUrl: apiBaseUrl)),
+        Provider<MediaRepository>(create: (_)=> MediaRepositoryImpl(baseUrl: apiBaseUrl)),
+        Provider<StorageProviderRepository>(create: (_)=> StorageProviderRepositoryImpl(baseUrl: apiBaseUrl)),
+        // Blocs / ChangeNotifiers
+        ChangeNotifierProvider(create: (context)=> QuizEditorBloc(context.read<QuizRepository>())),
+        ChangeNotifierProvider(create: (context)=> MediaEditorBloc(
+          uploadUseCase: UploadMediaUseCase(mediaRepository: context.read<MediaRepository>()),
+          getUseCase: GetMediaUseCase(mediaRepository: context.read<MediaRepository>(), storageProvider: context.read<StorageProviderRepository>()),
+          deleteUseCase: DeleteMediaUseCase(mediaRepository: context.read<MediaRepository>(), storageProvider: context.read<StorageProviderRepository>()),
+        )),
+      ],
+      child: MaterialApp(
+          title: 'Trivvy',
+          theme: ThemeData(
+            fontFamily: 'Onest',
+            primarySwatch: createMaterialColor(AppColor.primary),
+            primaryColor: AppColor.primary,
+            scaffoldBackgroundColor: AppColor.background,
+            appBarTheme: AppBarTheme(
+              backgroundColor: AppColor.primary,
+              iconTheme: IconThemeData(color: AppColor.onPrimary),
+              titleTextStyle: TextStyle(color: AppColor.onPrimary, fontSize: 20, fontWeight: FontWeight.w600),
             ),
-          ],
-        ),
+            floatingActionButtonTheme: FloatingActionButtonThemeData(backgroundColor: AppColor.secundary, foregroundColor: AppColor.onPrimary),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColor.secundary, foregroundColor: AppColor.onPrimary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            ),
+            iconTheme: IconThemeData(color: AppColor.primary),
+            colorScheme: ColorScheme.fromSwatch(primarySwatch: createMaterialColor(AppColor.primary)).copyWith(secondary: AppColor.accent),
+          ),
+          initialRoute: '/dashboard',
+          routes:{
+            '/dashboard': (context)=> DashboardPage(),
+            // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
+            '/create': (context) {
+              final args = ModalRoute.of(context)?.settings.arguments;
+              Quiz? template;
+              bool explicitClear = false;
+              if (args is Quiz) template = args;
+              if (args is Map && args['clear'] == true) explicitClear = true;
+              // Si no se pasa plantilla, limpiamos cualquier quiz en edición previo
+              // cuando se pida explícitamente limpiar (via FAB / create),
+              // o cuando no haya un `currentQuiz` establecido, o cuando el
+              // `currentQuiz` tenga un id vacío (indica una instancia local
+              // que no debe reutilizarse para una nueva creación).
+              final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+              final shouldClear = template == null && (explicitClear || quizBloc.currentQuiz == null || (quizBloc.currentQuiz?.quizId.isEmpty ?? false));
+              if (shouldClear) {
+                quizBloc.clear();
+              }
+              return QuizEditorPage(template: template);
+            },
+            '/questionEditor': (context) {
+              final args = ModalRoute.of(context)!.settings.arguments as Map<String, String>;
+              return QuestionEditorPage(quizId: args['quizId']!, questionId: args['questionId']!);
+            },
+            '/templateSelector': (context) => TemplateSelectorPage(),
+            //Comentoados por ahora
+            //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
+            //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
+            //'/discover': (context) => DiscoverPage(), // Agregar si existe
+            //'/library': (context) => LibraryPage(), // Agregar si existe
+          },
+          home: DashboardPage(),//Pagina inicial
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
 }
+

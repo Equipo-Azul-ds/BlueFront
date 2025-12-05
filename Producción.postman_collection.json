@@ -1,0 +1,251 @@
+{
+	"info": {
+		"_postman_id": "ceb26bcf-ae5f-4cc7-835d-e0456f99f38b",
+		"name": "Producción",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "44628130"
+	},
+	"item": [
+		{
+			"name": "Crear Kahoot",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"authorId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n    \"title\": \"Mi Nuevo Quiz con Imágenes\",\r\n    \"description\": \"Un quiz de prueba para verificar la asociación de imágenes.\",\r\n    \"coverImageId\": null,\r\n    \"visibility\": \"private\",\r\n    \"status\": \"draft\",\r\n    \"category\": \"Tecnología\",\r\n    \"themeId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n    \"questions\": [\r\n        {\r\n            \"questionText\": \"¿Cuál de estos es un framework de JavaScript?\",\r\n            \"mediaId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n            \"questionType\": \"quiz\",\r\n            \"timeLimit\": 30,\r\n            \"points\": 1000,\r\n            \"answers\": [\r\n                {\r\n                    \"answerText\": \"React\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": true\r\n                },\r\n                {\r\n                    \"answerText\": \"Laravel\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": false\r\n                },\r\n                {\r\n                    \"answerText\": \"Django\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": false\r\n                },\r\n                {\r\n                    \"answerText\": \"Rails\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": false\r\n                }\r\n            ]\r\n        },\r\n        {\r\n            \"questionText\": \"Esta es una respuesta con imagen.\",\r\n            \"questionType\": \"quiz\",\r\n            \"timeLimit\": 20,\r\n            \"points\": 1000,\r\n            \"answers\": [\r\n                {\r\n                    \"answerText\": null,\r\n                    \"mediaId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n                    \"isCorrect\": true\r\n                },\r\n                {\r\n                    \"answerText\": null,\r\n                    \"mediaId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n                    \"isCorrect\": false\r\n                }\r\n            ]\r\n        },\r\n        {\r\n            \"questionText\": \"El cielo es azul.\",\r\n            \"questionType\": \"true_false\",\r\n            \"timeLimit\": 10,\r\n            \"points\": 1000,\r\n            \"answers\": [\r\n                {\r\n                    \"answerText\": \"Verdadero\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": true\r\n                },\r\n                {\r\n                    \"answerText\": null,\r\n                    \"mediaId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n                    \"isCorrect\": false\r\n                }\r\n            ]\r\n        }\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/kahoots",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"kahoots"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Actualizar Kahoot",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"authorId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n    \"title\": \"Mi Nuevo Quiz con Imágenes (Actualizado)\",\r\n    \"description\": \"Un quiz de prueba para verificar la asociación de imágenes.\",\r\n    \"coverImageId\": null,\r\n    \"visibility\": \"private\",\r\n    \"status\": \"draft\",\r\n    \"category\": \"Tecnología\",\r\n    \"themeId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n    \"questions\": [\r\n        {\r\n            \"questionText\": \"¿Cuál de estos es un framework de JavaScript?\",\r\n            \"mediaId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n            \"questionType\": \"quiz\",\r\n            \"timeLimit\": 30,\r\n            \"points\": 1000,\r\n            \"answers\": [\r\n                {\r\n                    \"answerText\": \"React\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": true\r\n                },\r\n                {\r\n                    \"answerText\": \"Laravel\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": false\r\n                },\r\n                {\r\n                    \"answerText\": \"Django\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": false\r\n                },\r\n                {\r\n                    \"answerText\": \"Rails\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": false\r\n                }\r\n            ]\r\n        },\r\n        {\r\n            \"questionText\": \"Esta es una respuesta con imagen.\",\r\n            \"questionType\": \"quiz\",\r\n            \"timeLimit\": 20,\r\n            \"points\": 1000,\r\n            \"answers\": [\r\n                {\r\n                    \"answerText\": null,\r\n                    \"mediaId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n                    \"isCorrect\": true\r\n                },\r\n                {\r\n                    \"answerText\": null,\r\n                    \"mediaId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n                    \"isCorrect\": false\r\n                }\r\n            ]\r\n        },\r\n        {\r\n            \"questionText\": \"El cielo es azul.\",\r\n            \"questionType\": \"true_false\",\r\n            \"timeLimit\": 10,\r\n            \"points\": 1000,\r\n            \"answers\": [\r\n                {\r\n                    \"answerText\": \"Verdadero\",\r\n                    \"mediaId\": null,\r\n                    \"isCorrect\": true\r\n                },\r\n                {\r\n                    \"answerText\": null,\r\n                    \"mediaId\": \"f1986c62-7dc1-47c5-9a1f-03d34043e8f4\",\r\n                    \"isCorrect\": false\r\n                }\r\n            ]\r\n        }\r\n    ]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/kahoots/502fe9d9-80b4-4809-b743-0b01aa7bda9c",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"kahoots",
+						"502fe9d9-80b4-4809-b743-0b01aa7bda9c"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Leer Kahoot por Id",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/kahoots/502fe9d9-80b4-4809-b743-0b01aa7bda9c",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"kahoots",
+						"502fe9d9-80b4-4809-b743-0b01aa7bda9c"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Leer Kahoot por User",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/kahoots/user/f1986c62-7dc1-47c5-9a1f-03d34043e8f4",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"kahoots",
+						"user",
+						"f1986c62-7dc1-47c5-9a1f-03d34043e8f4"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Eliminar Kahoot",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/kahoots/502fe9d9-80b4-4809-b743-0b01aa7bda9c",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"kahoots",
+						"502fe9d9-80b4-4809-b743-0b01aa7bda9c"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Cargar Foto",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": "postman-cloud:///1f0c754d-785d-4d20-9372-96f78247262d"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/media/upload",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"media",
+						"upload"
+					]
+				},
+				"description": "Generated from cURL: curl -v -F \"file=@/ruta/a/tu/archivo.jpg\" http://localhost:3000/media/upload"
+			},
+			"response": []
+		},
+		{
+			"name": "Descargar foto",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/media/fef5ecb5-c170-4a2c-9021-fe6c0e48fb50",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"media",
+						"fef5ecb5-c170-4a2c-9021-fe6c0e48fb50"
+					]
+				},
+				"description": "Generated from cURL: curl -v -F \"file=@/ruta/a/tu/archivo.jpg\" http://localhost:3000/media/upload"
+			},
+			"response": []
+		},
+		{
+			"name": "Obtener lista de media",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/media",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"media"
+					]
+				},
+				"description": "Generated from cURL: curl -v -F \"file=@/ruta/a/tu/archivo.jpg\" http://localhost:3000/media/upload"
+			},
+			"response": []
+		},
+		{
+			"name": "Borrar foto",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "https://backcomun-production.up.railway.app/media/fef5ecb5-c170-4a2c-9021-fe6c0e48fb50",
+					"protocol": "https",
+					"host": [
+						"backcomun-production",
+						"up",
+						"railway",
+						"app"
+					],
+					"path": [
+						"media",
+						"fef5ecb5-c170-4a2c-9021-fe6c0e48fb50"
+					]
+				},
+				"description": "Generated from cURL: curl -v -F \"file=@/ruta/a/tu/archivo.jpg\" http://localhost:3000/media/upload"
+			},
+			"response": []
+		}
+	]
+}
