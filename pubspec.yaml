@@ -1,4 +1,4 @@
-name: trivvy
+name: Trivvy
 description: "A new Flutter project."
 publish_to: 'none'
 version: 1.0.0+1
@@ -15,6 +15,7 @@ dependencies:
 
   # Provider para manejar el estado
   provider: ^6.0.5
+  uuid: ^3.0.6
 
   # Para grid irregulares
   flutter_staggered_grid_view: ^0.7.0
@@ -27,6 +28,9 @@ dependencies:
 
   # Animaciones
   animations: ^2.0.6
+
+  # Confetti celebration
+  confetti: ^0.7.0
 
   # Para reproducir videos
   video_player: ^2.8.1
@@ -50,11 +54,18 @@ dependencies:
   stack_trace: ^1.12.1
   url_launcher: ^6.3.2
   web: ^1.1.1
+
+  # Escáner de códigos QR/cámara
+  mobile_scanner: ^5.0.2
+  path_provider: ^2.0.14
   
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints...
+  flutter_lints: ^6.0.0
 
   # Para generar íconos de la app
   flutter_launcher_icons: ^0.14.4
