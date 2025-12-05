@@ -22,7 +22,10 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Provider para manejar el estado
-  provider: ^6.1.5+1
+
+  provider: ^6.0.5
+  uuid: ^3.0.6
+
 
   # Para grid irregulares
   flutter_staggered_grid_view: ^0.7.0
@@ -35,6 +38,9 @@ dependencies:
 
   # Animaciones
   animations: ^2.0.6
+
+  # Confetti celebration
+  confetti: ^0.7.0
 
   # Para reproducir videos
   video_player: ^2.8.1
@@ -50,6 +56,11 @@ dependencies:
 
   # Almacenamiento seguro de datos
   flutter_secure_storage: ^9.2.4
+
+  # Escáner de códigos QR/cámara
+  mobile_scanner: ^5.0.2
+  path_provider: ^2.0.14
+  
 
 dev_dependencies:
   flutter_test:
@@ -75,3 +86,26 @@ flutter:
   # Assets para imágenes
   assets:
     - assets/images/
+    
+  # Fuentes locales
+  fonts:
+    - family: Onest
+      fonts:
+        - asset: assets/fonts/static/Onest-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/static/Onest-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/static/Onest-Light.ttf
+          weight: 300
+        - asset: assets/fonts/static/Onest-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/static/Onest-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/static/Onest-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/static/Onest-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/static/Onest-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/static/Onest-Black.ttf
+          weight: 900
