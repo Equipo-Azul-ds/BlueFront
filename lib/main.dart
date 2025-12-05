@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'core/constants/colors.dart';
 import 'common_pages/dashboard_page.dart';
 import 'features/challenge/domain/repositories/single_player_game_repository.dart';
 import 'features/challenge/infrastructure/repositories/single_player_game_repository_impl.dart';
@@ -71,16 +72,28 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'Trivvy',
         theme: ThemeData(
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF121212),
-          useMaterial3: true,
-          pageTransitionsTheme: const PageTransitionsTheme(
+            fontFamily: 'Onest',
+            primarySwatch: createMaterialColor(AppColor.primary),
+            primaryColor: AppColor.primary,
+            scaffoldBackgroundColor: AppColor.background,
+            appBarTheme: AppBarTheme(
+              backgroundColor: AppColor.primary,
+              iconTheme: IconThemeData(color: AppColor.onPrimary),
+              titleTextStyle: TextStyle(color: AppColor.onPrimary, fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+            floatingActionButtonTheme: FloatingActionButtonThemeData(backgroundColor: AppColor.secundary, foregroundColor: AppColor.onPrimary),
+            elevatedButtonTheme: ElevatedButtonThemeData(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColor.secundary, foregroundColor: AppColor.onPrimary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+            ),
+            iconTheme: IconThemeData(color: AppColor.primary),
+            colorScheme: ColorScheme.fromSwatch(primarySwatch: createMaterialColor(AppColor.primary)).copyWith(secondary: AppColor.accent),
+            pageTransitionsTheme: const PageTransitionsTheme(
             builders: {
               TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
               TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
             },
           ),
-        ),
+          ),
         initialRoute: '/dashboard',
         routes: {'/dashboard': (context) => DashboardPage()},
         home: DashboardPage(),

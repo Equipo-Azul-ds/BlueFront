@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
-import 'multiplayer_leaderboard.dart';
+import 'package:Trivvy/core/constants/colors.dart';
 
-const Color kPurple = Color(0xFF46178F);
-const Color kDarkPurple = Color(0xFF25076B);
-const Color kRed = Color(0xFFE21B3C);
-const Color kBlue = Color(0xFF1368CE);
-const Color kYellow = Color(0xFFD89E00);
-const Color kGreen = Color(0xFF26890C);
+import '../mocks/mock_session_data.dart';
+import 'host_results_screen.dart';
+
+const Color _triangleColor = Color(0xFF1C6BFF);
+const Color _diamondColor = Color(0xFFFF5C7A);
+const Color _circleColor = Color(0xFF34C759);
+const Color _squareColor = Color(0xFFFFC857);
+const List<Color> _optionColors = [
+  _triangleColor,
+  _diamondColor,
+  _circleColor,
+  _squareColor,
+];
 
 class HostGameScreen extends StatefulWidget {
   const HostGameScreen({super.key});
@@ -18,42 +25,8 @@ class HostGameScreen extends StatefulWidget {
 class _HostGameScreenState extends State<HostGameScreen> {
   int currentQuestionIndex = 0;
   bool isStatsView = false;
-
-  final List<Map<String, dynamic>> questions = [
-    {
-      "question": "What is the capital of France?",
-      "time": 20,
-      "answers": [
-        {"text": "London", "color": kRed, "correct": false},
-        {"text": "Berlin", "color": kBlue, "correct": false},
-        {"text": "Madrid", "color": kYellow, "correct": false},
-        {"text": "Paris", "color": kGreen, "correct": true},
-      ],
-      "stats": [2, 5, 1, 15],
-    },
-    {
-      "question": "Which planet is known as the Red Planet?",
-      "time": 15,
-      "answers": [
-        {"text": "Mars", "color": kRed, "correct": true},
-        {"text": "Venus", "color": kBlue, "correct": false},
-        {"text": "Jupiter", "color": kYellow, "correct": false},
-        {"text": "Saturn", "color": kGreen, "correct": false},
-      ],
-      "stats": [20, 3, 2, 1],
-    },
-    {
-      "question": "Wawa?",
-      "time": 10,
-      "answers": [
-        {"text": "Waawa", "color": kRed, "correct": false},
-        {"text": "Wjananf", "color": kBlue, "correct": true},
-        {"text": "Dbsbs", "color": kYellow, "correct": false},
-        {"text": "Eueusj", "color": kGreen, "correct": false},
-      ],
-      "stats": [1, 20, 5, 2],
-    },
-  ];
+  final List<Map<String, dynamic>> questions = mockSessionQuestions;
+  final List<Map<String, dynamic>> standings = mockSessionStandings;
 
   void _handleNextAction() {
     if (isStatsView) {
@@ -63,274 +36,344 @@ class _HostGameScreenState extends State<HostGameScreen> {
           isStatsView = false;
         });
       } else {
-        Navigator.pushReplacement(
-          context,
+        Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => const MultiplayerLeaderboardScreen(
-              nickname: "Player 1",
-              finalScore: 2500,
-              totalQuestions: 3,
-              correctAnswers: 3,
+            builder: (_) => HostResultsScreen(
+              standings: standings,
+              totalQuestions: questions.length,
+              quizTitle: mockQuizTitle,
             ),
           ),
         );
       }
     } else {
-      setState(() {
-        isStatsView = true;
-      });
+      setState(() => isStatsView = true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final currentQ = questions[currentQuestionIndex];
-    final List<dynamic> answers = currentQ['answers'];
-    final List<int> stats = currentQ['stats'];
+    final List<dynamic> rawAnswers = currentQ['answers'] as List<dynamic>;
+    final List<Map<String, dynamic>> decoratedAnswers =
+        _decorateAnswers(rawAnswers);
+    final List<int> stats =
+        (currentQ['stats'] as List<dynamic>).cast<int>();
 
     return Scaffold(
-      backgroundColor: kDarkPurple,
-      appBar: AppBar(
-        backgroundColor: kPurple,
-        automaticallyImplyLeading: false,
-        title: Text(
-          "${currentQuestionIndex + 1} of ${questions.length}",
-          style: const TextStyle(color: Colors.white),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColor.primary, AppColor.secundary],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: _handleNextAction,
-            child: Text(
-              isStatsView ? "Next" : "Skip",
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Container(
+        child: SafeArea(
+          child: Padding(
             padding: const EdgeInsets.all(20),
-            color: Colors.white,
-            width: double.infinity,
-            constraints: const BoxConstraints(minHeight: 100),
-            alignment: Alignment.center,
-            child: Text(
-              currentQ['question'],
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-          ),
-
-          Expanded(
-            child: isStatsView
-                ? _buildStatsView(stats, answers)
-                : _buildQuestionView(currentQ['time']),
-          ),
-          SizedBox(
-            height: 150,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    children: [
-                      _buildAnswerTile(answers[0], isStatsView),
-                      _buildAnswerTile(answers[2], isStatsView),
-                    ],
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          mockQuizTitle,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Pregunta ${currentQuestionIndex + 1} de ${questions.length}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          currentQ['context'] as String,
+                          style: const TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                    FilledButton.tonal(
+                      onPressed: _handleNextAction,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppColor.primary,
+                      ),
+                      child: Text(isStatsView ? 'Siguiente' : 'Mostrar resultados'),
+                    ),
+                  ],
                 ),
+                const SizedBox(height: 16),
+                _QuestionCard(text: currentQ['question'] as String),
+                const SizedBox(height: 14),
+                isStatsView
+                  ? _StatsCard(stats: stats, answers: decoratedAnswers)
+                    : _MediaAndTimerBlock(time: currentQ['time'] as int),
+                const SizedBox(height: 16),
                 Expanded(
-                  child: Column(
-                    children: [
-                      _buildAnswerTile(answers[1], isStatsView),
-                      _buildAnswerTile(answers[3], isStatsView),
-                    ],
+                  child: GridView.builder(
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 2.6,
+                    ),
+                    itemCount: decoratedAnswers.length,
+                    itemBuilder: (_, index) => _AnswerTile(
+                      data: decoratedAnswers[index],
+                      dimIncorrect: isStatsView,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildQuestionView(int time) {
+  List<Map<String, dynamic>> _decorateAnswers(List<dynamic> rawAnswers) {
+    return List<Map<String, dynamic>>.generate(rawAnswers.length, (index) {
+      final item = rawAnswers[index] as Map<String, dynamic>;
+      return {
+        'text': item['text'] as String,
+        'correct': item['correct'] as bool,
+        'color': _optionColors[index % _optionColors.length],
+      };
+    });
+  }
+
+}
+
+class _QuestionCard extends StatelessWidget {
+  final String text;
+
+  const _QuestionCard({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppColor.primary,
+          fontSize: 26,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaAndTimerBlock extends StatelessWidget {
+  final int time;
+
+  const _MediaAndTimerBlock({required this.time});
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       children: [
-        // Timer
-        SizedBox(
-          width: 80,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 20),
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: kPurple,
-                child: Text(
-                  "$time",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              const Text(
-                "0",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Text("Answers", style: TextStyle(color: Colors.white)),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-
-        // Center Content
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
             child: Container(
-              decoration: BoxDecoration(
-                color: kPurple.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(8),
-              ),
+              height: 140,
+              color: Colors.white.withValues(alpha: 0.15),
               child: const Center(
-                child: Icon(Icons.image, size: 80, color: Colors.white24),
+                child: Icon(
+                  Icons.image_outlined,
+                  size: 64,
+                  color: Colors.white54,
+                ),
               ),
             ),
           ),
         ),
-        const SizedBox(width: 80),
+        const SizedBox(width: 14),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 64,
+                width: 64,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CircularProgressIndicator(
+                      value: 0.85,
+                      strokeWidth: 6,
+                      color: AppColor.accent,
+                      backgroundColor: AppColor.primary.withValues(alpha: 0.1),
+                    ),
+                    Center(
+                      child: Text(
+                        '$time s',
+                        style: const TextStyle(
+                          color: AppColor.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Respuestas en curso',
+                style: TextStyle(
+                  color: AppColor.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
+}
 
-  Widget _buildStatsView(List<int> stats, List<dynamic> answers) {
-    int maxVotes = stats.reduce((curr, next) => curr > next ? curr : next);
-    if (maxVotes == 0) maxVotes = 1;
+class _StatsCard extends StatelessWidget {
+  final List<int> stats;
+  final List<dynamic> answers;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+  const _StatsCard({required this.stats, required this.answers});
+
+  @override
+  Widget build(BuildContext context) {
+    final maxVotes = stats.fold<int>(1, (prev, element) => element > prev ? element : prev);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: List.generate(4, (index) {
-          final color = (answers[index]['color'] as Color);
+        children: List.generate(stats.length, (index) {
+          final color = answers[index]['color'] as Color;
           final isCorrect = answers[index]['correct'] as bool;
           final count = stats[index];
+          final heightFactor = (count / maxVotes).clamp(0.15, 1.0);
 
-          double heightPct = (count / maxVotes);
-          if (heightPct < 0.1) heightPct = 0.1;
-
-          return _buildBar(color, heightPct, count, isCorrect);
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (isCorrect)
+                const Icon(Icons.check_circle, color: AppColor.success, size: 20)
+              else
+                const SizedBox(height: 20),
+              const SizedBox(height: 6),
+              Container(
+                width: 50,
+                height: 160 * heightFactor,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$count',
+                style: const TextStyle(
+                  color: AppColor.primary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          );
         }),
       ),
     );
   }
+}
 
-  Widget _buildBar(Color color, double heightPct, int count, bool isCorrect) {
-    return Expanded(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
+class _AnswerTile extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final bool dimIncorrect;
+
+  const _AnswerTile({required this.data, required this.dimIncorrect});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = data['color'] as Color;
+    final text = data['text'] as String;
+    final isCorrect = data['correct'] as bool;
+
+    final background = dimIncorrect && !isCorrect
+        ? color.withValues(alpha: 0.4)
+        : color;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
         children: [
-          if (isCorrect) const Icon(Icons.check, color: Colors.white, size: 30),
-          const SizedBox(height: 4),
-
-          // The Bar
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return Container(
-                width: 50,
-                height: 200 * heightPct,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(4),
-                  ),
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: 5),
-          if (isCorrect)
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
-          if (!isCorrect)
-            Icon(
-              Icons.close,
-              color: Colors.white.withValues(alpha: 0.5),
-              size: 20,
-            ),
-
-          Text(
-            "$count",
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
+          _getIconForColor(color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
+          if (dimIncorrect && isCorrect)
+            const Icon(Icons.check, color: Colors.white),
         ],
       ),
     );
   }
 
-  Widget _buildAnswerTile(Map<String, dynamic> answerData, bool dimIncorrect) {
-    final Color color = answerData['color'];
-    final String text = answerData['text'];
-    final bool isCorrect = answerData['correct'];
-
-    final double opacity = (dimIncorrect && !isCorrect) ? 0.4 : 1.0;
-
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.all(2),
-        color: color.withValues(alpha: opacity),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          children: [
-            // Icons
-            _getIconForColor(color),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                text,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (dimIncorrect && isCorrect)
-              const Icon(Icons.check, color: Colors.white),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _getIconForColor(Color c) {
-    IconData i = Icons.help;
-    if (c == kRed) i = Icons.change_history;
-    if (c == kBlue) i = Icons.diamond_outlined;
-    if (c == kYellow) i = Icons.circle_outlined;
-    if (c == kGreen) i = Icons.square_outlined;
-    return Icon(i, color: Colors.white);
+  Icon _getIconForColor(Color c) {
+    IconData icon = Icons.help_outline;
+    if (c == _triangleColor) icon = Icons.change_history_rounded;
+    if (c == _diamondColor) icon = Icons.diamond_outlined;
+    if (c == _circleColor) icon = Icons.circle_outlined;
+    if (c == _squareColor) icon = Icons.square_outlined;
+    return Icon(icon, color: Colors.white);
   }
 }

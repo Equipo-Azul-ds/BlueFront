@@ -1,4 +1,4 @@
-// ENUM
+// Enumerado
 // Representa el estado del progreso del juego (en curso o completado).
 enum GameProgressStatus {
   IN_PROGRESS,
@@ -14,7 +14,7 @@ enum GameProgressStatus {
   }
 }
 
-// AGGREGATE ROOT
+// Modelo de Agregado
 // Agregado raíz que representa un intento de juego en modo single-player.
 // Contiene información del jugador, progreso, puntuación y respuestas.
 class SinglePlayerGame {
@@ -73,7 +73,7 @@ class SinglePlayerGame {
   }
 }
 
-// VALUE OBJECTS
+// Modelo de Value Objects
 
 // Objeto de valor que representa el progreso (estado y porcentaje) del intento.
 class GameProgress {

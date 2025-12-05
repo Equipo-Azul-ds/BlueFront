@@ -28,6 +28,9 @@ dependencies:
   # Animaciones
   animations: ^2.0.6
 
+  # Confetti celebration
+  confetti: ^0.7.0
+
   # Para reproducir videos
   video_player: ^2.8.1
 
@@ -42,6 +45,9 @@ dependencies:
 
   # Almacenamiento seguro de datos
   flutter_secure_storage: ^9.2.4
+
+  # Escáner de códigos QR/cámara
+  mobile_scanner: ^5.0.2
   
 
 dev_dependencies:

@@ -1,19 +1,25 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'single_player_challenge_results.dart';
-import '../blocs/single_player_challenge_bloc.dart';
+import 'package:Trivvy/core/constants/colors.dart';
+
 import '../../application/dtos/single_player_dtos.dart';
 import '../../domain/entities/single_player_game.dart';
+import '../blocs/single_player_challenge_bloc.dart';
+import 'single_player_challenge_results.dart';
 
-const Color red = Color(0xFFE53935);
-const Color blue = Color(0xFF1E88E5);
-const Color yellow = Color(0xFFFFB300);
-const Color green = Color(0xFF43A047);
-const Color purpleDark = Color(0xFF4B0082);
-const Color purpleLight = Color(0xFF8A2BE2);
+const Color _optionBlue = Color(0xFF1C6BFF);
+const Color _optionRed = Color(0xFFFF5C7A);
+const Color _optionGreen = Color(0xFF34C759);
+const Color _optionYellow = Color(0xFFFFC857);
 
-const List<Color> optionColors = [red, blue, yellow, green];
+const List<Color> optionColors = [
+  _optionBlue,
+  _optionRed,
+  _optionGreen,
+  _optionYellow,
+];
 const List<IconData> optionIcons = [
   Icons.change_history_rounded,
   Icons.diamond_outlined,
@@ -275,8 +281,8 @@ class _SinglePlayerChallengeScreenState
             IconData? indicatorIcon;
             if (reveal) {
               backgroundColor = isCorrect
-                  ? green
-                  : (isSelected ? red : baseColor);
+                  ? AppColor.success
+                  : (isSelected ? AppColor.error : baseColor);
               indicatorIcon = isCorrect ? Icons.check : Icons.close;
             }
 
@@ -298,7 +304,7 @@ class _SinglePlayerChallengeScreenState
                       borderRadius: BorderRadius.circular(8),
                     ),
                     padding: const EdgeInsets.symmetric(
-                      vertical: 20,
+                      vertical: 50,
                       horizontal: 10,
                     ),
                     elevation: 8,
@@ -328,7 +334,47 @@ class _SinglePlayerChallengeScreenState
               ),
             );
           }
-          
+
+          Widget buildMedia(String mediaPath) {
+            Widget buildFallback() {
+              return Container(
+                height: 160,
+                color: Colors.grey[300],
+                child: const Center(child: Icon(Icons.broken_image)),
+              );
+            }
+
+            final uri = Uri.tryParse(mediaPath);
+            final bool isRemote =
+                uri != null &&
+                uri.hasScheme &&
+                (uri.scheme == 'http' || uri.scheme == 'https');
+
+            final image = isRemote
+                ? Image.network(
+                    mediaPath,
+                    height: 360,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => buildFallback(),
+                  )
+                : Image.asset(
+                    mediaPath,
+                    height: 360,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (c, e, s) => buildFallback(),
+                  );
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: image,
+              ),
+            );
+          }
+
           // Construye el Area de los bloques para preguntas
           Widget buildQuestionArea() {
             return Container(
@@ -350,7 +396,7 @@ class _SinglePlayerChallengeScreenState
                 qText,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: purpleDark,
+                  color: AppColor.primary,
                   fontSize: 24,
                   fontWeight: FontWeight.w800,
                 ),
@@ -369,7 +415,7 @@ class _SinglePlayerChallengeScreenState
                 : 0;
             return Container(
               width: double.infinity,
-              color: isCorrect ? green : red,
+              color: isCorrect ? AppColor.success : AppColor.error,
               padding: const EdgeInsets.all(12),
               child: Center(
                 child: Column(
@@ -403,7 +449,7 @@ class _SinglePlayerChallengeScreenState
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [purpleLight, purpleDark],
+                  colors: [AppColor.secundary, AppColor.primary],
                 ),
               ),
               child: Column(
@@ -439,42 +485,18 @@ class _SinglePlayerChallengeScreenState
                                         child: Text(
                                           '$_timeRemaining',
                                           style: const TextStyle(
-                                            color: purpleDark,
+                                            color: AppColor.primary,
                                             fontSize: 28,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                       ),
                                     const SizedBox(height: 14),
-                                    if (mediaUrl != null)
-                                      Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 20.0,
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          child: Image.network(
-                                            mediaUrl,
-                                            height: 160,
-                                            width: double.infinity,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (c, e, s) =>
-                                                Container(
-                                                  height: 160,
-                                                  color: Colors.grey[300],
-                                                  child: const Center(
-                                                    child: Icon(
-                                                      Icons.broken_image,
-                                                    ),
-                                                  ),
-                                                ),
-                                          ),
-                                        ),
-                                      ),
-                                    const SizedBox(height: 12),
                                     buildQuestionArea(),
+                                    if (mediaUrl != null) ...[
+                                      const SizedBox(height: 50),
+                                      buildMedia(mediaUrl),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -565,7 +587,7 @@ class _SinglePlayerChallengeScreenState
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
-                                foregroundColor: purpleDark,
+                                foregroundColor: AppColor.primary,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
                                   vertical: 8,

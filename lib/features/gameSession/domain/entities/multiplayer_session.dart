@@ -15,7 +15,7 @@ enum GameStateType {
   }
 }
 
-// AGGREGATE ROOT
+// Modelo de Agregado
 class MultiplayerSession {
   final String sessionId;
   final String hostId;
@@ -78,7 +78,7 @@ class MultiplayerSession {
   }
 }
 
-// VALUE OBJECTS
+// Modelos de Value Objects
 
 class GamePin {
   final int pin;
@@ -202,7 +202,7 @@ class EvaluatedAnswer {
   }
 }
 
-// ENTITY
+// Modelo de Entidad
 
 class Player {
   final String playerId;

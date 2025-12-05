@@ -37,12 +37,10 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
 
     if (existing != null) {
       // Reanuda intento existente: devolvemos el agregado tal cual está.
-      // La sincronización del puntero de slides la realiza el
-      // `SlideProviderImpl` a través del caso de uso `StartAttemptUseCase`.
       return existing;
     }
 
-    final attemptId = 'attempt_${now.millisecondsSinceEpoch}';
+    final attemptId = '${kahootId}_attempt_${now.millisecondsSinceEpoch}';
 
     final game = SinglePlayerGame(
       gameId: attemptId,

@@ -1,9 +1,8 @@
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
+import 'package:Trivvy/core/constants/colors.dart';
 
-const Color purpleDark = Color(0xFF4B0082);
-const Color purpleLight = Color(0xFF8A2BE2);
-
-class MultiplayerLeaderboardScreen extends StatelessWidget {
+class MultiplayerLeaderboardScreen extends StatefulWidget {
   final String nickname;
   final int finalScore;
   final int totalQuestions;
@@ -17,11 +16,38 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
     required this.correctAnswers,
   });
 
-  // Prefijos
-  String getOrdinal(int n) {
-    if (n >= 11 && n <= 13) {
-      return 'vo';
-    }
+  @override
+  State<MultiplayerLeaderboardScreen> createState() =>
+      _MultiplayerLeaderboardScreenState();
+}
+
+class _MultiplayerLeaderboardScreenState extends State<MultiplayerLeaderboardScreen>
+    with SingleTickerProviderStateMixin {
+  static final List<Map<String, dynamic>> _initialMockPlayers = [
+    {'name': 'Shima', 'score': 943, 'correct': 2},
+    {'name': 'Robyn', 'score': 948, 'correct': 3},
+    {'name': 'Mal', 'score': 788, 'correct': 1},
+    {'name': 'Nancy', 'score': 1050, 'correct': 3},
+    {'name': 'Zane', 'score': 500, 'correct': 1},
+  ];
+
+  late final ConfettiController _confettiController;
+
+  @override
+  void initState() {
+    super.initState();
+    _confettiController =
+        ConfettiController(duration: const Duration(seconds: 5))..play();
+  }
+
+  @override
+  void dispose() {
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  String _ordinalSuffix(int n) {
+    if (n >= 11 && n <= 13) return 'vo';
     switch (n % 10) {
       case 1:
         return 'er';
@@ -34,225 +60,178 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
     }
   }
 
-  // Mock de un leaderboard
-  static List<Map<String, dynamic>> initialMockPlayers = [
-    {'name': 'Shima', 'score': 943, 'correct': 2},
-    {'name': 'Robyn', 'score': 948, 'correct': 3},
-    {'name': 'Mal', 'score': 788, 'correct': 1},
-    {'name': 'Nancy', 'score': 1050, 'correct': 3},
-    {'name': 'Zane', 'score': 500, 'correct': 1},
-  ];
+  List<Map<String, dynamic>> _buildLeaderboard() {
+    final list = List<Map<String, dynamic>>.from(_initialMockPlayers)
+      ..add({
+        'name': widget.nickname,
+        'score': widget.finalScore,
+        'correct': widget.correctAnswers,
+      })
+      ..sort((a, b) => b['score'].compareTo(a['score']));
 
-  List<Map<String, dynamic>> get dynamicLeaderboard {
-    // Crea el mock de la lista
-    final List<Map<String, dynamic>> players = List.from(initialMockPlayers);
-
-    // Añade al jugador
-    players.add({
-      'name': nickname,
-      'score': finalScore,
-      'correct': correctAnswers,
-    });
-    // Ordena por puntaje descendente
-    players.sort((a, b) => b['score'].compareTo(a['score']));
-
-    // Asigna ranking
-    for (int i = 0; i < players.length; i++) {
-      players[i]['rank'] = i + 1;
+    for (int i = 0; i < list.length; i++) {
+      list[i]['rank'] = i + 1;
     }
-    return players;
+    return list;
   }
 
-  // Busca al jugador de la lista
-  Map<String, dynamic> getUserData(List<Map<String, dynamic>> fullLeaderboard) {
-    return fullLeaderboard.firstWhere(
-      (p) => p['name'] == nickname && p['score'] == finalScore,
+  Map<String, dynamic> _currentUser(List<Map<String, dynamic>> board) {
+    return board.firstWhere(
+      (player) =>
+          player['name'] == widget.nickname &&
+          player['score'] == widget.finalScore,
       orElse: () => {
-        'name': nickname,
-        'score': finalScore,
-        'rank': fullLeaderboard.length,
-        'correct': correctAnswers,
+        'name': widget.nickname,
+        'score': widget.finalScore,
+        'rank': board.length,
+        'correct': widget.correctAnswers,
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // 1. Genera el leaderboard completo y dinámico
-    final List<Map<String, dynamic>> fullLeaderboard = dynamicLeaderboard;
+    final leaderboard = _buildLeaderboard();
+    final userData = _currentUser(leaderboard);
+    final userRank = userData['rank'] as int;
+    final topPlayers = leaderboard.take(3).toList();
 
-    // 2. Obtiene los datos específicos para el usuario
-    final Map<String, dynamic> userData = getUserData(fullLeaderboard);
-    final int userRank = userData['rank'];
-
-    // 3. Extrae un top 3
-    final List<Map<String, dynamic>> topPlayers = fullLeaderboard
-        .take(3)
-        .toList();
-
-    // 4. Ordena los widgets por orden de top ranking y guarda el orden
-    List<Widget> podiumColumns = [];
-
-    // Indices para cada posicion
-    const int firstPlaceIndex = 0;
-    const int secondPlaceIndex = 1;
-    const int thirdPlaceIndex = 2;
-
-    // Verifica el 2do Lugar (índice 1) - VISUALMENTE IZQUIERDA
-    if (topPlayers.length > secondPlaceIndex) {
+    final List<Widget> podiumColumns = [];
+    if (topPlayers.length > 1) {
       podiumColumns.add(
-        buildPodiumColumn(
-          context,
-          topPlayers[secondPlaceIndex],
-          heightFactor: 0.8,
-        ),
+        _buildPodiumColumn(topPlayers[1], heightFactor: 0.8),
       );
     }
-
-    // Verifica el 1er Lugar (índice 0) - VISUALMENTE CENTRO
-    if (topPlayers.length > firstPlaceIndex) {
+    if (topPlayers.isNotEmpty) {
       podiumColumns.add(
-        buildPodiumColumn(
-          context,
-          topPlayers[firstPlaceIndex],
-          heightFactor: 1.0,
-        ),
+        _buildPodiumColumn(topPlayers[0], heightFactor: 1.0),
       );
     }
-
-    // Verifica el 3er Lugar (index 2) - VISUALEMNTE DERECHA
-    if (topPlayers.length > thirdPlaceIndex) {
+    if (topPlayers.length > 2) {
       podiumColumns.add(
-        buildPodiumColumn(
-          context,
-          topPlayers[thirdPlaceIndex],
-          heightFactor: 0.6,
-        ),
+        _buildPodiumColumn(topPlayers[2], heightFactor: 0.6),
       );
     }
 
     return Scaffold(
       body: Container(
-        // Probando Gradiente
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [purpleLight, purpleDark],
+            colors: [AppColor.primary, AppColor.secundary],
           ),
         ),
         child: Stack(
           children: [
             SafeArea(
-              child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const SizedBox(height: 20),
                     const Text(
                       'Trivvy!',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: 48,
+                        fontSize: 44,
                         fontWeight: FontWeight.bold,
-                        letterSpacing: 2.0,
+                        letterSpacing: 1.5,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    // Titulo del Quiz
+                    const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
+                        horizontal: 18,
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(5),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: const Text(
-                        'Probando',
+                        'Resultados',
                         style: TextStyle(
-                          color: purpleDark,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                          color: AppColor.primary,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
-                    const Spacer(),
-
-                    // Visualizacion del podium
-                    SizedBox(
-                      height: 350,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: podiumColumns,
-                      ),
-                    ),
-                    const Spacer(),
-
-                    // Mensaje de ranking y puntaje para el jugador
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 20.0),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                        child: Text.rich(
-                          TextSpan(
-                            text: "Estas en ",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                            ),
-                            children: [
-                              TextSpan(
-                                text: '$userRank${getOrdinal(userRank)} lugar',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 20,
-                                ),
+                    const SizedBox(height: 24),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: podiumColumns,
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(40),
+                            ),
+                            child: Text.rich(
                               TextSpan(
-                                text: ' con $finalScore puntos!',
+                                text: 'Estas en ',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
                                 ),
+                                children: [
+                                  TextSpan(
+                                    text:
+                                        '$userRank${_ordinalSuffix(userRank)} lugar',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 20,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        ' con ${widget.finalScore} puntos!',
+                                    style: const TextStyle(fontSize: 18),
+                                  ),
+                                ],
                               ),
-                            ],
+                              textAlign: TextAlign.center,
+                            ),
                           ),
-                          textAlign: TextAlign.center,
-                        ),
+                          const SizedBox(height: 24),
+                        ],
                       ),
                     ),
-
-                    // Volver a jugar (por ahora lleva a la pantalla de pin)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 30.0),
+                    SizedBox(
+                      width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {
-                          // Navegar de regreso a la pantalla de unión o al menú principal
-                          Navigator.of(
-                            context,
-                          ).popUntil((route) => route.isFirst);
-                        },
+                        onPressed: () => Navigator.of(context)
+                            .popUntil((route) => route.isFirst),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
-                          foregroundColor: purpleDark,
-                          minimumSize: const Size(200, 50),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                          foregroundColor: AppColor.primary,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 16,
                           ),
-                          elevation: 10,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          elevation: 8,
                         ),
                         child: const Text(
-                          'Jugar otra vez',
+                          'Ir al Inicio',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -264,15 +243,30 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
                 ),
               ),
             ),
+            Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                emissionFrequency: 0.04,
+                numberOfParticles: 25,
+                gravity: 0.1,
+                colors: const [
+                  Colors.white,
+                  AppColor.primary,
+                  AppColor.secundary,
+                  AppColor.accent,
+                  Color(0xFFFFC857),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  // Construye los podiums individuales
-  Widget buildPodiumColumn(
-    BuildContext context,
+  Widget _buildPodiumColumn(
     Map<String, dynamic> player, {
     required double heightFactor,
   }) {
@@ -280,26 +274,25 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
     final Color rankColor = rank == 1
         ? const Color(0xFFFFCC00)
         : rank == 2
-        ? const Color(0xFFC0C0C0)
-        : const Color(0xFFCD7F32);
+            ? const Color(0xFFC0C0C0)
+            : const Color(0xFFCD7F32);
     final IconData rankIcon = rank == 1
         ? Icons.looks_one_rounded
         : rank == 2
-        ? Icons.looks_two_rounded
-        : Icons.looks_3_rounded;
-    final int columnHeight = (300 * heightFactor).round();
+            ? Icons.looks_two_rounded
+            : Icons.looks_3_rounded;
+    final int columnHeight = (240 * heightFactor).round();
 
-    // Chequea si el podium que se esta construyendo es el usuario actual y asigna un color distinto si es el caso
     final bool isUser =
-        player['name'] == nickname && player['score'] == finalScore;
-    final Color nameTagColor = isUser ? const Color(0xFF40E0D0) : Colors.white;
+        player['name'] == widget.nickname &&
+        player['score'] == widget.finalScore;
+    final Color nameTagColor = isUser ? AppColor.accent : Colors.white;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // Nombre del jugador
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
@@ -309,23 +302,21 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
             child: Text(
               player['name'],
               style: TextStyle(
-                color: isUser ? Colors.white : purpleDark,
+                color: isUser ? Colors.white : AppColor.primary,
                 fontWeight: rank == 1 ? FontWeight.w900 : FontWeight.bold,
                 fontSize: rank == 1 ? 24 : 18,
               ),
             ),
           ),
           const SizedBox(height: 10),
-
-          // Barra del podium
           Container(
-            width: 100,
+            width: 96,
             height: columnHeight.toDouble(),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: isUser
-                  ? const Color(0xFF40E0D0).withValues(alpha: 0.5)
-                  : Colors.white.withValues(alpha: 0.25),
+                  ? AppColor.accent.withValues(alpha: 0.45)
+                  : Colors.white.withValues(alpha: 0.2),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(8),
                 topRight: Radius.circular(8),
@@ -334,7 +325,6 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Icono de ranking
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -347,22 +337,20 @@ class MultiplayerLeaderboardScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: Icon(rankIcon, color: Colors.white, size: 30),
+                  child: Icon(rankIcon, color: Colors.white, size: 28),
                 ),
-
-                // Detalles de puntaje y respuestas correctas
                 Column(
                   children: [
                     Text(
                       '${player['score']}',
                       style: TextStyle(
-                        color: isUser ? const Color(0xFF40E0D0) : Colors.white,
-                        fontSize: 24,
+                        color: isUser ? AppColor.accent : Colors.white,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     Text(
-                      '${player['correct']} de $totalQuestions',
+                      '${player['correct']} de ${widget.totalQuestions}',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,

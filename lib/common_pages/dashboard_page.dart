@@ -2,12 +2,66 @@ import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
     as staggered;
+import 'package:provider/provider.dart';
+import 'package:Trivvy/features/challenge/application/use_cases/single_player_usecases.dart';
+import 'package:Trivvy/features/challenge/presentation/pages/single_player_challenge.dart';
 import '/features/gameSession/presentation/pages/join_game.dart';
 import '../core/constants/colors.dart';
 import '../common_widgets/main_bottom_nav_bar.dart';
 
+final List<Map<String, dynamic>> activeTrivvys = [
+  {
+    'id': 'mock_quiz_1',
+    'title': 'Ciencia y Matemática Básica',
+    'questions': 5,
+  },
+  {
+    'id': 'mock_quiz_ddd',
+    'title': 'Domain-Driven Design Básico',
+    'questions': 5,
+  },
+];
+
 class HomePageContent extends StatelessWidget {
   const HomePageContent({super.key});
+
+  Future<void> _startTrivvy(
+    BuildContext context,
+    Map<String, dynamic> quiz,
+  ) async {
+    final startAttempt = Provider.of<StartAttemptUseCase>(
+      context,
+      listen: false,
+    );
+    try {
+      final res = await startAttempt.execute(
+        kahootId: quiz['id'] as String,
+        playerId: 'Jugador',
+        totalQuestions: quiz['questions'] as int,
+      );
+      if (!context.mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SinglePlayerChallengeScreen(
+            nickname: res.game.playerId,
+            quizId: res.game.quizId,
+            totalQuestions: res.game.totalQuestions,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SinglePlayerChallengeScreen(
+            nickname: 'Jugador',
+            quizId: quiz['id'] as String,
+            totalQuestions: quiz['questions'] as int,
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +73,7 @@ class HomePageContent extends StatelessWidget {
       {'id': '3', 'title': 'Seguimos en prueba'},
       {'id': '4', 'title': 'hOLA ESTO ES UNA PRUEBA'},
     ];
-
+    
     return LayoutBuilder(
       builder: (context, constraints) {
         final screenSize = MediaQuery.of(context).size;
@@ -305,6 +359,110 @@ class HomePageContent extends StatelessWidget {
               ),
             ),
 
+            // Sección Trivvys activos
+            SliverPadding(
+              padding: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth * 0.05,
+                vertical: screenSize.height * 0.025,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Trivvys Activos',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: constraints.maxWidth * 0.045,
+                      ),
+                    ),
+                    Text(
+                      '${activeTrivvys.length} juegos',
+                      style: TextStyle(
+                        color: AppColor.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: constraints.maxWidth * 0.035,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth * 0.05,
+                vertical: screenSize.height * 0.005,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final quiz = activeTrivvys[index];
+                    return Container(
+                      margin: EdgeInsets.only(
+                        bottom: screenSize.height * 0.015,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => _startTrivvy(context, quiz),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: constraints.maxWidth * 0.045,
+                              vertical: screenSize.height * 0.018,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      quiz['title'] as String,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: constraints.maxWidth * 0.042,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${quiz['questions']} preguntas',
+                                      style: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontSize: constraints.maxWidth * 0.035,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Icon(
+                                  Icons.play_circle_fill,
+                                  color: AppColor.primary,
+                                  size: 32,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: activeTrivvys.length,
+                ),
+              ),
+            ),
+
             SliverToBoxAdapter(
               child: SizedBox(height: min(screenSize.height * 0.06, 120)),
             ),
@@ -331,7 +489,9 @@ class _DashboardPageState extends State<DashboardPage> {
       body: Center(child: Text('Descubre Page')),
     ), // 1: Descubre (Placeholder)
     SizedBox.shrink(), // 2: Placeholder for FAB
-    // LibraryPage(), // 3: Biblioteca (Tu Épica 7)
+    Scaffold(
+      body: Center(child: Text('Biblioteca Page')),
+    ), // 3: Biblioteca (Placeholder)
     Scaffold(
       body: Center(child: Text('Perfil Page')),
     ), // 4: Perfil (Placeholder)
