@@ -1,23 +1,31 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart' as staggered;
-import 'package:provider/provider.dart';
 import 'dart:typed_data';
+
+import 'package:Trivvy/features/challenge/application/use_cases/single_player_usecases.dart';
+import 'package:Trivvy/features/challenge/presentation/pages/single_player_challenge.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart' as staggered;
 import 'package:http/http.dart' as http;
-import '../features/media/presentation/blocs/media_editor_bloc.dart';
+import 'package:provider/provider.dart';
+
+import '/features/gameSession/presentation/pages/join_game.dart';
+import '../common_widgets/kahoot_card.dart';
+import '../common_widgets/main_bottom_nav_bar.dart';
 import '../core/constants/colors.dart';
-import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import '../features/kahoot/application/dtos/create_quiz_dto.dart';
 import '../features/kahoot/domain/entities/Quiz.dart';
-import '../common_widgets/kahoot_card.dart';
+import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
+import '../features/media/presentation/blocs/media_editor_bloc.dart';
 
 
-class DashboardPage extends StatefulWidget{
+class HomePageContent extends StatefulWidget {
+  const HomePageContent({super.key});
+
   @override
-  _DashboardPageState createState() => _DashboardPageState();
+  State<HomePageContent> createState() => _HomePageContentState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _HomePageContentState extends State<HomePageContent> {
   bool _loadingUserQuizzes = false;
   final Map<String, Uint8List?> _coverCache = {};
   final Map<String, String?> _coverUrlCache = {};
@@ -411,10 +419,56 @@ class _DashboardPageState extends State<DashboardPage> {
     return map[id] ?? id;
   }
 
-  // no-op
+  final List<Map<String, dynamic>> activeTrivvys = [
+  {
+    'id': 'mock_quiz_1',
+    'title': 'Ciencia y Matemática Básica',
+    'questions': 5,
+  },
+  {
+    'id': 'mock_quiz_ddd',
+    'title': 'Domain-Driven Design Básico',
+    'questions': 5,
+  },
+];
+
+  Future<void> _startTrivvy(
+    BuildContext context,
+    Map<String, dynamic> quiz,
+  ) async {
+    final startAttempt = Provider.of<StartAttemptUseCase>(context, listen: false);
+    try {
+      final res = await startAttempt.execute(
+        kahootId: quiz['id'] as String,
+        playerId: 'Jugador',
+        totalQuestions: quiz['questions'] as int,
+      );
+      if (!context.mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SinglePlayerChallengeScreen(
+            nickname: res.game.playerId,
+            quizId: res.game.quizId,
+            totalQuestions: res.game.totalQuestions,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SinglePlayerChallengeScreen(
+            nickname: 'Jugador',
+            quizId: quiz['id'] as String,
+            totalQuestions: quiz['questions'] as int,
+          ),
+        ),
+      );
+    }
+  }
 
   @override
-  Widget build(BuildContext context){
+  Widget build(BuildContext context) {
     // Obtener el bloc si es necesario en el futuro
     final quizBloc = Provider.of<QuizEditorBloc>(context);
     // Si el navegador pasó un cuestionario creado como argumento, se inserta en userQuizzes 
@@ -530,157 +584,151 @@ class _DashboardPageState extends State<DashboardPage> {
         ),
       ];
 
-      final TextEditingController pinController = TextEditingController();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenSize = MediaQuery.of(context).size;
+        // Limitar la altura del header para evitar tamaños enormes al hacer overscroll
+        double headerHeight = min(constraints.maxHeight * 0.45, screenSize.height * 0.45);
+        // Asegurar un mínimo para que el header no colapse en pantallas pequeñas
+        headerHeight = max(headerHeight, screenSize.height * 0.22);
 
-    
-
-    return Scaffold(
-    backgroundColor: AppColor.background,
-    body: SafeArea(
-      bottom: false,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final screenSize = MediaQuery.of(context).size;
-          // Limitar la altura del header para evitar tamaños enormes al hacer overscroll
-          double headerHeight = min(constraints.maxHeight * 0.45, screenSize.height * 0.45);
-          // Asegurar un minimo para que el header no colapse en pantallas pequeñas
-          headerHeight = max(headerHeight, screenSize.height * 0.22);
-
-          return CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: headerHeight,
-                  child: Container(
-                    padding: EdgeInsets.all(constraints.maxWidth * 0.05), 
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColor.primary, AppColor.secundary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.only(
-                        bottomLeft: Radius.circular(40),
-                        bottomRight: Radius.circular(40),
-                      ),
+        return CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: headerHeight,
+                child: Container(
+                  padding: EdgeInsets.all(constraints.maxWidth * 0.05),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColor.primary, AppColor.secundary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-
-                    
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: headerHeight * 0.06),
-                        // Colocar el logo arriba del saludo y alineado a la izquierda
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Logo a la izquierda, arriba del texto
-                            Image.asset(
-                              'assets/images/logo.png',
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(40),
+                      bottomRight: Radius.circular(40),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: headerHeight * 0.06),
+                      // Colocar el logo arriba del saludo y alineado a la izquierda
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Image.asset(
+                            'assets/images/logo.png',
+                            width: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
+                            height: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stack) => Container(
                               width: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
                               height: (constraints.maxWidth * 0.12).clamp(40.0, 80.0),
-                              fit: BoxFit.contain,
+                              decoration: BoxDecoration(
+                                color: Colors.white24,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                color: Colors.white70,
+                              ),
                             ),
-                            SizedBox(width: constraints.maxWidth * 0.04),
-                            // Textos (Hola, Jugador! y subtitulo)
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Hola, Jugador!',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: constraints.maxWidth * 0.07,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          ),
+                          SizedBox(width: constraints.maxWidth * 0.04),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Hola, Jugador!',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: constraints.maxWidth * 0.07,
+                                    fontWeight: FontWeight.bold,
                                   ),
-                                  SizedBox(height: 4),
-                                  Text('Listo para jugar hoy?',
-                                      style: TextStyle(color: Colors.white70, fontSize: constraints.maxWidth * 0.04)),
-                                ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Listo para jugar hoy?',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: constraints.maxWidth * 0.04,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: headerHeight * 0.04),
+                      // Tarjeta con CTA para ingresar al juego mediante PIN (abre el modal actualizado)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: constraints.maxWidth * 0.04,
+                          vertical: min(screenSize.height * 0.03, headerHeight * 0.22),
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 8),
+                            ElevatedButton(
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) => DraggableScrollableSheet(
+                                    expand: false,
+                                    initialChildSize: 0.6,
+                                    minChildSize: 0.35,
+                                    maxChildSize: 0.95,
+                                    builder: (context, scrollController) {
+                                      return JoinGameScreen(scrollController: scrollController);
+                                    },
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amber.shade400,
+                                minimumSize: const Size(double.infinity, 48),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                                elevation: 6,
+                                shadowColor: Colors.amber.shade300,
+                              ),
+                              child: Text(
+                                'Unirse al juego',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: constraints.maxWidth * 0.04,
+                                  color: Colors.grey.shade900,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        SizedBox(height: headerHeight * 0.04),
-                        // Tu input PIN y botón
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: screenSize.height * 0.03),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              TextField(
-                                controller: pinController,
-                                keyboardType: TextInputType.number,
-                                decoration: InputDecoration(
-                                  hintText: 'Ingresa PIN de juego',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.grey[200],
-                                    contentPadding:
-                                      EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.015),
-                                ),
-                              ),
-                                  SizedBox(height: screenSize.height * 0.015),
-                              ElevatedButton(
-                                onPressed: () {
-                                  final pin = pinController.text.trim();
-                                  if (pin.isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                            'Por favor ingresa un PIN valido para poder jugar'),
-                                      ),
-                                    );
-                                  } else {
-                                    Navigator.pushNamed(context, '/joinLobby',
-                                        arguments: pin);
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.amber.shade400,
-                                  minimumSize: Size(double.infinity, max(48.0, screenSize.height * 0.06)),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30)),
-                                  elevation: 6,
-                                  shadowColor: Colors.amber.shade300,
-                                ),
-                                child: Text(
-                                  'Unirse al juego',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: constraints.maxWidth * 0.04,
-                                    color: Colors.grey.shade900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: screenSize.height * 0.02),
-                      ],
-                    ),
+                      ),
+                      SizedBox(height: screenSize.height * 0.02),
+                    ],
                   ),
                 ),
               ),
-
-              // Tus Quizzes header 
-              SliverPadding(
+            ),
+            // Tus Quizzes header
+            SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.01),
                 sliver: SliverToBoxAdapter(
                   child: Builder(builder: (ctx) {
@@ -698,8 +746,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   }),
                 ),
               ),
-
-              // Tus Quizzes grid 
+            // Tus Quizzes grid 
               Builder(builder: (ctx) {
                 final userQuizzes = quizBloc.userQuizzes ?? [];
                 return SliverPadding(
@@ -750,8 +797,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 );
               }),
-
-              SliverPadding(
+            SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: 0),
                 sliver: SliverToBoxAdapter(
                   child: Row(
@@ -774,8 +820,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
               ),
-
-              SliverPadding(
+            SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
@@ -815,8 +860,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
               ),
-
-              SliverPadding(
+            SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.0125),
                 sliver: SliverToBoxAdapter(
                   child: Text(
@@ -828,8 +872,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
               ),
-
-              SliverPadding(
+            SliverPadding(
                 padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.0125),
                 sliver: staggered.SliverMasonryGrid.count(
                   crossAxisCount: 2,
@@ -846,14 +889,154 @@ class _DashboardPageState extends State<DashboardPage> {
                   },
                 ),
               ),
+            SliverPadding(
+              // Sección Trivvys activos
+              padding: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth * 0.05,
+                vertical: screenSize.height * 0.025,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Trivvys Activos',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: constraints.maxWidth * 0.045,
+                      ),
+                    ),
+                    Text(
+                      '${activeTrivvys.length} juegos',
+                      style: TextStyle(
+                        color: AppColor.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: constraints.maxWidth * 0.035,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              // Lista de trivvys activos
+              padding: EdgeInsets.symmetric(
+                horizontal: constraints.maxWidth * 0.05,
+                vertical: screenSize.height * 0.005,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final quiz = activeTrivvys[index];
+                    return Container(
+                      margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => _startTrivvy(context, quiz),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: constraints.maxWidth * 0.045,
+                              vertical: screenSize.height * 0.018,
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      quiz['title'] as String,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: constraints.maxWidth * 0.042,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${quiz['questions']} preguntas',
+                                      style: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontSize: constraints.maxWidth * 0.035,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Icon(
+                                  Icons.play_circle_fill,
+                                  color: AppColor.primary,
+                                  size: 32,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  childCount: activeTrivvys.length,
+                ),
+              ),
+            ),
+            // Espacio inferior para dejar respirar el FAB
+            SliverToBoxAdapter(
+              child: SizedBox(height: min(screenSize.height * 0.06, 120)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
 
-              SliverToBoxAdapter(child: SizedBox(height: min(screenSize.height * 0.06, 120))),
-            ],
-          );
-        },
-      ),
-    ),
-    floatingActionButton: FloatingActionButton(
+
+class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  int _currentIndex = 0;
+
+  final List<Widget> _pages = const [
+    HomePageContent(),
+    Scaffold(body: Center(child: Text('Descubre Page'))),
+    SizedBox.shrink(),
+    Scaffold(body: Center(child: Text('Biblioteca Page'))),
+    Scaffold(body: Center(child: Text('Perfil Page'))),
+  ];
+
+  void _onItemTapped(int index) {
+    if (index == 2) {
+      Navigator.pushNamed(context, '/create');
+      return;
+    }
+    setState(() {
+      _currentIndex = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColor.background,
+      body: IndexedStack(index: _currentIndex, children: _pages),
+      floatingActionButton: FloatingActionButton(
       onPressed: () async {
         // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo
         final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
@@ -871,43 +1054,11 @@ class _DashboardPageState extends State<DashboardPage> {
       child: Icon(Icons.add),
       elevation: 6,
     ),
-    floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-    bottomNavigationBar: _builBottonNav(context, 0),
-  );
-  }
-
-  Widget _builBottonNav(BuildContext context, int currentIndex){
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: (index){
-        switch(index){
-          case 0:
-            Navigator.pushReplacementNamed(context, '/dashboard');
-            break;
-          case 1:
-            Navigator.pushReplacementNamed(context, '/discover');
-            break;
-          case 2:
-            //El espcio entre botones centrales (FAB) no hace nada
-            break;
-          case 3:
-            Navigator.pushReplacementNamed(context, '/library');
-            break;
-          case 4: 
-            Navigator.pushReplacementNamed(context, '/profile');
-            break;
-        }
-      },
-      type: BottomNavigationBarType.fixed,
-      selectedItemColor: AppColor.primary,
-      unselectedItemColor: Colors.grey,
-      items: const[
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
-        BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Descubre'),
-        BottomNavigationBarItem(icon: Icon(null), label: ''), //Espacio para FAB
-        BottomNavigationBarItem(icon: Icon(Icons.library_books), label: 'Biblioteca'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
-      ],
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: MainBottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: _onItemTapped,
+      ),
     );
   }
 }
