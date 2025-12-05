@@ -17,18 +17,6 @@ import '../features/kahoot/domain/entities/Quiz.dart';
 import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import '../features/media/presentation/blocs/media_editor_bloc.dart';
 
-final List<Map<String, dynamic>> activeTrivvys = [
-  {
-    'id': 'mock_quiz_1',
-    'title': 'Ciencia y Matemática Básica',
-    'questions': 5,
-  },
-  {
-    'id': 'mock_quiz_ddd',
-    'title': 'Domain-Driven Design Básico',
-    'questions': 5,
-  },
-];
 
 class HomePageContent extends StatefulWidget {
   const HomePageContent({super.key});
@@ -67,7 +55,7 @@ class _HomePageContentState extends State<HomePageContent> {
         try {
           await quizBloc.loadUserQuizzes(authorIdCandidate);
         } catch (e) {
-          // Registrar el error pero no bloqueaa la interfaz si el backend rechaza el authorId.
+            // Registrar el error pero no bloqueaa la interfaz si el backend rechaza el authorId.
           print('[dashboard] loadUserQuizzes error for author=$authorIdCandidate -> $e');
         }
         if (mounted) setState(() => _loadingUserQuizzes = false);
@@ -90,7 +78,7 @@ class _HomePageContentState extends State<HomePageContent> {
         _coverUrlCache[mediaId] = mediaPath;
         print('[dashboard] cached url for $mediaId -> $mediaPath');
       } else if (mediaPath is String && mediaPath.isNotEmpty) {
-        // Prueba los siguientes URLs candidatos construidos a partir de los baseUrl obtenidos de los providers (mediaRepo/storageRepo)
+        // Prueba los siguientes URLs candidatas construidas a partir de los baseUrl obtenidos de los providers (mediaRepo/storageRepo)
         String? baseUrl;
         try {
           final mediaRepo = Provider.of<dynamic>(context, listen: false);
@@ -103,7 +91,6 @@ class _HomePageContentState extends State<HomePageContent> {
           } catch (_) {}
         }
 
-        // Construye una lista de URLs a probar, aplicando varias rutas comunes para los recursos subidos
         final candidates = <String>[];
         if (baseUrl != null) {
           candidates.add('$baseUrl/storage/file/$mediaPath');
@@ -145,48 +132,39 @@ class _HomePageContentState extends State<HomePageContent> {
 
   Future<void> _confirmAndDelete(BuildContext context, Quiz q) async {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar Quiz'),
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) {
+      return AlertDialog(
+        title: Text('Eliminar Quiz'),
         content: Text('¿Estás seguro que deseas eliminar "${q.title}" de forma permanente?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
-          ),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text('Eliminar', style: TextStyle(color: Colors.red))),
         ],
-      ),
-    );
+      );
+    });
 
     if (confirmed == true) {
       try {
         // Solo llama al delete en el backend si el quiz no está marcado como local.
         // El frontend no debe inferir semánticas del backend a partir del formato del UUID — usa la bandera explícita `isLocal`.
         if (q.isLocal) {
-          // Quiz solo local — eliminar únicamente de la lista local sin llamar a la API.
-          // NO eliminar solo por `quizId == ''` porque muchos elementos locales pueden tener ids vacíos;
-          // prefiera la identidad del objeto y, si no, usa título + createdAt como heurística de respaldo.
+            // Quiz solo local — eliminar únicamente de la lista local sin llamar a la API.
+            // NO eliminar solo por `quizId == ''` porque muchos elementos locales
+            // pueden tener ids vacíos; prefiera la identidad del objeto y, si no, 
+            // use título + createdAt como heurística de respaldo.
           if (quizBloc.userQuizzes != null) {
             quizBloc.userQuizzes!.removeWhere((item) {
-              // Si son exactamente el mismo objeto en memoria, removerlo de inmediato.
               if (identical(item, q)) return true;
-              // Si no son el mismo objeto, compara por quizId cuando ambos no están vacíos.
+              // Si no son el mismo objeto, se comprobará más abajo por ID:
+              // solo se considera coincidencia cuando ambos quizId no están vacíos.
               if (item.quizId.isNotEmpty && q.quizId.isNotEmpty && item.quizId == q.quizId) return true;
-              // Si ambos quizId están vacíos, emplear título + createdAt para identificar duplicados locales.
-              if (item.quizId.isEmpty &&
-                  q.quizId.isEmpty &&
-                  item.title == q.title &&
-                  item.createdAt.toIso8601String() == q.createdAt.toIso8601String()) {
-                return true;
-              }
+                // Si ambos quizId están vacíos, emplear una heurística más robusta:
+                // coincidir por título + createdAt (timestamp) para identificar duplicados.
+              if (item.quizId.isEmpty && q.quizId.isEmpty && item.title == q.title && item.createdAt.toIso8601String() == q.createdAt.toIso8601String()) return true;
               return false;
             });
           }
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Quiz eliminado localmente')),
-          );
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz eliminado localmente')));
           if (mounted) setState(() {});
           return;
         }
@@ -194,35 +172,24 @@ class _HomePageContentState extends State<HomePageContent> {
         print('[dashboard] requesting delete for quizId=${q.quizId}');
         await quizBloc.deleteQuiz(q.quizId);
         if (quizBloc.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al eliminar: ${quizBloc.errorMessage}')),
-          );
+          print('[dashboard] delete returned error: ${quizBloc.errorMessage}');
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: ${quizBloc.errorMessage}')));
           return;
         }
-
-        // Elimina de la lista local si está presente (no confiar solo en el quizId; reutiliza las mismas heurísticas de arriba)
+        // Elimina de la lista local si está presente (no confiar solo en el quizId; usar mismas heurísticas que más abajo)
         if (quizBloc.userQuizzes != null) {
           quizBloc.userQuizzes!.removeWhere((item) {
             if (item.quizId.isNotEmpty && q.quizId.isNotEmpty && item.quizId == q.quizId) return true;
             if (identical(item, q)) return true;
-            if (item.quizId.isEmpty &&
-                q.quizId.isEmpty &&
-                item.title == q.title &&
-                item.createdAt.toIso8601String() == q.createdAt.toIso8601String()) {
-              return true;
-            }
+            if (item.quizId.isEmpty && q.quizId.isEmpty && item.title == q.title && item.createdAt.toIso8601String() == q.createdAt.toIso8601String()) return true;
             return false;
           });
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Quiz eliminado')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz eliminado')));
         if (mounted) setState(() {});
       } catch (e) {
         print('[dashboard] Exception during delete flow: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al eliminar: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
       }
     }
   }
@@ -233,254 +200,209 @@ class _HomePageContentState extends State<HomePageContent> {
     final mediaKey = q.coverImageUrl;
     Uint8List? bytes = mediaKey != null && !mediaKey.startsWith('http') ? _coverCache[mediaKey] : null;
     bytes ??= _coverCache[quizKey];
-    String? url = mediaKey != null
-        ? (_coverUrlCache[mediaKey] ?? (mediaKey.startsWith('http') ? mediaKey : null))
-        : _coverUrlCache[quizKey];
+    String? url = mediaKey != null ? (_coverUrlCache[mediaKey] ?? (mediaKey.startsWith('http') ? mediaKey : null)) : _coverUrlCache[quizKey];
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.45,
-        minChildSize: 0.25,
-        maxChildSize: 0.9,
-        builder: (_, controller) => Container(
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: SingleChildScrollView(
-            controller: controller,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Thumbnail
-                    Container(
-                      width: 86,
-                      height: 86,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.grey[200],
-                      ),
-                      clipBehavior: Clip.hardEdge,
-                      child: bytes != null
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.45,
+          minChildSize: 0.25,
+          maxChildSize: 0.9,
+          builder: (_, controller) => Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+                child: SingleChildScrollView(
+              controller: controller,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Thumbnail
+                      Container(
+                        width: 86,
+                        height: 86,
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Colors.grey[200]),
+                        clipBehavior: Clip.hardEdge,
+                        child: bytes != null
                           ? Image.memory(bytes, fit: BoxFit.cover)
-                          : (url != null
-                              ? Image.network(url, fit: BoxFit.cover)
-                              : (q.coverImageUrl != null && q.coverImageUrl!.startsWith('http')
-                                  ? Image.network(q.coverImageUrl!, fit: BoxFit.cover)
-                                  : const Center(child: Icon(Icons.image)))),
-                    ),
-                    const SizedBox(width: 12),
-                    // Editar: principal
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  q.title,
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit),
-                                onPressed: () async {
-                                  // Cierra primero el bottom sheet para evitar problemas de notifyListeners durante build
-                                  Navigator.of(ctx).pop();
-                                  try {
-                                    if (q.quizId.isNotEmpty && !q.isLocal) {
-                                      await quizBloc.loadQuiz(q.quizId);
-                                    } else {
-                                      WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
-                                    }
-                                    if (mounted) Navigator.pushNamed(context, '/create');
-                                  } catch (e) {
-                                    print('[dashboard] failed to load quiz for edit id=${q.quizId} -> $e');
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('Error cargando el quiz para edición: $e')),
-                                      );
-                                    }
-                                  }
-                                },
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(q.description, maxLines: 3, overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 8),
-                          // Template / Theme info
-                          Text('Tema: ${_themeName(q.themeId)}', style: TextStyle(color: Colors.grey[700])),
-                          if (q.templateId != null) ...[
-                            const SizedBox(height: 4),
-                            Text('Plantilla: ${q.templateId}', style: TextStyle(color: Colors.grey[700])),
-                          ],
-                        ],
+                          : (url != null ? Image.network(url, fit: BoxFit.cover) : (q.coverImageUrl != null && q.coverImageUrl!.startsWith('http') ? Image.network(q.coverImageUrl!, fit: BoxFit.cover) : Center(child: Icon(Icons.image)))),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Fila de botones.
-                Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: SizedBox(
-                        height: 48,
-                        child: ElevatedButton.icon(
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(child: Text(q.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                                IconButton(
+                                  icon: Icon(Icons.edit),
+                                  onPressed: () async {
+                                    // Cierra primero el bottom sheet para evitar que las notificaciones del Bloc
+                                    // provoquen errores tipo "notifyListeners durante build" o actualizaciones inoportunas.
+                                    Navigator.of(ctx).pop();
+                                    try {
+                                      if (q.quizId.isNotEmpty && !q.isLocal) {
+                                        // Carga el quiz completo en el Bloc (actualiza currentQuiz antes de navegar al editor)
+                                        await quizBloc.loadQuiz(q.quizId);
+                                      } else {
+                                        // Para elementos locales o sin ID: uso el objeto recibido tal cual;
+                                        // programar setCurrentQuiz después del frame para evitar notifyListeners durante build
+                                        WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
+                                      }
+                                      Navigator.pushNamed(context, '/create');
+                                    } catch (e) {
+                                      print('[dashboard] failed to load quiz for edit id=${q.quizId} -> $e');
+                                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando el quiz para edición: $e')));
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 6),
+                            Text(q.description, maxLines: 3, overflow: TextOverflow.ellipsis),
+                            SizedBox(height: 8),
+                            // Template / Theme info
+                            Text('Tema: ${_themeName(q.themeId)}', style: TextStyle(color: Colors.grey[700])),
+                            if (q.templateId != null) SizedBox(height: 4),
+                            if (q.templateId != null) Text('Plantilla: ${q.templateId}', style: TextStyle(color: Colors.grey[700])),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+                  // Fila de botones.
+                  Row(
+                    children: [
+                      // Editar: principal
+                      Expanded(
+                        flex: 3,
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              // Cierra primero el bottom sheet para evitar notifyDuringBuild
+                              Navigator.of(ctx).pop();
+                              try {
+                                if (q.quizId.isNotEmpty && !q.isLocal) {
+                                  await quizBloc.loadQuiz(q.quizId);
+                                } else {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
+                                }
+                                Navigator.pushNamed(context, '/create');
+                              } catch (e) {
+                                print('[dashboard] failed to load quiz for edit (button) id=${q.quizId} -> $e');
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando el quiz para edición: $e')));
+                              }
+                            },
+                            icon: Icon(Icons.edit, size: 20),
+                            label: Text('Editar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColor.primary,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      // Duplicar: botón compacto outlined con icono y pequeño texto
+                      SizedBox(
+                        width: 72,
+                        height: 44,
+                        child: OutlinedButton(
                           onPressed: () async {
-                            // Cierra primero el bottom sheet para evitar notifyDuringBuild
+                            // Realizar una petición POST para crear la copia del quiz en el backend (se construye el DTO a continuación)
                             Navigator.of(ctx).pop();
+                            
+                            const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+                            final authorIdCandidate = (q.authorId.isEmpty || q.authorId.contains('placeholder')) ? defaultTestAuthorId : q.authorId;
+
+                            // Mapear preguntas y respuestas a los DTOs Create* para la petición de duplicado.
+                            // NO se generan ni se reasignan IDs aquí: el backend debe asignar los nuevos identificadores.
+                            // Se copian los campos relevantes (texto, media, tipo, tiempo, puntos) y se mapean
+                            // las respuestas preservando texto, media y la marca de correcta.
+                            final mappedQuestions = q.questions.map((origQ) {
+                              final answers = origQ.answers.map((a) => CreateAnswerDto(answerText: a.text, answerImage: a.mediaUrl, isCorrect: a.isCorrect)).toList();
+                              return CreateQuestionDto(
+                                questionText: origQ.text,
+                                mediaUrl: origQ.mediaUrl,
+                                questionType: origQ.type,
+                                timeLimit: origQ.timeLimit,
+                                points: origQ.points,
+                                answers: answers,
+                              );
+                            }).toList();
+
+                            final dto = CreateQuizDto(
+                              authorId: authorIdCandidate,
+                              title: '${q.title} (copia)',
+                              description: q.description,
+                              coverImage: q.coverImageUrl,
+                              visibility: q.visibility,
+                              status: q.status,
+                              category: q.category,
+                              themeId: q.themeId,
+                              questions: mappedQuestions,
+                            );
+
                             try {
-                              if (q.quizId.isNotEmpty && !q.isLocal) {
-                                await quizBloc.loadQuiz(q.quizId);
-                              } else {
-                                WidgetsBinding.instance.addPostFrameCallback((_) => quizBloc.setCurrentQuiz(q));
+                              await quizBloc.createQuiz(dto);
+                              if (quizBloc.errorMessage != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al duplicar: ${quizBloc.errorMessage}')));
+                                return;
                               }
-                              if (mounted) Navigator.pushNamed(context, '/create');
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Quiz duplicado y creado')));
+                              if (mounted) setState(() {});
                             } catch (e) {
-                              print('[dashboard] failed to load quiz for edit (button) id=${q.quizId} -> $e');
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Error cargando el quiz para edición: $e')),
-                                );
-                              }
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al duplicar: $e')));
                             }
                           },
-                          icon: const Icon(Icons.edit, size: 20),
-                          label: const Text('Editar', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColor.primary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                          style: OutlinedButton.styleFrom(
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            side: BorderSide(color: Colors.grey.shade400),
+                            padding: EdgeInsets.symmetric(horizontal: 6),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [Icon(Icons.copy, size: 18), SizedBox(width: 6), Flexible(child: Text('Dup', style: TextStyle(fontSize: 12)))],
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Duplicar: botón compacto outlined con icono y texto corto
-                    // Eliminar: botón compacto
-                    SizedBox(
-                      width: 72,
-                      height: 44,
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          // Realizar una petición POST para crear la copia del quiz en el backend (se construye el DTO a continuación)
-                          Navigator.of(ctx).pop();
-
-                          const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
-                          final authorIdCandidate =
-                              (q.authorId.isEmpty || q.authorId.contains('placeholder')) ? defaultTestAuthorId : q.authorId;
-
-                          // Mapear preguntas y respuestas a los DTOs Create* para la petición de duplicado.
-                          // NO se generan ni se reasignan IDs aquí: el backend debe asignar los nuevos identificadores.
-                          // Se copian los campos relevantes (texto, media, tipo, tiempo, puntos) y se mapean
-                          // las respuestas preservando texto, media y la marca de correcta.
-                          final mappedQuestions = q.questions.map((origQ) {
-                            final answers = origQ.answers
-                                .map(
-                                  (a) => CreateAnswerDto(
-                                    answerText: a.text,
-                                    answerImage: a.mediaUrl,
-                                    isCorrect: a.isCorrect,
-                                  ),
-                                )
-                                .toList();
-                            return CreateQuestionDto(
-                              questionText: origQ.text,
-                              mediaUrl: origQ.mediaUrl,
-                              questionType: origQ.type,
-                              timeLimit: origQ.timeLimit,
-                              points: origQ.points,
-                              answers: answers,
-                            );
-                          }).toList();
-
-                          final dto = CreateQuizDto(
-                            authorId: authorIdCandidate,
-                            title: '${q.title} (copia)',
-                            description: q.description,
-                            coverImage: q.coverImageUrl,
-                            visibility: q.visibility,
-                            status: q.status,
-                            category: q.category,
-                            themeId: q.themeId,
-                            questions: mappedQuestions,
-                          );
-
-                          try {
-                            await quizBloc.createQuiz(dto);
-                            if (quizBloc.errorMessage != null) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Error al duplicar: ${quizBloc.errorMessage}')),
-                                );
-                              }
-                              return;
-                            }
-                            if (mounted) {
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(const SnackBar(content: Text('Quiz duplicado y creado')));
-                            }
-                            setState(() {});
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error al duplicar: $e')),
-                              );
-                            }
-                          }
-                        },
-                        style: OutlinedButton.styleFrom(
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          side: BorderSide(color: Colors.grey.shade400),
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.copy, size: 18),
-                            SizedBox(width: 6),
-                            Flexible(child: Text('Dup', style: TextStyle(fontSize: 12))),
-                          ],
+                      SizedBox(width: 12),
+                      // Eliminar: botón compacto
+                      SizedBox(
+                        width: 96,
+                        height: 44,
+                        child: ElevatedButton.icon(
+                          onPressed: () async { Navigator.of(ctx).pop(); await _confirmAndDelete(context, q); },
+                          icon: Icon(Icons.delete, size: 18),
+                          label: Text('Eliminar', style: TextStyle(fontSize: 13)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 96,
-                      height: 44,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          Navigator.of(ctx).pop();
-                          await _confirmAndDelete(context, q);
-                        },
-                        icon: const Icon(Icons.delete, size: 18),
-                        label: const Text('Eliminar', style: TextStyle(fontSize: 13)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      }
     );
   }
 
@@ -496,6 +418,19 @@ class _HomePageContentState extends State<HomePageContent> {
     };
     return map[id] ?? id;
   }
+
+  final List<Map<String, dynamic>> activeTrivvys = [
+  {
+    'id': 'mock_quiz_1',
+    'title': 'Ciencia y Matemática Básica',
+    'questions': 5,
+  },
+  {
+    'id': 'mock_quiz_ddd',
+    'title': 'Domain-Driven Design Básico',
+    'questions': 5,
+  },
+];
 
   Future<void> _startTrivvy(
     BuildContext context,
@@ -536,17 +471,21 @@ class _HomePageContentState extends State<HomePageContent> {
   Widget build(BuildContext context) {
     // Obtener el bloc si es necesario en el futuro
     final quizBloc = Provider.of<QuizEditorBloc>(context);
-    // Si el navegador pasó un cuestionario creado como argumento, se inserta en userQuizzes
-    // para que sea visible inmediatamente sin llamar al backend.
+    // Si el navegador pasó un cuestionario creado como argumento, se inserta en userQuizzes 
+    //para que sea visible inmediatamente sin llamar al backend.
     final args = ModalRoute.of(context)?.settings.arguments;
     if (args is Quiz) {
       quizBloc.userQuizzes ??= [];
       final incoming = args;
-      // Build a lightweight signature to detectar inserciones repetidas desde navegación.
+      print('[dashboard] nav arg received: quizId=${incoming.quizId} title=${incoming.title} isLocal=${incoming.isLocal}');
+      // Build a lightweight signature to detect repeated navigation inserts.
       final sigParts = [incoming.title.trim(), incoming.createdAt.toIso8601String(), incoming.coverImageUrl ?? ''];
       final signature = sigParts.join('|');
+      print('[dashboard] received nav arg quiz signature=$signature');
 
-      if (!_insertedQuizSignatures.contains(signature)) {
+      if (_insertedQuizSignatures.contains(signature)) {
+        print('[dashboard] skipping insert: signature already seen');
+      } else {
         Quiz toInsert = incoming;
         // NO marca un quiz entrante como copia local solo porque su id esté vacío:
         // lo trato como local únicamente si incoming.isLocal == true. Esto asegura que
@@ -587,72 +526,63 @@ class _HomePageContentState extends State<HomePageContent> {
           questions: List.from(toInsert.questions),
         );
 
-        // Evita duplicar entradas cuando se vuelve a esta pantalla rápidamente.
-        final exists = quizBloc.userQuizzes!.any(
-          (q) => q.quizId == candidate.quizId && q.title == candidate.title,
-        );
+        final exists = quizBloc.userQuizzes!.any((q) => q.quizId == candidate.quizId && q.title == candidate.title);
         if (!exists) {
           quizBloc.userQuizzes!.insert(0, candidate);
           _insertedQuizSignatures.add(signature);
-          setState(() {});
+          print('[dashboard] inserted quiz from nav args: id=${candidate.quizId} title=${candidate.title}');
+        } else {
+          print('[dashboard] not inserting: matching quiz already in list');
         }
       }
     }
 
-    // Datos simulados que posteriormente se reemplazarán con la API
-    final recentKahoots = <Quiz>[
-      Quiz(
-        quizId: '1',
-        authorId: 'Massiel',
-        title: 'Arquitectura Hexagonal',
-        description: '',
-        visibility: 'public',
-        status: 'draft',
-        category: 'tech',
-        themeId: 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4',
-        createdAt: DateTime.now(),
-        questions: const [],
-      ),
-      Quiz(
-        quizId: '2',
-        authorId: 'Jose',
-        title: 'Desarrollo de software',
-        description: '',
-        visibility: 'public',
-        status: 'draft',
-        category: 'tech',
-        themeId: 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4',
-        createdAt: DateTime.now(),
-        questions: const [],
-      ),
-    ];
+    //Datos simualdos que posteriormente se reemplazaran con la api
+      final recentKahoots = [
+        Quiz(
+          quizId: '1',
+          authorId: 'Massiel',
+          title: 'Arquitectura Hexagonal',
+          description: '',
+          visibility: 'public',
+          themeId: '',
+          createdAt: DateTime.now(),
+          questions: [],
+        ),
+        Quiz(
+          quizId: '2',
+          authorId: 'Jose',
+          title: 'Desarrollo de software',
+          description: '',
+          visibility: 'public',
+          themeId: '',
+          createdAt: DateTime.now(),
+          questions: [],
+        ),
+      ];
 
-    final recommendedKahoots = <Quiz>[
-      Quiz(
-        quizId: '3',
-        authorId: 'Massiel',
-        title: 'Seguimos en prueba',
-        description: '',
-        visibility: 'public',
-        status: 'published',
-        category: 'general',
-        themeId: 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4',
-        createdAt: DateTime.now(),
-        questions: const [],
-      ),
-      Quiz(
-        quizId: '4',
-        authorId: 'Jose',
-        title: 'Hola, esto es una prueba',
-        description: '',
-        visibility: 'public',
-        status: 'published',
-        category: 'general',
-        themeId: 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4',
-        createdAt: DateTime.now(),
-        questions: const [],
-      ),
-    ];
+      final recommendedKahoots = [
+        Quiz(
+          quizId: '3',
+          authorId: 'Massiel',
+          title: 'Seguimos en prueba',
+          description: '',
+          visibility: 'public',
+          themeId: '',
+          createdAt: DateTime.now(),
+          questions: [],
+        ),
+        Quiz(
+          quizId: '4',
+          authorId: 'Jose',
+          title: 'hOLA ESTO ES UNA PRUEBA',
+          description: '',
+          visibility: 'public',
+          themeId: '',
+          createdAt: DateTime.now(),
+          questions: [],
+        ),
+      ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -799,203 +729,166 @@ class _HomePageContentState extends State<HomePageContent> {
             ),
             // Tus Quizzes header
             SliverPadding(
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.01,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tus Quizzes',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: constraints.maxWidth * 0.045,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (_loadingUserQuizzes)
-                      const Center(child: CircularProgressIndicator())
-                    else if ((quizBloc.userQuizzes ?? []).isEmpty)
-                      Text(
-                        'No tienes quizzes aún. Crea uno con el botón +',
-                        style: TextStyle(color: Colors.grey[700]),
-                      ),
-                  ],
+                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.01),
+                sliver: SliverToBoxAdapter(
+                  child: Builder(builder: (ctx) {
+                    final userQuizzes = quizBloc.userQuizzes ?? [];
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Tus Quizzes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: constraints.maxWidth * 0.045)),
+                        SizedBox(height: 8),
+                        if (_loadingUserQuizzes) Center(child: CircularProgressIndicator()),
+                        if (!_loadingUserQuizzes && userQuizzes.isEmpty)
+                          Text('No tienes quizzes aún. Crea uno con el botón +', style: TextStyle(color: Colors.grey[700])),
+                      ],
+                    );
+                  }),
                 ),
               ),
-            ),
-            // Tus Quizzes grid
-            Builder(
-              builder: (ctx) {
+            // Tus Quizzes grid 
+              Builder(builder: (ctx) {
                 final userQuizzes = quizBloc.userQuizzes ?? [];
                 return SliverPadding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: constraints.maxWidth * 0.05,
-                    vertical: screenSize.height * 0.01,
-                  ),
+                  padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.01),
                   sliver: staggered.SliverMasonryGrid.count(
                     crossAxisCount: 2,
                     mainAxisSpacing: max(8.0, screenSize.height * 0.01),
                     crossAxisSpacing: constraints.maxWidth * 0.02,
                     childCount: userQuizzes.length,
                     itemBuilder: (context, index) {
-                      final q = userQuizzes[index];
-                      String? coverId = q.coverImageUrl;
-                      Uint8List? cachedBytes;
-                      String? cachedUrlOverride;
-                      // Si coverImageUrl parece un id de media (no una url completa), desencadena la obtención diferida
-                      if (coverId != null && !coverId.startsWith('http')) {
-                        cachedBytes = _coverCache[coverId];
-                        cachedUrlOverride = _coverUrlCache[coverId];
-                        if (!_fetchingCover.contains(coverId) && cachedBytes == null && cachedUrlOverride == null) {
-                          _fetchingCover.add(coverId);
-                          _fetchCoverIfNeeded(coverId);
-                        }
-                      }
-
-                      return GestureDetector(
-                        onLongPress: () async {
-                          // Permite reintentar la descarga de la portada almacenada en media service
-                          if (coverId != null && !coverId.startsWith('http')) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Reintentando obtener portada...')),
-                            );
-                            if (!_fetchingCover.contains(coverId)) {
-                              _fetchingCover.add(coverId);
-                              await _fetchCoverIfNeeded(coverId);
+                            final q = userQuizzes[index];
+                            // Si coverImageUrl parece un id de media (no una url http completa), desencadena la obtención
+                            String? coverId = q.coverImageUrl;
+                            Uint8List? cachedBytes;
+                            String? cachedUrlOverride;
+                            if (coverId != null && !coverId.startsWith('http')) {
+                              cachedBytes = _coverCache[coverId];
+                              cachedUrlOverride = _coverUrlCache[coverId];
+                              if (!_fetchingCover.contains(coverId) && cachedBytes == null && cachedUrlOverride == null) {
+                                _fetchingCover.add(coverId);
+                                // Lanzar la obtención en segundo plano y actualizar el estado cuando termine.
+                                // No espero aquí (estamos en el builder); _fetchingCover evita solicitudes duplicadas.
+                                _fetchCoverIfNeeded(coverId);
+                              }
                             }
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('No hay una portada en formato media-id para reintentar')),
+
+                            return GestureDetector(
+                              onLongPress: () async {
+                                if (coverId != null && !coverId.startsWith('http')) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reintentando obtener portada...')));
+                                  if (!_fetchingCover.contains(coverId)) {
+                                    _fetchingCover.add(coverId);
+                                    await _fetchCoverIfNeeded(coverId);
+                                  }
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No hay una portada en formato media-id para reintentar')));
+                                }
+                              },
+                              child: KahootCard(
+                                kahoot: q,
+                                coverBytes: cachedBytes,
+                                coverUrlOverride: cachedUrlOverride,
+                                onTap: () => _showQuizOptions(context, q),
+                                isLocalCopy: q.isLocal,
+                              ),
                             );
-                          }
-                        },
-                        child: KahootCard(
-                          kahoot: q,
-                          coverBytes: cachedBytes,
-                          coverUrlOverride: cachedUrlOverride,
-                          onTap: () => _showQuizOptions(context, q),
-                          isLocalCopy: q.isLocal,
-                        ),
-                      );
                     },
                   ),
                 );
-              },
-            ),
+              }),
             SliverPadding(
-              // Sección Recientes
-              padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Recientes',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: constraints.maxWidth * 0.045,
+                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: 0),
+                sliver: SliverToBoxAdapter(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Recientes',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: constraints.maxWidth * 0.045
+                          )),
+                      TextButton(
+                        onPressed: () {},
+                        child: Text(
+                          'Ver todo',
+                          style: TextStyle(
+                              color: AppColor.primary, fontWeight: FontWeight.w600),
+                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () {},
-                      child: Text(
-                        'Ver todo',
-                        style: TextStyle(color: AppColor.primary, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              // Lista de recientes con porcentaje ficticio
-              padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final kahoot = recentKahoots[index];
-                    return Container(
-                      margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: constraints.maxWidth * 0.04,
-                        vertical: screenSize.height * 0.015,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border(left: BorderSide(color: AppColor.primary, width: 4)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            kahoot.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: constraints.maxWidth * 0.04,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Hace 2 días • ${kahoot.questions.length * 20 + 60}% correcto',
-                            style: TextStyle(
-                              fontSize: constraints.maxWidth * 0.03,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  childCount: recentKahoots.length,
-                ),
-              ),
-            ),
-            SliverPadding(
-              // Sección Recomendados
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.0125,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: Text(
-                  'Recomendado para ti',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: constraints.maxWidth * 0.045,
+                    ],
                   ),
                 ),
               ),
-            ),
             SliverPadding(
-              // Grid de recomendados reutilizando KahootCard
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.0125,
+                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final kahoot = recentKahoots[index];
+                      return Container(
+                        margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
+                        padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.04, vertical: screenSize.height * 0.015),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border(left: BorderSide(color: AppColor.primary, width: 4)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              kahoot.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: constraints.maxWidth * 0.04
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            Text('Hace 2 días • 80% correcto',
+                                style: TextStyle(
+                                  fontSize: constraints.maxWidth * 0.03,
+                                  color: Colors.grey[700]
+                                )),
+                          ],
+                        ),
+                      );
+                    },
+                    childCount: recentKahoots.length,
+                  ),
+                ),
               ),
-              sliver: staggered.SliverMasonryGrid.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: max(8.0, screenSize.height * 0.01),
-                crossAxisSpacing: constraints.maxWidth * 0.02,
-                childCount: recommendedKahoots.length,
-                itemBuilder: (context, index) {
-                  final kahoot = recommendedKahoots[index];
-                  return KahootCard(
-                    kahoot: kahoot,
-                    onTap: () => Navigator.pushNamed(
-                      context,
-                      '/gameDetail',
-                      arguments: kahoot.quizId,
+            SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.0125),
+                sliver: SliverToBoxAdapter(
+                  child: Text(
+                    'Recomendado para ti',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: constraints.maxWidth * 0.045
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-            ),
+            SliverPadding(
+                padding: EdgeInsets.symmetric(horizontal: constraints.maxWidth * 0.05, vertical: screenSize.height * 0.0125),
+                sliver: staggered.SliverMasonryGrid.count(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: max(8.0, screenSize.height * 0.01),
+                  crossAxisSpacing: constraints.maxWidth * 0.02,
+                  childCount: recommendedKahoots.length,
+                  itemBuilder: (context, index) {
+                    final kahoot = recommendedKahoots[index];
+                    return KahootCard(
+                      kahoot: kahoot,
+                        onTap: () => Navigator.pushNamed(context, '/gameDetail',
+                          arguments: kahoot.quizId),
+                    );
+                  },
+                ),
+              ),
             SliverPadding(
               // Sección Trivvys activos
               padding: EdgeInsets.symmetric(
@@ -1042,7 +935,7 @@ class _HomePageContentState extends State<HomePageContent> {
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -1109,6 +1002,7 @@ class _HomePageContentState extends State<HomePageContent> {
   }
 }
 
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -1143,11 +1037,23 @@ class _DashboardPageState extends State<DashboardPage> {
       backgroundColor: AppColor.background,
       body: IndexedStack(index: _currentIndex, children: _pages),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.pushNamed(context, '/create'),
-        backgroundColor: Colors.amber.shade400,
-        elevation: 6,
-        child: const Icon(Icons.add),
-      ),
+      onPressed: () async {
+        // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo
+        final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+        quizBloc.clear();
+        // Abrir selector de plantillas; si el usuario elige una, navegar al editor con la plantilla
+        final selected = await Navigator.pushNamed(context, '/templateSelector');
+        if (selected != null && selected is Quiz) {
+          Navigator.pushNamed(context, '/create', arguments: selected);
+        } else {
+            // Solicita explícitamente un editor limpio al crear un nuevo quiz
+          Navigator.pushNamed(context, '/create', arguments: {'clear': true});
+        }
+      },
+      backgroundColor: Colors.amber.shade400,
+      child: Icon(Icons.add),
+      elevation: 6,
+    ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: MainBottomNavBar(
         currentIndex: _currentIndex,
