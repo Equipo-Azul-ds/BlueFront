@@ -25,6 +25,7 @@ class HomePageContent extends StatefulWidget {
   State<HomePageContent> createState() => _HomePageContentState();
 }
 
+
 class _HomePageContentState extends State<HomePageContent> {
   bool _loadingUserQuizzes = false;
   final Map<String, Uint8List?> _coverCache = {};
