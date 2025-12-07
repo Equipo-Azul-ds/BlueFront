@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'features/discovery/domain/Repositories/IDiscoverRepository.dart';
+import 'features/discovery/infraestructure/dataSource/ThemeRemoteDataSource.dart';
+import 'features/discovery/infraestructure/dataSource/kahootRemoteDataSource.dart';
+import 'features/discovery/infraestructure/repositories/DiscoverRepository.dart';
+import 'features/discovery/infraestructure/repositories/ThemeRepository.dart';
+import 'features/discovery/presentation/pages/discover_page.dart';
 import 'core/constants/colors.dart';
 import 'common_pages/dashboard_page.dart';
 import 'features/challenge/domain/repositories/single_player_game_repository.dart';
@@ -57,6 +64,32 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<http.Client>(create: (_) => http.Client()),
+
+        //Estos son los proveedores para los repositorios (inyeccion de dependencias)
+        Provider<ThemeRemoteDataSource>(
+          create: (context) => ThemeRemoteDataSource(
+            baseUrl: apiBaseUrl,
+            cliente: context.read<http.Client>(),
+          ),
+        ),
+        Provider<ThemeRepository>(
+          create: (context) => ThemeRepository(
+            remoteDataSource: context.read<ThemeRemoteDataSource>(),
+          ),
+        ),
+        Provider<KahootRemoteDataSource>(
+          create: (context) => KahootRemoteDataSource(
+            baseUrl: apiBaseUrl,
+            cliente: context.read<http.Client>(),
+          ),
+        ),
+        Provider<IDiscoverRepository>(
+          create: (context) => DiscoverRepository(
+            remoteDataSource: context.read<KahootRemoteDataSource>(),
+          ),
+        ),
+        //Blocs para el estado
         Provider<SlideProvider>(create: (_) => SlideProviderImpl()),
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
@@ -188,6 +221,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ],
+
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Trivvy',
@@ -271,7 +305,7 @@ class MyApp extends StatelessWidget {
           //Comentoados por ahora
           //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
           //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
-          //'/discover': (context) => DiscoverPage(), // Agregar si existe
+          '/discover': (context) => DiscoverScreen(), // Agregar si existe
           '/library': (context) => LibraryPage(), // Agregar si existe
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),

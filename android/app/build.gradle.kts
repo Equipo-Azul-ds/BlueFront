@@ -8,6 +8,7 @@ plugins {
 android {
     namespace = "com.example.trivvy"
     compileSdk = flutter.compileSdkVersion
+    //ndkVersion = flutter.ndkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
