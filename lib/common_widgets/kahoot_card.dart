@@ -86,6 +86,7 @@ class KahootCard extends StatelessWidget{
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
+
                       ),
                       if (isLocalCopy && kahoot.title.contains('(copia)')) ...[
                         SizedBox(width: 6),

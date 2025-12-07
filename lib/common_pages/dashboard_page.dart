@@ -539,6 +539,7 @@ class _HomePageContentState extends State<HomePageContent> {
 
     //Datos simualdos que posteriormente se reemplazaran con la api
       final recentKahoots = [
+
         Quiz(
           quizId: '1',
           authorId: 'Massiel',
