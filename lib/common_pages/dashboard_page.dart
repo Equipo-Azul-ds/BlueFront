@@ -1027,6 +1027,10 @@ class _DashboardPageState extends State<DashboardPage> {
       Navigator.pushNamed(context, '/create');
       return;
     }
+    if (index == 1) {
+      Navigator.pushReplacementNamed(context, '/discover');
+      return;
+    }
     setState(() {
       _currentIndex = index;
     });
