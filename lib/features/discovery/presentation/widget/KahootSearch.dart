@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
-import '../../domain/Repositories/IDiscoverRepository.dart';
-import '../../infraestructure/repositories/DiscoverRepository.dart';
 import 'kahootListItem.dart';
 
 
@@ -58,9 +55,6 @@ class KahootSearch extends StatefulWidget {
 }
 
 class _KahootSearchState extends State<KahootSearch> {
-  /*List<Kahoot> _kahoots = [];
-  bool _isLoading = true;
-  String? _error;*/
   List<Kahoot> _kahoots = kDummyKahoots;
   bool _isLoading = false;
   String? _error;
@@ -83,52 +77,16 @@ class _KahootSearchState extends State<KahootSearch> {
   Future<void> _fetchKahoots(String query) async {
     if (mounted) {
       setState(() {
-        _isLoading = true;
+        _isLoading = false;
         _error = null;
-        _kahoots = [];
+        // Filtra dummies por título si hay query
+        _kahoots = query.isEmpty
+            ? kDummyKahoots
+            : kDummyKahoots
+                .where((k) =>
+                    k.title.toLowerCase().contains(query.toLowerCase()))
+                .toList();
       });
-    }
-
-    if (query.isEmpty) {
-      if (mounted) setState(() => _isLoading = false);
-      return;
-    }
-
-    try {
-      final repository = context.read<IDiscoverRepository>();
-
-      final result = await repository.getKahoots(
-        query: query,
-        themes: const [],
-        orderBy: 'createdAt',
-        order: 'desc',
-      );
-
-      result.fold(
-            (failure) {
-          if (mounted) {
-            setState(() {
-              _error = 'Error al buscar Kahoots: ${failure.runtimeType}';
-              _isLoading = false;
-            });
-          }
-        },
-            (kahoots) {
-          if (mounted) {
-            setState(() {
-              _kahoots = kahoots;
-              _isLoading = false;
-            });
-          }
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Ocurrió un error inesperado durante la búsqueda: $e';
-          _isLoading = false;
-        });
-      }
     }
   }
 

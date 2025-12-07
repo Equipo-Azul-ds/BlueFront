@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
-import '../../domain/Repositories/IDiscoverRepository.dart';
-import '../../infraestructure/repositories/DiscoverRepository.dart';
 import 'kahootListItem.dart';
 
 final kDummyKahoots = [
@@ -69,48 +66,6 @@ class _KahootCategorySectionState extends State<KahootCategorySection> {
     super.initState();
     //Future.microtask(_fetchCategoryKahoots);
   }
-
-  Future<void> _fetchCategoryKahoots() async {
-
-    final repository = context.read<IDiscoverRepository>();
-
-    try {
-
-      final result = await repository.getKahoots(
-        query: null,
-        themes: [widget.categoryTitle],
-        orderBy: 'createdAt',
-        order: 'desc',
-      );
-
-      result.fold(
-            (failure) {
-          if (mounted) {
-            setState(() {
-              _error = 'Error al cargar kahoots de ${widget.categoryTitle}: ${failure.runtimeType}';
-              _isLoading = false;
-            });
-          }
-        },
-            (kahoots) {
-          if (mounted) {
-            setState(() {
-              _kahoots = kahoots;
-              _isLoading = false;
-            });
-          }
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Ocurrió un error inesperado: $e';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
 
   @override
   Widget build(BuildContext context) {

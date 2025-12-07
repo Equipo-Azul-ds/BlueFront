@@ -282,7 +282,7 @@ class MyApp extends StatelessWidget {
           //Comentoados por ahora
           //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
           //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
-          //'/discover': (context) => DiscoverScreen(), // Agregar si existe
+          '/discover': (context) => const DiscoverScreen(),
           '/library': (context) => LibraryPage(), // Agregar si existe
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),
