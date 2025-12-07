@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+
 import 'core/constants/colors.dart';
+
+import 'features/discovery/domain/Repositories/IDiscoverRepository.dart';
+import 'features/discovery/infraestructure/dataSource/ThemeRemoteDataSource.dart';
+import 'features/discovery/infraestructure/dataSource/kahootRemoteDataSource.dart';
+import 'features/discovery/infraestructure/repositories/DiscoverRepository.dart';
+import 'features/discovery/infraestructure/repositories/ThemeRepository.dart';
+import 'features/discovery/presentation/pages/discover_page.dart';
+
 import 'common_pages/dashboard_page.dart';
 import 'features/challenge/domain/repositories/single_player_game_repository.dart';
 import 'features/challenge/infrastructure/repositories/single_player_game_repository_impl.dart';
@@ -272,7 +282,7 @@ class MyApp extends StatelessWidget {
           //Comentoados por ahora
           //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
           //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
-          //'/discover': (context) => DiscoverScreen(), // Agregar si existe
+          '/discover': (context) => const DiscoverScreen(),
           '/library': (context) => LibraryPage(), // Agregar si existe
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),
