@@ -183,6 +183,7 @@ class TemplateSelectorPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context){
+
     return Scaffold(
       appBar: AppBar(title: Text('Selecciona una plantilla')),
       body: Padding(

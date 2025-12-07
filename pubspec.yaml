@@ -14,8 +14,10 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Provider para manejar el estado
+
   provider: ^6.0.5
   uuid: ^3.0.6
+
 
   # Para grid irregulares
   flutter_staggered_grid_view: ^0.7.0
@@ -46,6 +48,14 @@ dependencies:
 
   # Almacenamiento seguro de datos
   flutter_secure_storage: ^9.2.4
+  dtd: ^4.0.0
+  flutter_lints: ^6.0.0
+  google_fonts: ^6.3.2
+  json_rpc_2: ^4.0.0
+  path: ^1.9.1
+  stack_trace: ^1.12.1
+  url_launcher: ^6.3.2
+  web: ^1.1.1
 
   # Escáner de códigos QR/cámara
   mobile_scanner: ^5.0.2

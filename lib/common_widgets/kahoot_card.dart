@@ -42,6 +42,7 @@ class KahootCard extends StatelessWidget{
                       color: Colors.grey[300],
                       child: Icon(Icons.broken_image, color: Colors.grey[600]),
                     ),
+
                   )
                 : (coverUrlOverride != null && coverUrlOverride!.startsWith('http')
                     ? Image.network(
