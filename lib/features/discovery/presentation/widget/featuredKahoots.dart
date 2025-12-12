@@ -1,45 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/Repositories/IDiscoverRepository.dart';
 import 'kahootListItem.dart';
 
-final kDummyKahoots = [
-  Kahoot(
-    id: 'd-001',
-    title: 'Dummy: Matemáticas Básicas',
-    description: 'Quices de prueba para operaciones fundamentales.',
-    kahootImage: 'assets/images/placeholder.png',
-    visibility: 'public',
-    status: 'published',
-    themes: ['Matemáticas'],
-    author: 'auth-dummy',
-    createdAt: DateTime(2025, 11, 25),
-    playCount: 1500,
-  ),
-  Kahoot(
-    id: 'd-002',
-    title: 'Dummy: Historia del Arte',
-    description: 'Viaje por el Renacimiento.',
-    kahootImage: 'assets/images/placeholder.png',
-    visibility: 'public',
-    status: 'published',
-    themes: ['Arte', 'Historia'],
-    author: 'auth-dummy',
-    createdAt: DateTime(2025, 11, 20),
-    playCount: 800,
-  ),
-  Kahoot(
-    id: 'd-003',
-    title: 'Dummy: Ciencia Ficción',
-    description: 'Preguntas sobre los clásicos del género.',
-    kahootImage: 'assets/images/placeholder.png',
-    visibility: 'public',
-    status: 'published',
-    themes: ['Cine', 'Literatura'],
-    author: 'auth-dummy',
-    createdAt: DateTime(2025, 10, 15),
-    playCount: 2200,
-  ),
-];
+
 
 
 class FeaturedKahoots extends StatefulWidget {
@@ -52,17 +17,62 @@ class FeaturedKahoots extends StatefulWidget {
 }
 
 class _FeaturedKahootsState extends State<FeaturedKahoots> {
-  /*List<Kahoot> _kahoots = [];
+  List<Kahoot> _kahoots = [];
   bool _isLoading = true;
-  String? _error;*/
-  List<Kahoot> _kahoots = kDummyKahoots;
-  bool _isLoading = false;
   String? _error;
+
 
   @override
   void initState() {
     super.initState();
-    //Future.microtask(_fetchFeaturedKahoots);
+    Future.microtask(_fetchFeaturedKahoots);
+  }
+
+  Future<void> _fetchFeaturedKahoots() async {
+    print('[dashboard] _fetchFeaturedKahoots START');
+
+    final repository = Provider.of<IDiscoverRepository>(context, listen: false);
+    const limit = 10;
+
+    try {
+      final result = await repository.getFeaturedKahoots(limit: limit);
+
+      result.fold(
+            (failure) {
+          print(
+            '[dashboard] fetchFeaturedKahoots FAILED -> Failure: ${failure.runtimeType}',
+          );
+          if (mounted) {
+            setState(() {
+              _error = 'Error al cargar Kahoots destacados: ${failure.runtimeType}';
+              _isLoading = false;
+            });
+          }
+        },
+            (kahoots) {
+          print(
+            '[dashboard] fetchFeaturedKahoots SUCCESS -> count: ${kahoots.length}',
+          );
+          if (mounted) {
+            setState(() {
+              _kahoots = kahoots;
+              _isLoading = false;
+            });
+          }
+        },
+      );
+    } catch (e, st) {
+      print(
+        '[dashboard] Exception fetching Featured Kahoots -> $e',
+      );
+      print(st);
+      if (mounted) {
+        setState(() {
+          _error = 'Ocurrió un error inesperado: $e';
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -138,13 +148,11 @@ List<Widget> buildKahootWidgets(BuildContext context, List<Kahoot> kahoots) {
         padding: const EdgeInsets.only(right: 4.0),
         child: KahootListItem(
           number: (index + 1).toString(),
-          title: kahoot.title,
-          source: kahoot.author,
-          image: kahoot.kahootImage,
+          kahoot: kahoot,
           onTap: () {
             Navigator.of(context).pushNamed(
-              '/kahoot-detail',  //pagina de detalles del kahoot nombre temporal
-              arguments: kahoot.id,
+              '/kahootdetail',
+              arguments: kahoot,
             );
           },
         ),

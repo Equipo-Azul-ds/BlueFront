@@ -3,7 +3,6 @@ import 'package:http/http.dart' as http;
 import '../../../../core/errors/exception.dart';
 import '../../application/DataSource/IKahootRemoteDataSource.dart';
 import '../../application/dto/KahootSearchresponseDto.dart';
-import '../../application/model/kahoot_Model.dart';
 
 
 class KahootRemoteDataSource implements IKahootRemoteDataSource {
@@ -11,7 +10,11 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
   final http.Client cliente;
 
   KahootRemoteDataSource({required this.baseUrl, required http.Client cliente})
-      : cliente = cliente ?? http.Client();
+      : cliente = cliente ?? http.Client() {
+    try {
+      print('KahootRemoteDataSource initialized with baseUrl=$baseUrl');
+    } catch (_) {}
+  }
 
   Uri _buildUri(String path, Map<String, dynamic> params) {
     final Map<String, dynamic> cleanParams = {};
@@ -25,7 +28,12 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
       }
     });
 
-    return Uri.parse('$baseUrl$path').replace(queryParameters: cleanParams.cast<String, String>());
+    final uri = Uri.parse('$baseUrl$path').replace(queryParameters: cleanParams.cast<String, String>());
+    try {
+      // Nuevo log detallado de URI/request consistente con QuizRepositoryImpl
+      print('KahootRemoteDataSource -> Building URI: $uri');
+    } catch (_) {}
+    return uri;
   }
 
   @override
@@ -41,7 +49,13 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
     );
 
     try {
+      // Log antes de la petición
+      print('KahootRemoteDataSource.fetchKahoots -> GET $uri');
       final response = await cliente.get(uri, headers: {'Content-Type': 'application/json'});
+      // Log de respuesta
+      print(
+        'KahootRemoteDataSource.fetchKahoots -> Response status: ${response.statusCode} headers: ${response.headers}',
+      );
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
@@ -51,10 +65,13 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
         throw ServerException(message: "400: Parámetros de búsqueda inválidos.");
       } else {
         final msg = 'Fallo al cargar Kahoots: ${response.statusCode} - ${response.body}';
+        print('KahootRemoteDataSource.fetchKahoots -> $msg');
         throw ServerException(message: msg);
       }
-    } catch (e) {
-      print('KahootRemoteDataSourceImpl.fetchKahoots -> Error: $e');
+    } catch (e, st) { // Añadir StackTrace
+      // Manejo de errores consistente con QuizRepositoryImpl
+      print('KahootRemoteDataSource.fetchKahoots -> Exception performing HTTP GET: $e');
+      print('Stacktrace: $st');
       rethrow;
     }
   }
@@ -69,18 +86,26 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
     );
 
     try {
+      // Log antes de la petición
+      print('KahootRemoteDataSource.fetchFeaturedKahoots -> GET $uri');
       final response = await cliente.get(uri, headers: {'Content-Type': 'application/json'});
+      // Log de respuesta
+      print(
+        'KahootRemoteDataSource.fetchFeaturedKahoots -> Response status: ${response.statusCode} headers: ${response.headers}',
+      );
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonBody = json.decode(response.body);
-
-        // CORRECCIÓN CLAVE: Usar el DTO para parsear la respuesta paginada.
         return KahootSearchResponseDto.fromJson(jsonBody);
       } else {
         final msg = 'Error al recuperar Kahoots destacados: ${response.statusCode} - ${response.body}';
+        print('KahootRemoteDataSource.fetchFeaturedKahoots -> $msg');
         throw ServerException(message: msg);
       }
-    } catch (e) {
+    } catch (e, st) { // Añadir StackTrace
+      // Manejo de errores consistente con QuizRepositoryImpl
+      print('KahootRemoteDataSource.fetchFeaturedKahoots -> Exception performing HTTP GET: $e');
+      print('Stacktrace: $st');
       rethrow;
     }
   }

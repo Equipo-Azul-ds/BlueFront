@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/Repositories/IDiscoverRepository.dart';
 import 'kahootListItem.dart';
 
 
@@ -55,8 +57,8 @@ class KahootSearch extends StatefulWidget {
 }
 
 class _KahootSearchState extends State<KahootSearch> {
-  List<Kahoot> _kahoots = kDummyKahoots;
-  bool _isLoading = false;
+  List<Kahoot> _kahoots = [];
+  bool _isLoading = true;
   String? _error;
 
   @override
@@ -75,18 +77,69 @@ class _KahootSearchState extends State<KahootSearch> {
   }
 
   Future<void> _fetchKahoots(String query) async {
+    print('[dashboard] _fetchKahoots START -> query="$query"');
+
     if (mounted) {
       setState(() {
-        _isLoading = false;
+        _isLoading = true;
         _error = null;
-        // Filtra dummies por título si hay query
-        _kahoots = query.isEmpty
-            ? kDummyKahoots
-            : kDummyKahoots
-                .where((k) =>
-                    k.title.toLowerCase().contains(query.toLowerCase()))
-                .toList();
+        _kahoots = [];
       });
+    }
+
+    if (query.isEmpty) {
+      print('[dashboard] _fetchKahoots SKIPPED -> query is empty');
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      // Se cambia context.read<IDiscoverRepository>() por Provider.of<...>(context, listen: false)
+      // para ser consistente con el primer fragmento de código.
+      final repository = Provider.of<IDiscoverRepository>(context, listen: false);
+
+      final result = await repository.getKahoots(
+        query: query,
+        themes: const [],
+        orderBy: 'createdAt',
+        order: 'desc',
+      );
+
+      result.fold(
+            (failure) {
+          print(
+            '[dashboard] fetchKahoots FAILED for query="$query" -> Failure: ${failure.runtimeType}',
+          );
+          if (mounted) {
+            setState(() {
+              _error = 'Error al buscar Kahoots: ${failure.runtimeType}';
+              _isLoading = false;
+            });
+          }
+        },
+            (kahoots) {
+          print(
+            '[dashboard] fetchKahoots SUCCESS for query="$query" -> count: ${kahoots.length}',
+          );
+          if (mounted) {
+            setState(() {
+              _kahoots = kahoots;
+              _isLoading = false;
+            });
+          }
+        },
+      );
+    } catch (e, st) { // Se añade 'st' para el StackTrace
+      print(
+        '[dashboard] Exception fetching Kahoots for query="$query" -> $e',
+      );
+      print(st); // Imprimir el StackTrace como en el código anterior
+      if (mounted) {
+        setState(() {
+          _error = 'Ocurrió un error inesperado durante la búsqueda: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -163,13 +216,12 @@ List<Widget> buildKahootWidgets(BuildContext context, List<Kahoot> kahoots) {
         padding: const EdgeInsets.only(right: 4.0),
         child: KahootListItem(
           number: (index + 1).toString(),
-          title: kahoot.title,
-          source: kahoot.author,
-          image: kahoot.kahootImage,
+          kahoot: kahoot,
+
           onTap: () {
             Navigator.of(context).pushNamed(
-              '/kahoot-detail', //pagina de detalles del kahoot nombre temporal
-              arguments: kahoot.id,
+              '/kahootdetail',
+              arguments: kahoot,
             );
           },
         ),

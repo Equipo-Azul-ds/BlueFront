@@ -1,26 +1,28 @@
 import 'package:flutter/material.dart';
 
+import '../../../kahoot/domain/entities/kahoot.dart';
+
+
 
 class KahootListItem extends StatelessWidget {
 
   const KahootListItem({
     super.key,
     required this.number,
-    required this.title,
-    required this.source,
-    this.image,
+    required this.kahoot,
     this.onTap,
   });
   final String number;
-  final String title;
-  final String source;
-  final String? image;
+  final Kahoot kahoot;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     const double kahootContentWidth = 210;
     const double kahootContentHeight = 160;
+    final String title = kahoot.title;
+    final String source = kahoot.author;
+    final String? image = kahoot.kahootImage;
 
     return GestureDetector(
       onTap: onTap,
