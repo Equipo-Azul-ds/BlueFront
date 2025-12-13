@@ -9,6 +9,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import '../features/discovery/presentation/pages/discover_page.dart';
 import '/features/gameSession/presentation/pages/join_game.dart';
 import '../common_widgets/kahoot_card.dart';
 import '../common_widgets/main_bottom_nav_bar.dart';
@@ -1262,9 +1263,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   final List<Widget> _pages = const [
     HomePageContent(), // 0: Inicio
-    Scaffold(
-      body: Center(child: Text('Descubre Page')),
-    ), // 1: Descubre (Placeholder)
+    DiscoverScreen(), //Discovery
     SizedBox.shrink(), // 2: Placeholder for FAB
     LibraryPage(), // 3: Biblioteca (Épica 7)
     Scaffold(
@@ -1277,10 +1276,7 @@ class _DashboardPageState extends State<DashboardPage> {
       Navigator.pushNamed(context, '/create');
       return;
     }
-    if (index == 1) {
-      Navigator.pushReplacementNamed(context, '/discover');
-      return;
-    }
+
     setState(() {
       _currentIndex = index;
     });

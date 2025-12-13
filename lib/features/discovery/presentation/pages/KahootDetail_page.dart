@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../common_widgets/bottom_navbar.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
 
@@ -175,10 +174,6 @@ class _KahootDetailPageDisState extends State<KahootDetailPageDis> {
             ],
           ),
         ),
-      ),
-
-      bottomNavigationBar: const CustomBottomNavBar(
-        currentIndex: discoverIndex,
       ),
     );
   }

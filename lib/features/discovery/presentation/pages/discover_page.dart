@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../../common_widgets/bottom_navbar.dart';
 import 'package:Trivvy/features/discovery/presentation/widget/featuredKahoots.dart';
 import '../../domain/entities/theme.dart';
 import '../../infraestructure/repositories/ThemeRepository.dart';
 import '../widget/KahootCategory.dart';
 import '../widget/KahootSearch.dart';
-
-
+import '../../../../core/constants/colors.dart';
 
 
 class DiscoverScreen extends StatefulWidget {
@@ -30,8 +28,8 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   void initState() {
     super.initState();
-     Future.microtask(() => _fetchThemes());
-
+    // Iniciar la carga de datos
+    Future.microtask(() => _fetchThemes());
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -52,97 +50,140 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     }
   }
 
-  Future<void> _fetchThemes() async {
-    final ThemeRepository repository = context.read<ThemeRepository>();
-    final result = await repository.getThemes();
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _currentQuery = '';
+    });
+  }
 
-    result.fold(
-          (failure) {
-        if(mounted) {
-          setState(() {
-            _error = 'Error al cargar los temas: ${failure.runtimeType}';
-            _isLoading = false;
-          });
-        }
-      },
-          (themes) {
-        if(mounted) {
-          setState(() {
-            _themes = themes;
-            _isLoading = false;
-          });
-        }
-      },
-    );
+  Future<void> _fetchThemes() async {
+    // Implementación del fetchThemes (mantener tu lógica original)
+    try{
+      // Asegúrate de que ThemeRepository esté disponible
+      final ThemeRepository repository = context.read<ThemeRepository>();
+      final result = await repository.getThemes();
+
+      result.fold(
+            (failure) {
+          if(mounted) {
+            setState(() {
+              _error = 'Error al cargar los temas: ${failure.runtimeType}';
+              _isLoading = false;
+            });
+          }
+        },
+            (themes) {
+          if(mounted) {
+            setState(() {
+              _themes = themes;
+              _isLoading = false;
+            });
+          }
+        },
+      );
+    }catch (e) {
+      print('Error en _fetchThemes: $e');
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    const int discoverIndex = 1;
-    final bool showSearchResults = _currentQuery.isNotEmpty;
+    bool showSearchResults = _searchController.text.trim().isNotEmpty;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Container(
+    return Column(
+      children: [
+        Container(
           decoration: BoxDecoration(
-            color: Colors.grey[800],
-            borderRadius: BorderRadius.circular(8.0),
+            gradient: LinearGradient(
+              colors: [
+                AppColor.primary,
+                AppColor.primary,
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10.0),
+          // *** MANEJO DEL SAFEA AREA SUPERIOR ***
+          // Añade el padding de la barra de estado + 8.0 para un espacio correcto
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + 8.0,
+            bottom: 8.0,
+            left: 16.0,
+            right: 16.0,
+          ),
           child: TextField(
             controller: _searchController,
-            decoration: const InputDecoration(
-              hintText: 'Find a kahoot about...',
-              hintStyle: TextStyle(color: Colors.white54),
-              border: InputBorder.none,
-              icon: Icon(Icons.search, color: Colors.white54),
+            decoration: InputDecoration(
+              hintText: 'Buscar Kahoots',
+              hintStyle: const TextStyle(color: Colors.white70),
+              prefixIcon: const Icon(Icons.search, color: Colors.white),
+              filled: true,
+              fillColor: Colors.white.withOpacity(0.3),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: BorderSide.none,
+              ),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                icon: const Icon(Icons.clear, color: Colors.white),
+                onPressed: _clearSearch,
+              )
+                  : null,
             ),
             style: const TextStyle(color: Colors.white),
           ),
         ),
-        actions: [
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(top: 8.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
 
-            if (showSearchResults)
-              KahootSearch(searchTitle: _currentQuery),
-
-              Column(
+        // 2. Contenido Desplazable (Resto de la Pantalla)
+        Expanded(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FeaturedKahoots(),
                   const SizedBox(height: 20),
 
-
-                  if (_isLoading)
-                    const Center(child: CircularProgressIndicator(color: Colors.white))
-                  else if (_error != null)
-                    Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+                  // Si hay búsqueda, mostrar solo resultados
+                  if (showSearchResults)
+                    KahootSearch(searchTitle: _currentQuery)
+                  // Si no hay búsqueda, mostrar contenido principal
                   else
-                    ..._themes.map((themeEntity) =>
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 20),
-                          child: KahootCategorySection(categoryTitle: themeEntity.name),
-                        )
-                    ).toList(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        FeaturedKahoots(),
+                        const SizedBox(height: 20),
 
+                        // Manejo de estado
+                        if (_isLoading)
+                          const Center(child: CircularProgressIndicator(color: AppColor.primary))
+                        else if (_error != null)
+                          Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+                        else
+                          ..._themes.map((themeEntity) =>
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 20),
+                                // Asumo que KahootCategorySection es tu KahootCategory
+                                child: KahootCategorySection(categoryTitle: themeEntity.name),
+                              )
+                          ).toList(),
+                      ],
+                    ),
 
+                  const SizedBox(height: 100), // Padding inferior
                 ],
               ),
-
-            const SizedBox(height: 100),
-          ],
+            ),
+          ),
         ),
-      ),
-      bottomNavigationBar: const CustomBottomNavBar(
-        currentIndex: discoverIndex,
-      ),
+      ],
     );
   }
 }
