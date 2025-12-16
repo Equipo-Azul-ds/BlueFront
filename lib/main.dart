@@ -9,7 +9,6 @@ import 'features/discovery/infraestructure/dataSource/ThemeRemoteDataSource.dart
 import 'features/discovery/infraestructure/dataSource/kahootRemoteDataSource.dart';
 import 'features/discovery/infraestructure/repositories/DiscoverRepository.dart';
 import 'features/discovery/infraestructure/repositories/ThemeRepository.dart';
-import 'features/discovery/presentation/pages/KahootDetail_page.dart';
 import 'features/discovery/presentation/pages/discover_page.dart';
 
 import 'common_pages/dashboard_page.dart';
@@ -20,7 +19,7 @@ import 'features/challenge/application/use_cases/single_player_usecases.dart';
 import 'features/challenge/application/ports/slide_provider.dart';
 import 'features/challenge/presentation/blocs/single_player_challenge_bloc.dart';
 import 'features/challenge/presentation/blocs/single_player_results_bloc.dart';
-import 'features/kahoot/domain/entities/kahoot.dart';
+import 'features/discovery/domain/entities/kahoot.dart';
 import 'features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import 'features/media/presentation/blocs/media_editor_bloc.dart';
 import 'features/kahoot/presentation/pages/quiz_editor_page.dart';
@@ -314,10 +313,7 @@ class MyApp extends StatelessWidget {
           '/library': (context) => LibraryPage(), // Agregar si existe
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),
-          '/kahootdetail': (context) {
-            final kahoot = ModalRoute.of(context)!.settings.arguments as Kahoot;
-            return KahootDetailPageDis(kahoot: kahoot);
-          },
+
         },
         home: DashboardPage(), //Pagina inicial
       ),

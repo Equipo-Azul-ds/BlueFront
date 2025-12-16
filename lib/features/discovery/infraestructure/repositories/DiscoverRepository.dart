@@ -1,7 +1,7 @@
 import 'package:dartz/dartz.dart';
 import '../../../../core/errors/exception.dart';
 import '../../../../core/errors/failures.dart';
-import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/entities/kahoot.dart';
 import '../../domain/Repositories/IDiscoverRepository.dart';
 import '../dataSource/kahootRemoteDataSource.dart';
 

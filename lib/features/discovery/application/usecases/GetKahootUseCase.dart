@@ -3,7 +3,7 @@ import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/usecase.dart';
-import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/entities/kahoot.dart';
 
 
 class GetKahootsParams extends Equatable {

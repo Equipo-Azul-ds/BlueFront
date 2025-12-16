@@ -1,6 +1,6 @@
 import 'package:dartz/dartz.dart';
 import '../../../../core/errors/failures.dart';
-import '../../../kahoot/domain/entities/kahoot.dart';
+import '../entities/kahoot.dart';
 
 
 

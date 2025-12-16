@@ -20,7 +20,7 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
 
   final TextEditingController _searchController = TextEditingController();
-  List<ThemeEntity> _themes = [];
+  List<ThemeVO> _themes = [];
   bool _isLoading = true;
   String? _error;
   String _currentQuery = '';

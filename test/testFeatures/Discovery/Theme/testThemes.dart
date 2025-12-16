@@ -41,7 +41,7 @@ void main() {
       // Assert
       verify(mockRemoteDataSource.fetchThemes());
       // Verifica que el resultado sea Right(List<ThemeEntity>)
-      expect(result, Right<Failure, List<ThemeEntity>>([tThemeEntity]));
+      expect(result, Right<Failure, List<ThemeVO>>([tThemeEntity]));
     });
 
     test('debe retornar NetworkFailure si la llamada falla con ServerException', () async {
@@ -55,7 +55,7 @@ void main() {
       // Assert
       verify(mockRemoteDataSource.fetchThemes());
       // Verifica que el resultado sea Left(NetworkFailure)
-      expect(result, Left<Failure, List<ThemeEntity>>(NetworkFailure()));
+      expect(result, Left<Failure, List<ThemeVO>>(NetworkFailure()));
     });
   });
 }

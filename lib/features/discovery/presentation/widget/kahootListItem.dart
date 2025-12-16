@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/entities/kahoot.dart';
 
 
 

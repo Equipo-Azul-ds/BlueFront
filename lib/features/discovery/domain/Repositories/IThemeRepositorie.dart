@@ -4,5 +4,5 @@ import '../entities/theme.dart';
 
 abstract class IThemeRepository {
 
-  Future<Either<Failure, List<ThemeEntity>>> getThemes();
+  Future<Either<Failure, List<ThemeVO>>> getThemes();
 }

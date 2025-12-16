@@ -14,14 +14,14 @@ class ThemeRepository implements IThemeRepository {
   }
 
   @override
-  Future<Either<Failure, List<ThemeEntity>>> getThemes() async {
+  Future<Either<Failure, List<ThemeVO>>> getThemes() async {
     // Log de inicio de operación
     try { print('ThemeRepository.getThemes -> Fetching themes...'); } catch (_) {}
 
     try {
       final responseDto = await remoteDataSource.fetchThemes();
 
-      final List<ThemeEntity> themes = responseDto.data
+      final List<ThemeVO> themes = responseDto.data
           .map((model) => model.toEntity())
           .toList();
 

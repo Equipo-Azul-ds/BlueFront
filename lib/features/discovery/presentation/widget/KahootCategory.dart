@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/entities/kahoot.dart';
 import '../../domain/Repositories/IDiscoverRepository.dart';
-import 'kahootListItem.dart';
+import '../Funciones/buildKahootWidgets.dart';
 
 
 
@@ -146,27 +146,3 @@ class _KahootCategorySectionState extends State<KahootCategorySection> {
   }
 }
 
-List<Widget> buildKahootWidgets(BuildContext context, List<Kahoot> kahoots) {
-  return kahoots.asMap().entries.map((entry) {
-    int index = entry.key;
-    Kahoot kahoot = entry.value;
-
-    return SizedBox(
-      width: 250,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 4.0),
-        child: KahootListItem(
-          number: (index + 1).toString(),
-          kahoot: kahoot,
-
-          onTap: () {
-            Navigator.of(context).pushNamed(
-              '/kahootdetail',
-              arguments: kahoot,
-            );
-          },
-        ),
-      ),
-    );
-  }).toList();
-}
