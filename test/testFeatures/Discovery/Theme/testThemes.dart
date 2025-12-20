@@ -30,7 +30,7 @@ void main() {
   final tThemeListDto = ThemeListResponseDto(data: [tThemeModel]);
 
   group('getThemes', () {
-    test('debe retornar List<ThemeEntity> si la llamada al DataSource es exitosa', () async {
+    test('debe retornar List<ThemeEntity> si la llamada al UserDataSource.dart es exitosa', () async {
 
       when(mockRemoteDataSource.fetchThemes())
           .thenAnswer((_) async => tThemeListDto);

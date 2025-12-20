@@ -4,6 +4,15 @@ import 'package:provider/provider.dart';
 
 import 'core/constants/colors.dart';
 
+import 'features/Administrador/Aplication/DataSource/IUserDataSource.dart';
+import 'features/Administrador/Aplication/UseCases/GetUserListUseCase.dart';
+import 'features/Administrador/Dominio/Repositorio/IUserManagementRepository.dart';
+import 'features/Administrador/Infraestructure/Datasource/UserDataSource.dart';
+import 'features/Administrador/Infraestructure/repositories/UserRepositorie.dart';
+import 'features/Administrador/Presentacion/pages/Admin_Page.dart';
+import 'features/Administrador/Presentacion/pages/Persona_Page.dart';
+import 'features/Administrador/Presentacion/pages/UserManagementPage.dart';
+import 'features/Administrador/Presentacion/provider/UserManagementProvider.dart';
 import 'features/discovery/domain/Repositories/IDiscoverRepository.dart';
 import 'features/discovery/infraestructure/dataSource/ThemeRemoteDataSource.dart';
 import 'features/discovery/infraestructure/dataSource/kahootRemoteDataSource.dart';
@@ -19,7 +28,6 @@ import 'features/challenge/application/use_cases/single_player_usecases.dart';
 import 'features/challenge/application/ports/slide_provider.dart';
 import 'features/challenge/presentation/blocs/single_player_challenge_bloc.dart';
 import 'features/challenge/presentation/blocs/single_player_results_bloc.dart';
-import 'features/discovery/domain/entities/kahoot.dart';
 import 'features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import 'features/media/presentation/blocs/media_editor_bloc.dart';
 import 'features/kahoot/presentation/pages/quiz_editor_page.dart';
@@ -50,6 +58,7 @@ import 'features/library/presentation/pages/kahoot_detail_page.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
+// API base railway: 'https://backcomun-production.up.railway.app'
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'https://backcomun-production.up.railway.app',
@@ -71,6 +80,31 @@ class MyApp extends StatelessWidget {
         Provider<http.Client>(
           create: (_) => http.Client(),
         ),
+
+        Provider<IUserDataSource>(
+          create: (context) => UserRemoteDataSourceImpl( // Usa 'context' aquí
+            baseUrl2: apiBaseUrl,
+            cliente: context.read<http.Client>(), // Ahora buscará al Provider<http.Client> de arriba
+          ),
+        ),
+        Provider<IUserRepository>(
+          create: (context) => UserRepositoryImpl(
+            remoteDataSource: context.read<IUserDataSource>(),
+          ),
+        ),
+        Provider<GetUserListUseCase>(
+          create: (context) => GetUserListUseCase(
+            context.read<IUserRepository>(),
+          ),
+        ),
+
+// 3. El Provider debe leer el UseCase
+        ChangeNotifierProvider(
+          create: (context) => UserManagementProvider(
+            getUserListUseCase: context.read<GetUserListUseCase>(),
+          ),
+        ),
+
         Provider<KahootRemoteDataSource>(
           create: (context) => KahootRemoteDataSource(
             baseUrl: apiBaseUrl,
@@ -125,6 +159,8 @@ class MyApp extends StatelessWidget {
           create: (context) =>
               GetSummaryUseCase(context.read<SinglePlayerGameRepository>()),
         ),
+
+
         ChangeNotifierProvider<SinglePlayerChallengeBloc>(
           create: (context) => SinglePlayerChallengeBloc(
             startAttemptUseCase: context.read<StartAttemptUseCase>(),
@@ -310,9 +346,12 @@ class MyApp extends StatelessWidget {
           //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
           //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
           '/discover': (context) => const DiscoverScreen(),
-          '/library': (context) => LibraryPage(), // Agregar si existe
+          '/library': (context) => LibraryPage(),
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),
+          '/persona': (context) => const PersonaPage(),
+          '/admin': (context) => const AdminPage(),
+          '/admin/users': (context) => const UserManagementPage(),
 
         },
         home: DashboardPage(), //Pagina inicial

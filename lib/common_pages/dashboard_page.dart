@@ -9,6 +9,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import '../features/Administrador/Presentacion/pages/Persona_Page.dart';
 import '../features/discovery/presentation/pages/discover_page.dart';
 import '/features/gameSession/presentation/pages/join_game.dart';
 import '../common_widgets/kahoot_card.dart';
@@ -1266,9 +1267,7 @@ class _DashboardPageState extends State<DashboardPage> {
     DiscoverScreen(), //Discovery
     SizedBox.shrink(), // 2: Placeholder for FAB
     LibraryPage(), // 3: Biblioteca (Épica 7)
-    Scaffold(
-      body: Center(child: Text('Perfil Page')),
-    ), // 4: Perfil (Placeholder)
+    PersonaPage(), // 4: Perfil (Placeholder)
   ];
 
   void _onItemTapped(int index) {
