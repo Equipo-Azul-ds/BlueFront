@@ -9,7 +9,7 @@ abstract class IUserRepository {
 
   Future<Either<Failure, PaginatedUserList>> getUsers(UserQueryParams params);
 
-  Future<Either<Failure, void>> blockUser(String userId);
+  Future<Either<Failure, UserEntity>> toggleUserStatus(String userId, String status);
   Future<Either<Failure, void>> deleteUser(String userId);
 }
 

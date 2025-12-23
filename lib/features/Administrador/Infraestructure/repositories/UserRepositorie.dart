@@ -39,35 +39,27 @@ class UserRepositoryImpl implements IUserRepository {
         limit: pagination['limit'] as int,
       );
 
-      // Log de éxito consistente con DiscoverRepository.dart
       try { print('UserRepositoryImpl.getUsers -> SUCCESS, ${users.length} users fetched'); } catch (_) {}
       return Right(paginatedList);
 
     } on ServerException catch (e, st) {
-      // Captura de ServerException con StackTrace (Consistente con DiscoverRepository.dart)
       print('UserRepositoryImpl.getUsers -> ServerException: ${e.message}');
       print('Stacktrace: $st');
-      // Mapear a NetworkFailure (Consistente con DiscoverRepository.dart)
       return Left(NetworkFailure());
     } catch (e, st) {
-      // Captura genérica con StackTrace (Consistente con DiscoverRepository.dart)
       print('UserRepositoryImpl.getUsers -> Unexpected Exception: $e');
       print('Stacktrace: $st');
-      // Mapear a UnknownFailure (Consistente con DiscoverRepository.dart)
       return Left(UnknownFailure());
     }
   }
 
-  // Implementaciones dummy para otras operaciones
   @override
-  Future<Either<Failure, void>> blockUser(String userId) async {
+  Future<Either<Failure, UserEntity>> toggleUserStatus(String userId, String status) async {
     try {
-      await remoteDataSource.blockUser(userId);
-      return const Right(null);
-    } on ServerException {
+      final user = await remoteDataSource.toggleUserStatus(userId, status);
+      return Right(user);
+    } catch (e) {
       return Left(NetworkFailure());
-    } catch (_) {
-      return Left(UnknownFailure());
     }
   }
 
@@ -75,11 +67,9 @@ class UserRepositoryImpl implements IUserRepository {
   Future<Either<Failure, void>> deleteUser(String userId) async {
     try {
       await remoteDataSource.deleteUser(userId);
-      return const Right(null);
-    } on ServerException {
+      return Right(null);
+    } catch (e) {
       return Left(NetworkFailure());
-    } catch (_) {
-      return Left(UnknownFailure());
     }
   }
 }

@@ -1,3 +1,4 @@
+import 'package:Trivvy/features/Administrador/Presentacion/pages/NotificationAdminPage.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
@@ -5,13 +6,18 @@ import 'package:provider/provider.dart';
 import 'core/constants/colors.dart';
 
 import 'features/Administrador/Aplication/DataSource/IUserDataSource.dart';
+import 'features/Administrador/Aplication/UseCases/DeleteUserUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/GetUserListUseCase.dart';
+import 'features/Administrador/Aplication/UseCases/ToggleUserStatusUseCase.dart';
 import 'features/Administrador/Dominio/Repositorio/IUserManagementRepository.dart';
 import 'features/Administrador/Infraestructure/Datasource/UserDataSource.dart';
 import 'features/Administrador/Infraestructure/repositories/UserRepositorie.dart';
 import 'features/Administrador/Presentacion/pages/Admin_Page.dart';
+import 'features/Administrador/Presentacion/pages/CategoryManagementPage.dart';
 import 'features/Administrador/Presentacion/pages/Persona_Page.dart';
 import 'features/Administrador/Presentacion/pages/UserManagementPage.dart';
+import 'features/Administrador/Presentacion/provider/AdminNotificationProvider.dart';
+import 'features/Administrador/Presentacion/provider/CategotyManagementProvider.dart';
 import 'features/Administrador/Presentacion/provider/UserManagementProvider.dart';
 import 'features/discovery/domain/Repositories/IDiscoverRepository.dart';
 import 'features/discovery/infraestructure/dataSource/ThemeRemoteDataSource.dart';
@@ -97,11 +103,23 @@ class MyApp extends StatelessWidget {
             context.read<IUserRepository>(),
           ),
         ),
+        Provider<ToggleUserStatusUseCase>(
+          create: (context) => ToggleUserStatusUseCase(
+            context.read<IUserRepository>(),
+          ),
+        ),
+        Provider<DeleteUserUseCase>(
+          create: (context) => DeleteUserUseCase(
+            context.read<IUserRepository>(),
+          ),
+        ),
 
 // 3. El Provider debe leer el UseCase
         ChangeNotifierProvider(
           create: (context) => UserManagementProvider(
             getUserListUseCase: context.read<GetUserListUseCase>(),
+            toggleUserStatusUseCase: context.read<ToggleUserStatusUseCase>(),
+            deleteUserUseCase: context.read<DeleteUserUseCase>(),
           ),
         ),
 
@@ -127,6 +145,14 @@ class MyApp extends StatelessWidget {
           create: (context) => ThemeRepository(
             remoteDataSource: context.read<ThemeRemoteDataSource>(),
           ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => CategoryManagementProvider(
+            repository: context.read<ThemeRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AdminNotificationProvider(),
         ),
         Provider<SlideProvider>(create: (_) => SlideProviderImpl()),
         Provider<SinglePlayerGameRepositoryImpl>(
@@ -352,10 +378,13 @@ class MyApp extends StatelessWidget {
           '/persona': (context) => const PersonaPage(),
           '/admin': (context) => const AdminPage(),
           '/admin/users': (context) => const UserManagementPage(),
-
+          '/admin/categories': (context) => const CategoryManagementPage(),
+          '/admin/notifications': (context) => const NotificationAdminPage()
         },
         home: DashboardPage(), //Pagina inicial
       ),
     );
   }
 }
+
+

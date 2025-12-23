@@ -67,9 +67,9 @@ class AdminPage extends StatelessWidget {
             ),
             _buildAdminButton(
               context,
-              'Gestión de Quizzes (Kahoots)',
+              'Gestión de Categorias',
               Icons.quiz,
-              '/admin/quizzes',
+              '/admin/categorias',
             ),
             _buildAdminButton(
               context,

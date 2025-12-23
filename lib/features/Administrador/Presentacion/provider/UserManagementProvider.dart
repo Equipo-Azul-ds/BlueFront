@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../Aplication/UseCases/DeleteUserUseCase.dart';
 import '../../Aplication/UseCases/GetUserListUseCase.dart';
+import '../../Aplication/UseCases/ToggleUserStatusUseCase.dart';
 import '../../Aplication/dtos/user_query_params.dart';
 import '../../Dominio/entidad/User.dart';
 
@@ -7,10 +9,16 @@ import '../../Dominio/entidad/User.dart';
 // Definición de estados de UI
 enum UserManagementState { initial, loading, loaded, error }
 
+
 class UserManagementProvider with ChangeNotifier {
   final GetUserListUseCase getUserListUseCase;
+  final ToggleUserStatusUseCase toggleUserStatusUseCase;
+  final DeleteUserUseCase deleteUserUseCase;
 
-  UserManagementProvider({required this.getUserListUseCase});
+
+  UserManagementProvider({required this.getUserListUseCase,
+    required this.toggleUserStatusUseCase,
+    required this.deleteUserUseCase,});
 
   // Estado interno
   List<UserEntity> _users = [];
@@ -46,24 +54,34 @@ class UserManagementProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleBlockStatus(String userId) {
-    // Implementación temporal para actualizar la UI localmente
-    _users = _users.map((u) {
-      if (u.id == userId) {
-        final newStatus = u.isBlocked ? UserStatus.active : UserStatus.blocked;
-        return UserEntity(
-          id: u.id, name: u.name, email: u.email, description: u.description,
-          userType: u.userType, createdAt: u.createdAt, status: newStatus,
-        );
-      }
-      return u;
-    }).toList();
-    notifyListeners();
+  // Lógica para bloquear/desbloquear
+  Future<void> toggleBlockStatus(String userId) async {
+    final userIndex = _users.indexWhere((u) => u.id == userId);
+    if (userIndex == -1) return;
+
+    final currentStatus = _users[userIndex].status == UserStatus.active ? 'active' : 'blocked';
+
+    final result = await toggleUserStatusUseCase.execute(userId, currentStatus);
+
+    result.fold(
+          (failure) => print("Error al cambiar estado"),
+          (updatedUser) {
+        _users[userIndex] = updatedUser;
+        notifyListeners(); // Actualiza la lista en la pantalla
+      },
+    );
   }
 
-  void deleteUser(String userId) {
-    // Implementación temporal para actualizar la UI localmente
-    _users.removeWhere((u) => u.id == userId);
-    notifyListeners();
+  // Lógica para eliminar
+  Future<void> deleteUser(String userId) async {
+    final result = await deleteUserUseCase.execute(userId);
+
+    result.fold(
+          (failure) => print("Error al eliminar"),
+          (_) {
+        _users.removeWhere((u) => u.id == userId);
+        notifyListeners(); // Elimina de la UI inmediatamente
+      },
+    );
   }
 }

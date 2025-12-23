@@ -6,4 +6,6 @@ class ThemeVO {
     required this.name,
 
   });
+
+  get id => null;
 }
