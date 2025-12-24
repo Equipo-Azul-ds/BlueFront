@@ -10,14 +10,12 @@ class LibraryPage extends StatefulWidget {
 }
 
 class _LibraryPageState extends State<LibraryPage> {
-  final String userId = 'user_123';
-
   @override
   void initState() {
     super.initState();
     // La carga se inicia cuando la página se inserta en el IndexedStack por primera vez.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<LibraryProvider>(context, listen: false).loadAllLists(userId);
+      context.read<LibraryProvider>().loadAllLists();
     });
   }
 
@@ -57,10 +55,7 @@ class _LibraryPageState extends State<LibraryPage> {
           onTap: () {
             Navigator.of(context).pushNamed('/kahoots-category').then((_) {
               if (!mounted) return;
-              Provider.of<LibraryProvider>(
-                context,
-                listen: false,
-              ).loadAllLists(userId);
+              context.read<LibraryProvider>().loadAllLists();
             });
           },
         ),

@@ -33,7 +33,7 @@ import 'features/media/application/delete_media_usecase.dart';
 import 'features/kahoot/domain/entities/Quiz.dart';
 
 import 'features/library/domain/repositories/library_repository.dart';
-import 'features/library/infrastructure/repositories/mock_library_repository.dart';
+import 'features/library/infrastructure/repositories/library_repository_impl.dart';
 import 'features/library/application/get_kahoots_use_cases.dart';
 import 'features/library/application/get_kahoot_detail_use_case.dart';
 import 'features/library/application/get_kahoot_progress_usecase.dart';
@@ -166,7 +166,9 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        Provider<LibraryRepository>(create: (_) => MockLibraryRepository()),
+        Provider<LibraryRepository>(
+          create: (_) => LibraryRepositoryImpl(baseUrl: apiBaseUrl),
+        ),
         Provider<GetCreatedKahootsUseCase>(
           create: (context) => GetCreatedKahootsUseCase(
             repository: context.read<LibraryRepository>(),

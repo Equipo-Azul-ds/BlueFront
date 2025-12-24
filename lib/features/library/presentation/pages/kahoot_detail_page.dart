@@ -8,33 +8,23 @@ import '../providers/library_provider.dart';
 class KahootDetailPage extends StatelessWidget {
   const KahootDetailPage({super.key});
 
-  // Simulamos el ID del usuario logueado
-  static const String _userId = 'user_123';
-
   // Lógica para cambiar el estado de favorito
   void _toggleFavorite(
     BuildContext context,
     String kahootId,
     bool currentStatus,
   ) async {
-    final manager = context.read<LibraryProvider>();
-
-    // Ejecutamos la mutación. El Provider se encarga de recargar las listas automáticamente.
-    await manager.toggleFavoriteStatus(
+    await context.read<LibraryProvider>().toggleFavoriteStatus(
       kahootId: kahootId,
       currentStatus: currentStatus,
-      userId: _userId,
     );
   }
 
   // Simula el fin del juego y actualiza el progreso al 100%
   void _simulateGameCompletion(BuildContext context, String kahootId) async {
-    final manager = context.read<LibraryProvider>();
-
     // Llamamos al método del Provider, que ejecuta el Use Case y recarga las listas
-    await manager.updateKahootProgress(
+    await context.read<LibraryProvider>().updateKahootProgress(
       kahootId: kahootId,
-      userId: _userId,
       newPercentage: 100,
       isCompleted: true,
     );
@@ -45,9 +35,10 @@ class KahootDetailPage extends StatelessWidget {
     BuildContext context,
     Kahoot kahoot,
     KahootProgress? progress,
+    String currentUserId, // Recibimos el ID del provider para comparar
   ) {
     // 1. Caso Borrador
-    if (kahoot.authorId == _userId && kahoot.status == 'Draft') {
+    if (kahoot.authorId == currentUserId && kahoot.status == 'Draft') {
       return const Chip(
         label: Text('Borrador'),
         backgroundColor: Colors.grey,
@@ -99,8 +90,6 @@ class KahootDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final String kahootId =
         ModalRoute.of(context)!.settings.arguments as String;
-    //final GetKahootDetailUseCase getKahootDetail = context
-    //.read<GetKahootDetailUseCase>();
     final getKahootDetail = context.read<GetKahootDetailUseCase>();
 
     return Scaffold(
@@ -127,7 +116,7 @@ class KahootDetailPage extends StatelessWidget {
               // Cargamos el progreso específico y reactivo de este Kahoot
               return FutureBuilder<KahootProgress?>(
                 // Llama al método del Provider para obtener el progreso individual
-                future: manager.getKahootProgress(kahootId, _userId),
+                future: manager.getKahootProgress(kahootId),
                 builder: (context, progressSnapshot) {
                   // Obtenemos el estado de favorito y progreso
                   final isFavorite = progressSnapshot.data?.isFavorite ?? false;
@@ -181,7 +170,12 @@ class KahootDetailPage extends StatelessWidget {
                         const Divider(height: 16),
 
                         // === INDICADOR DE ESTADO ===
-                        _buildStatusIndicator(context, kahoot, progress),
+                        _buildStatusIndicator(
+                          context,
+                          kahoot,
+                          progress,
+                          manager.userId,
+                        ),
                         const Divider(height: 16),
 
                         // === BOTÓN SIMULACIÓN DE FINALIZACIÓN ===

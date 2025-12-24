@@ -18,6 +18,8 @@ class LibraryProvider with ChangeNotifier {
   final UpdateKahootProgressUseCase _updateProgress;
   final GetKahootProgressUseCase _getKahootProgress;
 
+  final String _testUserId = '33db2a9f-ed60-4161-ab98-b7cd8b079fa7';
+  String get userId => _testUserId;
   LibraryProvider({
     required GetCreatedKahootsUseCase getCreated,
     required GetFavoriteKahootsUseCase getFavorite,
@@ -49,7 +51,7 @@ class LibraryProvider with ChangeNotifier {
   List<Kahoot> _completedKahoots = [];
   List<Kahoot> get completedKahoots => _completedKahoots;
 
-  Future<void> loadAllLists(String userId) async {
+  Future<void> loadAllLists() async {
     if (_state == LibraryState.loading) return;
 
     _state = LibraryState.loading;
@@ -76,26 +78,25 @@ class LibraryProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<KahootProgress?> getKahootProgress(String kahootId, String userId) {
+  Future<KahootProgress?> getKahootProgress(String kahootId) {
     return _getKahootProgress.execute(kahootId: kahootId, userId: userId);
   }
 
   Future<void> toggleFavoriteStatus({
     required String kahootId,
     required bool currentStatus,
-    required String userId,
   }) async {
     await _toggleFavorite.execute(
       kahootId: kahootId,
       isFavorite: !currentStatus,
+      userId: userId,
     );
 
-    await loadAllLists(userId);
+    await loadAllLists();
   }
 
   Future<void> updateKahootProgress({
     required String kahootId,
-    required String userId,
     required double newPercentage,
     required bool isCompleted,
   }) async {
@@ -107,6 +108,6 @@ class LibraryProvider with ChangeNotifier {
     );
 
     // Recargar todas las listas para reflejar el cambio en la UI
-    await loadAllLists(userId);
+    await loadAllLists();
   }
 }
