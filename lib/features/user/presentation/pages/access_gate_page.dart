@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'onboarding_welcome_page.dart';
 import '../blocs/auth_bloc.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../common_pages/dashboard_page.dart';
 
 /// Simple gate that can show loading, error, or route to welcome.
 class AccessGatePage extends StatefulWidget {
@@ -15,6 +16,7 @@ class AccessGatePage extends StatefulWidget {
 class _AccessGatePageState extends State<AccessGatePage> {
   bool _loading = true;
   bool _error = false;
+  bool _hasSession = false;
 
   @override
   void initState() {
@@ -29,12 +31,14 @@ class _AccessGatePageState extends State<AccessGatePage> {
       setState(() {
         _loading = false;
         _error = false;
+        _hasSession = auth.currentUser != null;
       });
     } catch (_) {
       setState(() {
         _loading = false;
         // Si falla la sesión (401/timeout), deja pasar a onboarding en lugar de bloquear.
         _error = false;
+        _hasSession = false;
       });
     }
   }
@@ -79,6 +83,10 @@ class _AccessGatePageState extends State<AccessGatePage> {
           ),
         ),
       );
+    }
+
+    if (_hasSession) {
+      return const DashboardPage();
     }
 
     return const OnboardingWelcomePage();

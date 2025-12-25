@@ -5,6 +5,7 @@ class User {
   final String userName;
   final String name;
   final String email;
+  final String hashedPassword;
   final String userType; // e.g. 'admin' | 'player'
   final String avatarUrl;
   final String theme; // 'light' | 'dark'
@@ -19,6 +20,7 @@ class User {
     required this.userName,
     required this.name,
     required this.email,
+    this.hashedPassword = '',
     required this.userType,
     required this.avatarUrl,
     required this.theme,
@@ -47,6 +49,7 @@ class User {
     String? userName,
     String? name,
     String? email,
+    String? hashedPassword,
     String? userType,
     String? avatarUrl,
     String? theme,
@@ -61,6 +64,7 @@ class User {
       userName: userName ?? this.userName,
       name: name ?? this.name,
       email: email ?? this.email,
+      hashedPassword: hashedPassword ?? this.hashedPassword,
       userType: userType ?? this.userType,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       theme: theme ?? this.theme,
@@ -77,6 +81,7 @@ class User {
         'userName': userName,
         'name': name,
         'email': email,
+      if (hashedPassword.isNotEmpty) 'hashedPassword': hashedPassword,
         'userType': userType,
         'avatarUrl': avatarUrl,
         'theme': theme,
@@ -93,6 +98,7 @@ class User {
       userName: json['userName'] as String,
       name: (json['name'] ?? '') as String,
       email: json['email'] as String,
+      hashedPassword: (json['hashedPassword'] ?? '') as String,
       userType: json['userType'] as String,
       avatarUrl: (json['avatarUrl'] ?? '') as String,
       theme: (json['theme'] ?? 'light') as String,

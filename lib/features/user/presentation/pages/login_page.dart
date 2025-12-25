@@ -33,12 +33,10 @@ class _LoginPageState extends State<LoginPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: TextButton(
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text(
-            'Cancel',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-          ),
+          tooltip: 'Cerrar',
         ),
         actions: [
           TextButton(
@@ -48,7 +46,7 @@ class _LoginPageState extends State<LoginPage> {
               );
             },
             child: const Text(
-              'Sign up',
+              'Crear cuenta',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
           ),
@@ -79,7 +77,7 @@ class _LoginPageState extends State<LoginPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Text(
-                        'Log in',
+                        'Iniciar sesión',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 20,
@@ -99,12 +97,12 @@ class _LoginPageState extends State<LoginPage> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      const Center(child: Text('or')),
+                      const Center(child: Text('o')),
                       const SizedBox(height: 16),
                       TextField(
                         controller: _emailController,
                         decoration: InputDecoration(
-                          labelText: 'Username or email',
+                          labelText: 'Usuario o correo',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -116,7 +114,7 @@ class _LoginPageState extends State<LoginPage> {
                         controller: _passwordController,
                         obscureText: _obscure,
                         decoration: InputDecoration(
-                          labelText: 'Password',
+                          labelText: 'Contraseña',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -140,7 +138,7 @@ class _LoginPageState extends State<LoginPage> {
                               MaterialPageRoute(builder: (_) => const ResetPasswordPage()),
                             );
                           },
-                          child: const Text('Forgot password? Reset your password'),
+                          child: const Text('¿Olvidaste tu contraseña? Restablécela'),
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -158,11 +156,11 @@ class _LoginPageState extends State<LoginPage> {
                                 width: 18,
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
-                            : const Text('Log in'),
+                            : const Text('Iniciar sesión'),
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'By signing up, you accept our Terms and Conditions. Please read our Privacy Notice.',
+                        'Al continuar, aceptas nuestros Términos y la Política de Privacidad.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12, color: Colors.black54),
                       ),
@@ -195,7 +193,7 @@ class _LoginPageState extends State<LoginPage> {
     final password = _passwordController.text;
     if (userOrEmail.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter username/email and password')),
+        const SnackBar(content: Text('Ingresa usuario/correo y contraseña')),
       );
       return;
     }
@@ -203,15 +201,12 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await auth.login(userOrEmail, password);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logged in (mock). Implement real auth call.')),
-        );
-        Navigator.of(context).pop();
+        Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Login failed: $e')),
+          SnackBar(content: Text('Error al iniciar sesión: $e')),
         );
       }
     }

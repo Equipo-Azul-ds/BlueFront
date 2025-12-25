@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 import '../../application/create_user_usecase.dart';
 import '../../application/edit_user_usecase.dart';
@@ -74,11 +75,13 @@ class AuthBloc extends ChangeNotifier {
   }) async {
     return _run<User?>(() async {
       final id = const Uuid().v4();
+      final hashed = BCrypt.hashpw(password, BCrypt.gensalt());
       await createUser(
         CreateUserParams(
           id: id,
           userName: userName,
           email: email,
+          hashedPassword: hashed,
           userType: userType,
           avatarUrl: avatarUrl,
           name: name,

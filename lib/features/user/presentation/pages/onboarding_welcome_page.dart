@@ -1,13 +1,50 @@
+import 'dart:async';
+
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/colors.dart';
 import 'login_page.dart';
 import 'account_type_page.dart';
 
-class OnboardingWelcomePage extends StatelessWidget {
+class OnboardingWelcomePage extends StatefulWidget {
   const OnboardingWelcomePage({super.key});
 
   @override
+  State<OnboardingWelcomePage> createState() => _OnboardingWelcomePageState();
+}
+
+class _OnboardingWelcomePageState extends State<OnboardingWelcomePage> {
+  late final ConfettiController _confettiController;
+  Timer? _heroTimer;
+  int _heroIndex = 0;
+
+  final List<_HeroItem> _heroItems = const [
+    _HeroItem(icon: Icons.celebration, title: 'Crea retos únicos'),
+    _HeroItem(icon: Icons.games, title: 'Juega en vivo con amigos'),
+    _HeroItem(icon: Icons.star, title: 'Gana streaks y recompensas'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _confettiController = ConfettiController(duration: const Duration(seconds: 3))..play();
+    _heroTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      setState(() {
+        _heroIndex = (_heroIndex + 1) % _heroItems.length;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _heroTimer?.cancel();
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final hero = _heroItems[_heroIndex];
     return Scaffold(
       backgroundColor: AppColor.primary,
       body: SafeArea(
@@ -40,23 +77,51 @@ class OnboardingWelcomePage extends StatelessWidget {
                         child: Column(
                           children: [
                             const Spacer(),
-                            Container(
-                              height: 220,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.celebration,
-                                  color: Colors.white,
-                                  size: 96,
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 500),
+                              child: Container(
+                                key: ValueKey(hero.icon),
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.14),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(hero.icon, color: Colors.white, size: 96),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      hero.title,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                             const Spacer(),
                           ],
                         ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: ConfettiWidget(
+                        confettiController: _confettiController,
+                        blastDirectionality: BlastDirectionality.explosive,
+                        emissionFrequency: 0.08,
+                        numberOfParticles: 12,
+                        maxBlastForce: 18,
+                        minBlastForce: 6,
+                        gravity: 0.12,
                       ),
                     ),
                   ),
@@ -171,4 +236,10 @@ class OnboardingWelcomePage extends StatelessWidget {
       ),
     );
   }
+}
+
+class _HeroItem {
+  final IconData icon;
+  final String title;
+  const _HeroItem({required this.icon, required this.title});
 }

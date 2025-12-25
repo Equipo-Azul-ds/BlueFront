@@ -65,7 +65,18 @@ class UserRepositoryImpl implements UserRepository {
   @override
   Future<void> create(User user) async {
     final uri = Uri.parse('$baseUrl/user');
-    final res = await _post(uri, user.toJson());
+    if (user.hashedPassword.isEmpty) {
+      throw Exception('hashedPassword requerido para crear usuario');
+    }
+    final body = <String, dynamic>{
+      'userName': user.userName,
+      'email': user.email,
+      'hashedPassword': user.hashedPassword,
+      'userType': user.userType,
+      'avatarUrl': user.avatarUrl,
+      if (user.name.isNotEmpty) 'name': user.name,
+    };
+    final res = await _post(uri, body);
     _ensureSuccess(res, allowed: {200, 201});
   }
 

@@ -8,6 +8,7 @@ class CreateUserParams {
   final String id;
   final String userName;
   final String email;
+  final String hashedPassword;
   final String userType; // 'student' | 'teacher' | 'personal'
   final String avatarUrl;
   final String name;
@@ -22,6 +23,7 @@ class CreateUserParams {
     required this.id,
     required this.userName,
     required this.email,
+    required this.hashedPassword,
     required this.userType,
     required this.avatarUrl,
     this.name = '',
@@ -57,6 +59,7 @@ class CreateUserUseCase {
       userName: params.userName,
       name: params.name,
       email: params.email,
+      hashedPassword: params.hashedPassword,
       userType: params.userType,
       avatarUrl: params.avatarUrl,
       theme: params.theme,

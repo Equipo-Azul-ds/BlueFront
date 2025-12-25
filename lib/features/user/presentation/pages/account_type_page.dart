@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/colors.dart';
+import 'account_cta_page.dart';
 
 class AccountTypePage extends StatefulWidget {
   const AccountTypePage({super.key});
@@ -10,17 +11,13 @@ class AccountTypePage extends StatefulWidget {
 
 class _AccountTypePageState extends State<AccountTypePage> {
   String? _selected;
-  bool _showCompletion = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
-          child: _showCompletion ? _buildCompletion() : _buildSelector(),
-        ),
+        child: _buildSelector(),
       ),
     );
   }
@@ -102,9 +99,12 @@ class _AccountTypePageState extends State<AccountTypePage> {
                     onPressed: _selected == null
                         ? null
                         : () {
-                            setState(() {
-                              _showCompletion = true;
-                            });
+                            final selection = _selected!;
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => AccountCtaPage(selectedType: selection),
+                              ),
+                            );
                           },
                     icon: const Icon(Icons.check),
                     label: const Text('Continuar'),
@@ -175,66 +175,6 @@ class _AccountTypePageState extends State<AccountTypePage> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildCompletion() {
-    return Column(
-      children: [
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: LinearProgressIndicator(
-            value: 1,
-            color: Colors.green,
-            backgroundColor: Colors.green.withOpacity(0.2),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                height: 170,
-                width: 170,
-                decoration: BoxDecoration(
-                  color: Colors.green.shade100,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle, color: Colors.green, size: 100),
-              ),
-              const SizedBox(height: 28),
-              const Text(
-                '¡Listo!',
-                style: TextStyle(
-                  color: AppColor.primary,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _selected == 'teacher'
-                    ? 'Elegiste Profesor. Ajustaremos el contenido para educadores.'
-                    : 'Elegiste Estudiante. ¡Listo para aprender y jugar!',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.black87, fontSize: 16),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColor.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () => Navigator.of(context).pop(_selected),
-                child: const Text('Continuar'),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

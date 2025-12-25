@@ -5,7 +5,8 @@ import '../blocs/auth_bloc.dart';
 import 'account_type_page.dart';
 
 class SignUpPage extends StatefulWidget {
-  const SignUpPage({super.key});
+  final String? initialType; // 'teacher' o 'student'
+  const SignUpPage({super.key, this.initialType});
 
   @override
   State<SignUpPage> createState() => _SignUpPageState();
@@ -14,6 +15,7 @@ class SignUpPage extends StatefulWidget {
 class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
+  final _userNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
@@ -23,6 +25,7 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _userNameCtrl.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
@@ -66,21 +69,32 @@ class _SignUpPageState extends State<SignUpPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Text(
-                        'Create account',
+                        'Crear cuenta',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _nameCtrl,
-                        decoration: _inputDecoration('Name'),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        decoration: _inputDecoration('Nombre'),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _userNameCtrl,
+                        decoration: _inputDecoration('Nombre de usuario'),
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _emailCtrl,
-                        decoration: _inputDecoration('Username or email'),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                        decoration: _inputDecoration('Correo electrónico'),
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Requerido';
+                          final email = v.trim();
+                          return email.contains('@') ? null : 'Correo no válido';
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -92,23 +106,23 @@ class _SignUpPageState extends State<SignUpPage> {
                             onPressed: () => setState(() => _obscure = !_obscure),
                           ),
                         ),
-                        validator: (v) => (v == null || v.length < 6) ? 'Min 6 chars' : null,
+                        validator: (v) => (v == null || v.length < 6) ? 'Mínimo 6 caracteres' : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: _confirmCtrl,
                         obscureText: _obscure,
-                        decoration: _inputDecoration('Confirm password'),
-                        validator: (v) => (v != _passwordCtrl.text) ? 'Passwords do not match' : null,
+                        decoration: _inputDecoration('Confirmar contraseña'),
+                        validator: (v) => (v != _passwordCtrl.text) ? 'Las contraseñas no coinciden' : null,
                       ),
                       const SizedBox(height: 16),
-                      const Text('Account type', style: TextStyle(fontWeight: FontWeight.w600)),
+                      const Text('Tipo de cuenta', style: TextStyle(fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          _typeChip('student', 'Student', Icons.emoji_people),
+                          _typeChip('student', 'Estudiante', Icons.emoji_people),
                           const SizedBox(width: 8),
-                          _typeChip('teacher', 'Teacher', Icons.school),
+                          _typeChip('teacher', 'Profesor', Icons.school),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -125,7 +139,7 @@ class _SignUpPageState extends State<SignUpPage> {
                                 width: 18,
                                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                               )
-                            : const Text('Sign up'),
+                            : const Text('Crear cuenta'),
                       ),
                       TextButton(
                         onPressed: () async {
@@ -136,7 +150,7 @@ class _SignUpPageState extends State<SignUpPage> {
                             setState(() => _type = selected);
                           }
                         },
-                        child: const Text('Need help choosing? Pick account type'),
+                        child: const Text('¿No estás seguro? Elige tipo de cuenta'),
                       ),
                     ],
                   ),
@@ -149,12 +163,20 @@ class _SignUpPageState extends State<SignUpPage> {
     );
   }
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialType != null) {
+      _type = widget.initialType!;
+    }
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthBloc>();
     auth
         .signup(
-          userName: _emailCtrl.text.trim(),
+          userName: _userNameCtrl.text.trim(),
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
           userType: _type,
@@ -163,14 +185,11 @@ class _SignUpPageState extends State<SignUpPage> {
         )
         .then((_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registered as $_type (mock signup).')),
-      );
-      Navigator.of(context).pop();
+      Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
     }).catchError((e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Signup failed: $e')),
+        SnackBar(content: Text('Error al registrar: $e')),
       );
     });
   }
