@@ -46,12 +46,14 @@ import 'features/library/presentation/providers/library_provider.dart';
 import 'features/library/presentation/pages/library_page.dart';
 import 'features/library/presentation/pages/kahoots_category_page.dart';
 import 'features/library/presentation/pages/kahoot_detail_page.dart';
+import 'features/user/presentation/user_providers.dart';
+import 'features/user/presentation/pages/access_gate_page.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://backcomun-production.up.railway.app',
+  defaultValue: 'https://backcomun-gc5j.onrender.com',
 );
 
 void main() {
@@ -199,7 +201,9 @@ class MyApp extends StatelessWidget {
         ),
       ],
 
-      child: MaterialApp(
+      child: UserProviders(
+        baseUrl: apiBaseUrl,
+        child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Trivvy',
         theme: ThemeData(
@@ -240,7 +244,6 @@ class MyApp extends StatelessWidget {
             },
           ),
         ),
-        initialRoute: '/dashboard',
         routes: {
           '/dashboard': (context) => DashboardPage(),
           // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
@@ -287,7 +290,8 @@ class MyApp extends StatelessWidget {
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),
         },
-        home: DashboardPage(), //Pagina inicial
+        home: const AccessGatePage(), // Pagina inicial de onboarding/auth
+      ),
       ),
     );
   }
