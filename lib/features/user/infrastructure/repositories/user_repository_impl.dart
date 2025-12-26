@@ -52,6 +52,9 @@ class UserRepositoryImpl implements UserRepository {
     final uri = Uri.parse('$baseUrl/user/username/$name');
     final res = await _get(uri);
     if (res.statusCode == 200) {
+      // Debug: inspecciona respuesta cruda para verificar campos de contraseña.
+      // ignore: avoid_print
+      print('[user_repo] GET /user/username/$name -> ${res.body}');
       final data = jsonDecode(res.body);
       if (data is Map<String, dynamic>) {
         return User.fromJson(Map<String, dynamic>.from(data));
@@ -60,6 +63,24 @@ class UserRepositoryImpl implements UserRepository {
     }
     if (res.statusCode == 404) return null;
     throw Exception('Failed to fetch user by name: ${res.statusCode} ${res.body}');
+  }
+
+  @override
+  Future<User?> getOneByEmail(String email) async {
+    final uri = Uri.parse('$baseUrl/user/email/$email');
+    final res = await _get(uri);
+    if (res.statusCode == 200) {
+      // Debug: inspecciona respuesta cruda para verificar campos de contraseña.
+      // ignore: avoid_print
+      print('[user_repo] GET /user/email/$email -> ${res.body}');
+      final data = jsonDecode(res.body);
+      if (data is Map<String, dynamic>) {
+        return User.fromJson(Map<String, dynamic>.from(data));
+      }
+      return null;
+    }
+    if (res.statusCode == 404) return null;
+    throw Exception('Failed to fetch user by email: ${res.statusCode} ${res.body}');
   }
 
   @override

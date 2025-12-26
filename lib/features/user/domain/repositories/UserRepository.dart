@@ -7,6 +7,8 @@ abstract class UserRepository {
 
   Future<User?> getOneByName(String name);
 
+  Future<User?> getOneByEmail(String email);
+
   Future<void> create(User user);
 
   Future<void> edit(User user);

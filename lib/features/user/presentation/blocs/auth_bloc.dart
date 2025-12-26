@@ -47,8 +47,52 @@ class AuthBloc extends ChangeNotifier {
   // Login simplificado: busca por username/email y guarda token mock.
   Future<User?> login(String userOrEmail, String password) async {
     return _run<User?>(() async {
-      // TODO: reemplazar por endpoint real de auth; esto solo busca por nombre.
-      final user = await getUserByName(userOrEmail);
+      // Debug de entrada
+      // ignore: avoid_print
+      print('[auth] login start input=$userOrEmail isEmail=${userOrEmail.contains('@')}');
+
+      final isEmail = userOrEmail.contains('@');
+      User? user;
+      if (isEmail) {
+        user = await repository.getOneByEmail(userOrEmail);
+        // fallback: algunos backends permiten login por username en el mismo campo
+        user ??= await repository.getOneByName(userOrEmail);
+      } else {
+        user = await repository.getOneByName(userOrEmail);
+      }
+
+      if (user == null) {
+        // ignore: avoid_print
+        print('[auth] login user not found for $userOrEmail');
+        throw Exception('Usuario no encontrado');
+      }
+
+      // ignore: avoid_print
+      print('[auth] login fetched id=${user.id} userName=${user.userName} email=${user.email} type=${user.userType}');
+
+      final hpw = user.hashedPassword;
+      if (hpw.isEmpty) {
+        // ignore: avoid_print
+        print('[auth] login empty hashedPassword for user=${user.userName}');
+        throw Exception('El usuario no tiene contraseña registrada');
+      }
+
+      // Debug mínimo (no imprime la contraseña). Deja este print temporal mientras validamos el backend.
+      // ignore: avoid_print
+      print('[auth] login user=${user.userName} hashLen=${hpw.length} prefix=${hpw.substring(0, hpw.length > 7 ? 7 : hpw.length)}');
+
+      final looksBcrypt = hpw.startsWith(r'$2');
+      // ignore: avoid_print
+      print('[auth] login looksBcrypt=$looksBcrypt');
+      final ok = looksBcrypt ? BCrypt.checkpw(password, hpw) : password == hpw;
+
+      // ignore: avoid_print
+      print('[auth] login passwordMatch=$ok');
+
+      if (!ok) {
+        throw Exception('Contraseña incorrecta');
+      }
+
       currentUser = user;
       await storage.write('token', 'mock-token');
       await storage.write('currentUserId', user.id);

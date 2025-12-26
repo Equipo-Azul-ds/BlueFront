@@ -81,7 +81,7 @@ class User {
         'userName': userName,
         'name': name,
         'email': email,
-      if (hashedPassword.isNotEmpty) 'hashedPassword': hashedPassword,
+        if (hashedPassword.isNotEmpty) 'hashedPassword': hashedPassword,
         'userType': userType,
         'avatarUrl': avatarUrl,
         'theme': theme,
@@ -93,12 +93,23 @@ class User {
       };
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final dynamic rawHash = json['hashedPassword'] ??
+        json['password'] ??
+        json['pwd'] ??
+        json['pass'] ??
+        json['passwordHash'] ??
+        json['password_hash'] ??
+        json['hashed_password'] ??
+        json['hashPassword'] ??
+        json['hash_password'];
+    final hashed = rawHash == null ? '' : rawHash.toString();
+
     return User(
       id: json['id'] as String,
       userName: json['userName'] as String,
       name: (json['name'] ?? '') as String,
       email: json['email'] as String,
-      hashedPassword: (json['hashedPassword'] ?? '') as String,
+      hashedPassword: hashed,
       userType: json['userType'] as String,
       avatarUrl: (json['avatarUrl'] ?? '') as String,
       theme: (json['theme'] ?? 'light') as String,
