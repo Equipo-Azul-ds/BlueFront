@@ -73,10 +73,24 @@ class UserRepositoryImpl implements UserRepository {
       'email': user.email,
       'hashedPassword': user.hashedPassword,
       'userType': user.userType,
-      'avatarUrl': user.avatarUrl,
+      'avatarUrl': (user.avatarUrl.isNotEmpty &&
+              (user.avatarUrl.startsWith('http://') ||
+                  user.avatarUrl.startsWith('https://')))
+          ? user.avatarUrl
+          : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(user.userName)}&background=0D47A1&color=fff',
       if (user.name.isNotEmpty) 'name': user.name,
     };
+    // Debug ligero para diagnosticar errores del backend
+    // Nota: no imprime la contraseña en claro, solo el hash.
+    // Puedes retirar esto en producción si no lo necesitas.
+    // ignore: avoid_print
+    print('[user_repository] POST /user body=$body');
+
     final res = await _post(uri, body);
+    if (res.statusCode >= 400) {
+      // ignore: avoid_print
+      print('[user_repository] POST /user -> ${res.statusCode} ${res.body}');
+    }
     _ensureSuccess(res, allowed: {200, 201});
   }
 

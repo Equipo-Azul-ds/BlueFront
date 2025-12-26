@@ -1,8 +1,10 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
 import '../blocs/auth_bloc.dart';
 import 'account_type_page.dart';
+import 'avatar_picker_page.dart';
 
 class SignUpPage extends StatefulWidget {
   final String? initialType; // 'teacher' o 'student'
@@ -21,6 +23,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final _confirmCtrl = TextEditingController();
   String _type = 'student';
   bool _obscure = true;
+  String _avatarUrl = '';
 
   @override
   void dispose() {
@@ -78,6 +81,32 @@ class _SignUpPageState extends State<SignUpPage> {
                         controller: _nameCtrl,
                         decoration: _inputDecoration('Nombre'),
                         validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      // Avatar selector
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                        leading: CircleAvatar(
+                          radius: 22,
+                          backgroundColor: Colors.grey.shade200,
+                          backgroundImage: _avatarUrl.isNotEmpty ? NetworkImage(_avatarUrl) : null,
+                          child: _avatarUrl.isEmpty
+                              ? const Icon(Icons.person, color: Colors.grey)
+                              : null,
+                        ),
+                        title: const Text('Avatar'),
+                        subtitle: const Text('Elige un avatar (recomendado para estudiantes)'),
+                        trailing: TextButton(
+                          onPressed: () async {
+                            final picked = await Navigator.of(context).push<String>(
+                              MaterialPageRoute(builder: (_) => const AvatarPickerPage()),
+                            );
+                            if (picked != null) {
+                              setState(() => _avatarUrl = picked);
+                            }
+                          },
+                          child: const Text('Elegir'),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -174,13 +203,20 @@ class _SignUpPageState extends State<SignUpPage> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final auth = context.read<AuthBloc>();
+    // Requerir avatar seleccionado para ambos roles (teacher/student)
+    if (_avatarUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Elige un avatar para continuar')),
+      );
+      return;
+    }
     auth
         .signup(
           userName: _userNameCtrl.text.trim(),
           email: _emailCtrl.text.trim(),
           password: _passwordCtrl.text,
           userType: _type,
-          avatarUrl: '',
+          avatarUrl: _avatarUrl,
           name: _nameCtrl.text.trim(),
         )
         .then((_) {

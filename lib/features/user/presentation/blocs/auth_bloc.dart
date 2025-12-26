@@ -76,6 +76,9 @@ class AuthBloc extends ChangeNotifier {
     return _run<User?>(() async {
       final id = const Uuid().v4();
       final hashed = BCrypt.hashpw(password, BCrypt.gensalt());
+      final safeAvatar = avatarUrl.trim().isEmpty
+          ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName)}&background=0D47A1&color=fff'
+          : avatarUrl.trim();
       await createUser(
         CreateUserParams(
           id: id,
@@ -83,7 +86,7 @@ class AuthBloc extends ChangeNotifier {
           email: email,
           hashedPassword: hashed,
           userType: userType,
-          avatarUrl: avatarUrl,
+          avatarUrl: safeAvatar,
           name: name,
         ),
       );
