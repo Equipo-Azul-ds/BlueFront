@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Simple avatar picker for students using DiceBear (free avatars).
 /// Returns a selected image URL via Navigator.pop<String>(context, url).
@@ -89,7 +90,28 @@ class _AvatarPickerPageState extends State<AvatarPickerPage> {
                       padding: const EdgeInsets.all(8.0),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.network(url, fit: BoxFit.cover),
+                        child: CachedNetworkImage(
+                          imageUrl: url,
+                          fit: BoxFit.cover,
+                          fadeInDuration: const Duration(milliseconds: 120),
+                          fadeOutDuration: const Duration(milliseconds: 80),
+                          placeholder: (context, _) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: SizedBox(
+                                height: 18,
+                                width: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, _, __) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Center(
+                              child: Icon(Icons.image_not_supported, color: Colors.grey),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),

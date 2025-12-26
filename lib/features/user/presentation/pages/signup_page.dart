@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/constants/colors.dart';
 import '../blocs/auth_bloc.dart';
@@ -89,7 +90,9 @@ class _SignUpPageState extends State<SignUpPage> {
                         leading: CircleAvatar(
                           radius: 22,
                           backgroundColor: Colors.grey.shade200,
-                          backgroundImage: _avatarUrl.isNotEmpty ? NetworkImage(_avatarUrl) : null,
+                          backgroundImage: _avatarUrl.isNotEmpty
+                              ? CachedNetworkImageProvider(_avatarUrl)
+                              : null,
                           child: _avatarUrl.isEmpty
                               ? const Icon(Icons.person, color: Colors.grey)
                               : null,
