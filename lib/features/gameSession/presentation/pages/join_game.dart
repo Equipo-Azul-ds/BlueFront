@@ -277,6 +277,7 @@ class _QrScannerSheetState extends State<_QrScannerSheet> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Stack(
+        fit: StackFit.expand,
         children: [
           MobileScanner(
             controller: _controller,

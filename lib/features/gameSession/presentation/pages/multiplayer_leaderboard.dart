@@ -123,6 +123,7 @@ class _MultiplayerLeaderboardScreenState extends State<MultiplayerLeaderboardScr
           ),
         ),
         child: Stack(
+          fit: StackFit.expand,
           children: [
             SafeArea(
               child: Padding(

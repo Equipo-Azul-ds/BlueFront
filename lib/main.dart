@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
 import 'core/constants/colors.dart';
 import 'common_pages/dashboard_page.dart';
 import 'features/challenge/domain/repositories/single_player_game_repository.dart';
 import 'features/challenge/infrastructure/repositories/single_player_game_repository_impl.dart';
-import 'features/challenge/infrastructure/ports/slide_provider_impl.dart';
 import 'features/challenge/application/use_cases/single_player_usecases.dart';
-import 'features/challenge/application/ports/slide_provider.dart';
 import 'features/challenge/presentation/blocs/single_player_challenge_bloc.dart';
 import 'features/challenge/presentation/blocs/single_player_results_bloc.dart';
+import 'features/challenge/infrastructure/storage/single_player_attempt_tracker.dart';
 import 'features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import 'features/media/presentation/blocs/media_editor_bloc.dart';
 import 'features/kahoot/presentation/pages/quiz_editor_page.dart';
@@ -27,7 +27,9 @@ import 'features/kahoot/domain/entities/Quiz.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
-const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://backcomun-production.up.railway.app');
+const String apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'https://backcomun-gc5j.onrender.com');
+// Token (UUID) usado mientras el backend mockea la verificación real.
+const String apiAuthToken = String.fromEnvironment('API_AUTH_TOKEN', defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333');
 
 
 void main() {
@@ -43,49 +45,52 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<SlideProvider>(create: (_) => SlideProviderImpl()),
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
-            slideProvider: context.read<SlideProvider>(),
+            baseUrl: apiBaseUrl,
+            mockAuthToken: apiAuthToken,
           ),
         ),
         Provider<SinglePlayerGameRepository>(
           create: (context) => context.read<SinglePlayerGameRepositoryImpl>(),
         ),
-        Provider<GetAttemptStateUseCase>(
-          create: (context) => GetAttemptStateUseCase(
-            repository: context.read<SinglePlayerGameRepository>(),
-          ),
+        Provider<FlutterSecureStorage>(
+          create: (_) => const FlutterSecureStorage(),
+        ),
+        Provider<SinglePlayerAttemptTracker>(
+          create: (context) =>
+              SinglePlayerAttemptTracker(context.read<FlutterSecureStorage>()),
         ),
         Provider<StartAttemptUseCase>(
           create: (context) => StartAttemptUseCase(
             repository: context.read<SinglePlayerGameRepository>(),
-            slideProvider: context.read<SlideProvider>(),
-            getAttemptStateUseCase: context.read<GetAttemptStateUseCase>(),
           ),
         ),
         Provider<SubmitAnswerUseCase>(
           create: (context) => SubmitAnswerUseCase(
             repository: context.read<SinglePlayerGameRepository>(),
-            slideProvider: context.read<SlideProvider>(),
           ),
         ),
         Provider<GetSummaryUseCase>(
           create: (context) =>
               GetSummaryUseCase(context.read<SinglePlayerGameRepository>()),
         ),
+        Provider<GetAttemptStateUseCase>(
+          create: (context) => GetAttemptStateUseCase(
+            repository: context.read<SinglePlayerGameRepository>(),
+          ),
+        ),
         ChangeNotifierProvider<SinglePlayerChallengeBloc>(
           create: (context) => SinglePlayerChallengeBloc(
             startAttemptUseCase: context.read<StartAttemptUseCase>(),
-            getAttemptStateUseCase: context.read<GetAttemptStateUseCase>(),
             submitAnswerUseCase: context.read<SubmitAnswerUseCase>(),
             getSummaryUseCase: context.read<GetSummaryUseCase>(),
+            attemptTracker: context.read<SinglePlayerAttemptTracker>(),
           ),
         ),
 
         ChangeNotifierProvider<SinglePlayerResultsBloc>(
           create: (context) => SinglePlayerResultsBloc(
-            repository: context.read<SinglePlayerGameRepository>(),
             getSummaryUseCase: context.read<GetSummaryUseCase>(),
           ),
         ),

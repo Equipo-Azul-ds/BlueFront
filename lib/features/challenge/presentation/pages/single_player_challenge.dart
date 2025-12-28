@@ -31,15 +31,15 @@ const List<IconData> optionIcons = [
 // Responsable de mostrar la pregunta actual, temporizador, opciones y el
 // overlay de revisión (reveal) cuando llega la evaluación de la respuesta.
 class SinglePlayerChallengeScreen extends StatefulWidget {
-  final String nickname;
   final String quizId;
-  final int totalQuestions;
+  final SinglePlayerGame? initialGame;
+  final SlideDTO? initialSlide;
 
   const SinglePlayerChallengeScreen({
     super.key,
-    required this.nickname,
     required this.quizId,
-    required this.totalQuestions,
+    this.initialGame,
+    this.initialSlide,
   });
 
   @override
@@ -55,6 +55,7 @@ class _SinglePlayerChallengeScreenState
 
   int? _selectedIndex;
   bool _answerRevealed = false;
+  bool _hasEvaluation = false;
   Timer? _countdownTimer;
   int _timeRemaining = 0;
   Timer? _autoAdvanceTimer;
@@ -63,6 +64,25 @@ class _SinglePlayerChallengeScreenState
   late final AnimationController _reviewController;
   static const int _reviewDurationMs = 2000;
   EvaluatedAnswer? _displayedEvaluated;
+
+  int? _serverIndexForButton(SlideDTO slide, int buttonIndex) {
+    if (buttonIndex < 0 || buttonIndex >= slide.options.length) {
+      return null;
+    }
+    return slide.options[buttonIndex].index;
+  }
+
+  int? _buttonIndexForServer(List<SlideOptionDTO> options, int? serverIndex) {
+    if (serverIndex == null) {
+      return null;
+    }
+    for (var i = 0; i < options.length; i++) {
+      if (options[i].index == serverIndex) {
+        return i;
+      }
+    }
+    return null;
+  }
 
   @override
   // didChangeDependencies: iniciamos el BLoC y arrancamos/reamos el intento
@@ -74,7 +94,19 @@ class _SinglePlayerChallengeScreenState
       bloc = Provider.of<SinglePlayerChallengeBloc>(context, listen: false);
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        bloc.startGame(widget.quizId, widget.nickname, widget.totalQuestions);
+        final SinglePlayerGame? resumeGame = widget.initialGame;
+        final SlideDTO? resumeSlide = widget.initialSlide;
+        final Future<void> launchFuture = resumeGame != null
+            ? bloc.hydrateExistingGame(resumeGame, nextSlide: resumeSlide)
+            : bloc.startGame(widget.quizId);
+
+        launchFuture.catchError((error) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No se pudo iniciar el juego: $error')),
+          );
+          Navigator.of(context).pop();
+        });
       });
 
       bloc.addListener(_onBlocChanged);
@@ -113,6 +145,7 @@ class _SinglePlayerChallengeScreenState
     setState(() {
       _selectedIndex = null;
       _answerRevealed = false;
+      _hasEvaluation = false;
       _displayedSlide = slide;
     });
 
@@ -169,22 +202,29 @@ class _SinglePlayerChallengeScreenState
     final totalSeconds = currentDisplayed.timeLimitSeconds;
     final timeUsedSeconds = totalSeconds - _timeRemaining;
     final timeUsedMs = (timeUsedSeconds * 1000).round();
+    final serverAnswerIndex = selectedIdx == null
+        ? null
+        : _serverIndexForButton(currentDisplayed, selectedIdx);
 
     final playerAnswer = PlayerAnswer(
-      answerIndex: selectedIdx == null ? null : [selectedIdx],
+      slideId: currentDisplayed.slideId,
+      answerIndex: serverAnswerIndex == null ? null : [serverAnswerIndex],
       timeUsedMs: timeUsedMs,
     );
 
     setState(() {
       _selectedIndex = selectedIdx;
       _answerRevealed = true;
+      _hasEvaluation = false;
       _displayedEvaluated = null;
     });
 
     await bloc.submitAnswer(playerAnswer);
+    if (!mounted) return;
 
     setState(() {
       _displayedEvaluated = bloc.lastResult?.evaluatedAnswer;
+      _hasEvaluation = true;
     });
 
     if (_reviewController.isAnimating) {
@@ -207,6 +247,7 @@ class _SinglePlayerChallengeScreenState
         _pendingSlide = null;
         _selectedIndex = null;
         _answerRevealed = false;
+        _hasEvaluation = false;
       });
       _startCountdown(_displayedSlide!.timeLimitSeconds);
       return;
@@ -221,7 +262,10 @@ class _SinglePlayerChallengeScreenState
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) =>
-              SinglePlayerChallengeResultsScreen(gameId: currentGame.gameId),
+              SinglePlayerChallengeResultsScreen(
+            gameId: currentGame.gameId,
+            initialSummaryGame: currentGame,
+          ),
         ),
       );
       return;
@@ -231,6 +275,7 @@ class _SinglePlayerChallengeScreenState
       _displayedSlide = bloc.currentSlide;
       _selectedIndex = null;
       _answerRevealed = false;
+      _hasEvaluation = false;
     });
 
     if (_displayedSlide != null) {
@@ -272,10 +317,9 @@ class _SinglePlayerChallengeScreenState
 
             final bool isSelected = _selectedIndex == idx;
             final bool reveal = _answerRevealed;
-            final int? correctIdx = b.lastCorrectIndex;
-            final bool isCorrect = reveal
-                ? (correctIdx != null ? correctIdx == idx : false)
-                : false;
+            final int? correctIdx =
+                _buttonIndexForServer(answers, b.lastCorrectIndex);
+            final bool isCorrect = reveal && correctIdx != null && correctIdx == idx;
 
             Color backgroundColor = baseColor;
             IconData? indicatorIcon;
@@ -443,6 +487,8 @@ class _SinglePlayerChallengeScreenState
             );
           }
 
+          final bool canShowReviewUi = _answerRevealed && _hasEvaluation;
+
           return Scaffold(
             body: Container(
               decoration: const BoxDecoration(
@@ -454,9 +500,10 @@ class _SinglePlayerChallengeScreenState
               ),
               child: Column(
                 children: [
-                  if (_answerRevealed) buildReviewBar(),
+                  if (canShowReviewUi) buildReviewBar(),
                   Expanded(
                     child: Stack(
+                      fit: StackFit.expand,
                       children: [
                         SafeArea(
                           child: Column(
@@ -529,7 +576,7 @@ class _SinglePlayerChallengeScreenState
                           ),
                         ),
 
-                        if (_answerRevealed)
+                        if (canShowReviewUi)
                           Positioned.fill(
                             child: IgnorePointer(
                               child: Container(
@@ -539,6 +586,7 @@ class _SinglePlayerChallengeScreenState
                                     width: 96,
                                     height: 96,
                                     child: Stack(
+                                      fit: StackFit.expand,
                                       alignment: Alignment.center,
                                       children: [
                                         AnimatedBuilder(

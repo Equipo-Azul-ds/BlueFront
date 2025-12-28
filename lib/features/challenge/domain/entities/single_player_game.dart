@@ -27,6 +27,8 @@ class SinglePlayerGame {
   final DateTime startedAt;
   final DateTime? completedAt;
   final List<QuestionResult> gameAnswers;
+  final int? totalCorrect;
+  final double? accuracyPercentage;
 
   SinglePlayerGame({
     required this.gameId,
@@ -38,6 +40,8 @@ class SinglePlayerGame {
     required this.startedAt,
     this.completedAt,
     required this.gameAnswers,
+    this.totalCorrect,
+    this.accuracyPercentage,
   });
 
   factory SinglePlayerGame.fromJson(Map<String, dynamic> json) {
@@ -52,9 +56,11 @@ class SinglePlayerGame {
       completedAt: json['completedAt'] != null
           ? DateTime.parse(json['completedAt'])
           : null,
-      gameAnswers: (json['gameAnswers'] as List<dynamic>)
+        gameAnswers: (json['gameAnswers'] as List<dynamic>? ?? const [])
           .map((e) => QuestionResult.fromJson(e))
           .toList(),
+      totalCorrect: json['totalCorrect'] as int?,
+      accuracyPercentage: (json['accuracyPercentage'] as num?)?.toDouble(),
     );
   }
 
@@ -69,6 +75,8 @@ class SinglePlayerGame {
       'startedAt': startedAt.toIso8601String(),
       'completedAt': completedAt?.toIso8601String(),
       'gameAnswers': gameAnswers.map((e) => e.toJson()).toList(),
+      'totalCorrect': totalCorrect,
+      'accuracyPercentage': accuracyPercentage,
     };
   }
 }
@@ -138,13 +146,15 @@ class QuestionResult {
 
 class PlayerAnswer {
   // Representa la respuesta enviada por el jugador y el tiempo usado en ms.
+  final String? slideId;
   final List<int>? answerIndex;
   final int timeUsedMs;
 
-  PlayerAnswer({this.answerIndex, required this.timeUsedMs});
+  PlayerAnswer({this.slideId, this.answerIndex, required this.timeUsedMs});
 
   factory PlayerAnswer.fromJson(Map<String, dynamic> json) {
     return PlayerAnswer(
+      slideId: json['slideId'] as String?,
       answerIndex: json['answerIndex'] == null
           ? null
           : (json['answerIndex'] is List)
@@ -155,7 +165,11 @@ class PlayerAnswer {
   }
 
   Map<String, dynamic> toJson() {
-    return {'answerIndex': answerIndex, 'timeUsedMs': timeUsedMs};
+    return {
+      'slideId': slideId,
+      'answerIndex': answerIndex,
+      'timeUsedMs': timeUsedMs,
+    };
   }
 }
 

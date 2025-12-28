@@ -73,6 +73,7 @@ class _PlayerResultsScreenState extends State<PlayerResultsScreen>
 
     return Scaffold(
       body: Stack(
+        fit: StackFit.expand,
         children: [
           Container(
             decoration: const BoxDecoration(

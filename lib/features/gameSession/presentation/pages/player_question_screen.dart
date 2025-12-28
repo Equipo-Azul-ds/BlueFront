@@ -313,6 +313,7 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen>
             if (_answerRevealed) _buildReviewBanner(),
             Expanded(
               child: Stack(
+                fit: StackFit.expand,
                 children: [
                   SafeArea(
                     child: Column(

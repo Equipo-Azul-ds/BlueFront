@@ -1,7 +1,10 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:Trivvy/features/challenge/application/dtos/single_player_dtos.dart';
 import 'package:Trivvy/features/challenge/application/use_cases/single_player_usecases.dart';
+import 'package:Trivvy/features/challenge/domain/entities/single_player_game.dart';
+import 'package:Trivvy/features/challenge/infrastructure/storage/single_player_attempt_tracker.dart';
 import 'package:Trivvy/features/challenge/presentation/pages/single_player_challenge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart' as staggered;
@@ -240,6 +243,24 @@ class _HomePageContentState extends State<HomePageContent> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  Navigator.of(ctx).pop();
+                                  await _startSinglePlayerQuiz(context, q);
+                                },
+                                icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                                label: const Text('Jugar en modo solitario'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColor.secundary,
+                                  foregroundColor: AppColor.onPrimary,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -406,6 +427,28 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
+  Future<void> _startSinglePlayerQuiz(BuildContext context, Quiz quiz) async {
+    final kahootId = quiz.quizId.trim();
+    if (kahootId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este quiz aún no tiene un ID válido; sincronízalo antes de jugar.')),
+      );
+      return;
+    }
+
+    final resume = await _resolveSinglePlayerResume(context, kahootId);
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SinglePlayerChallengeScreen(
+          quizId: kahootId,
+          initialGame: resume.game,
+          initialSlide: resume.nextSlide,
+        ),
+      ),
+    );
+  }
+
   String _themeName(String? id) {
     if (id == null || id.isEmpty) return '—';
     final map = {
@@ -436,34 +479,42 @@ class _HomePageContentState extends State<HomePageContent> {
     BuildContext context,
     Map<String, dynamic> quiz,
   ) async {
-    final startAttempt = Provider.of<StartAttemptUseCase>(context, listen: false);
+    final quizId = quiz['id'] as String;
+    final resume = await _resolveSinglePlayerResume(context, quizId);
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SinglePlayerChallengeScreen(
+          quizId: quizId,
+          initialGame: resume.game,
+          initialSlide: resume.nextSlide,
+        ),
+      ),
+    );
+  }
+
+  Future<({SinglePlayerGame? game, SlideDTO? nextSlide})>
+      _resolveSinglePlayerResume(BuildContext context, String quizId) async {
+    final tracker = context.read<SinglePlayerAttemptTracker>();
+    final attemptStateUseCase = context.read<GetAttemptStateUseCase>();
+    final storedAttemptId = await tracker.readAttemptId(quizId);
+    if (storedAttemptId == null) {
+      return (game: null, nextSlide: null);
+    }
+
     try {
-      final res = await startAttempt.execute(
-        kahootId: quiz['id'] as String,
-        playerId: 'Jugador',
-        totalQuestions: quiz['questions'] as int,
-      );
-      if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SinglePlayerChallengeScreen(
-            nickname: res.game.playerId,
-            quizId: res.game.quizId,
-            totalQuestions: res.game.totalQuestions,
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SinglePlayerChallengeScreen(
-            nickname: 'Jugador',
-            quizId: quiz['id'] as String,
-            totalQuestions: quiz['questions'] as int,
-          ),
-        ),
-      );
+      final attemptState = await attemptStateUseCase.execute(storedAttemptId);
+      final game = attemptState.game;
+      if (game == null ||
+          game.gameProgress.state == GameProgressStatus.COMPLETED) {
+        await tracker.clearAttempt(quizId);
+        return (game: null, nextSlide: null);
+      }
+      return (game: game, nextSlide: attemptState.nextSlide);
+    } catch (e) {
+      print('[dashboard] Failed to resume attempt for quiz=$quizId -> $e');
+      await tracker.clearAttempt(quizId);
+      return (game: null, nextSlide: null);
     }
   }
 
