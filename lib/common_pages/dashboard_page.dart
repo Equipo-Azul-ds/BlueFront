@@ -18,6 +18,8 @@ import '../features/kahoot/domain/entities/Quiz.dart';
 import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import '../features/media/presentation/blocs/media_editor_bloc.dart';
 import '../features/library/presentation/pages/library_page.dart';
+import '../features/user/presentation/pages/profile_page.dart';
+import '../features/user/presentation/blocs/auth_bloc.dart';
 
 class HomePageContent extends StatefulWidget {
   const HomePageContent({super.key});
@@ -1260,17 +1262,23 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
-    HomePageContent(), // 0: Inicio
-    Scaffold(
-      body: Center(child: Text('Descubre Page')),
-    ), // 1: Descubre (Placeholder)
-    SizedBox.shrink(), // 2: Placeholder for FAB
-    LibraryPage(), // 3: Biblioteca (Épica 7)
-    Scaffold(
-      body: Center(child: Text('Perfil Page')),
-    ), // 4: Perfil (Placeholder)
-  ];
+  List<Widget> _buildPages(BuildContext context) {
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    final currentUser = auth.currentUser;
+    return [
+      const HomePageContent(), // 0: Inicio
+      const Scaffold(
+        body: Center(child: Text('Descubre Page')),
+      ), // 1: Descubre (Placeholder)
+      const SizedBox.shrink(), // 2: Placeholder for FAB
+      const LibraryPage(), // 3: Biblioteca
+      currentUser == null
+          ? const Scaffold(
+              body: Center(child: Text('Inicia sesión para ver tu perfil')),
+            )
+          : ProfilePage(user: currentUser), // 4: Perfil
+    ];
+  }
 
   void _onItemTapped(int index) {
     if (index == 2) {
@@ -1290,7 +1298,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColor.background,
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: IndexedStack(index: _currentIndex, children: _buildPages(context)),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo

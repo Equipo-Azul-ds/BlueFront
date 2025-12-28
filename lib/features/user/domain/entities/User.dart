@@ -4,6 +4,7 @@ class User {
   final String id;
   final String userName;
   final String name;
+  final String description;
   final String email;
   final String hashedPassword;
   final String userType; // e.g. 'admin' | 'player'
@@ -19,6 +20,7 @@ class User {
     required this.id,
     required this.userName,
     required this.name,
+    this.description = '',
     required this.email,
     this.hashedPassword = '',
     required this.userType,
@@ -48,6 +50,7 @@ class User {
     String? id,
     String? userName,
     String? name,
+    String? description,
     String? email,
     String? hashedPassword,
     String? userType,
@@ -63,6 +66,7 @@ class User {
       id: id ?? this.id,
       userName: userName ?? this.userName,
       name: name ?? this.name,
+      description: description ?? this.description,
       email: email ?? this.email,
       hashedPassword: hashedPassword ?? this.hashedPassword,
       userType: userType ?? this.userType,
@@ -80,6 +84,7 @@ class User {
         'id': id,
         'userName': userName,
         'name': name,
+      if (description.isNotEmpty) 'description': description,
         'email': email,
         if (hashedPassword.isNotEmpty) 'hashedPassword': hashedPassword,
         'userType': userType,
@@ -108,6 +113,7 @@ class User {
       id: json['id'] as String,
       userName: json['userName'] as String,
       name: (json['name'] ?? '') as String,
+      description: (json['description'] ?? '') as String,
       email: json['email'] as String,
       hashedPassword: hashed,
       userType: json['userType'] as String,

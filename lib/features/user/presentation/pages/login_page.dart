@@ -29,7 +29,7 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthBloc>();
     return Scaffold(
-      backgroundColor: const Color(0xFF5C2D91),
+      backgroundColor: AppColor.primary,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,

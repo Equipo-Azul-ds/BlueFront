@@ -13,15 +13,26 @@ abstract class UserRepository {
 
   Future<void> edit(User user);
 
+  /// Partially update user by ID with only the provided fields.
+  /// Payload should include only changed keys to avoid backend validation issues.
+  Future<void> partialEdit(String id, Map<String, dynamic> fields);
+
   Future<void> delete(String id);
 
   Future<User> getCurrentUser();
 
   Future<User> updateSettings({
+    String? id,
+    String? userName,
+    String? email,
     String? name,
+    String? description,
     String? avatarUrl,
+    String? userType,
+    String? hashedPassword,
     String? theme, // 'light' | 'dark'
     String? language, // 'es' | 'en' | ...
+    int? gameStreak,
   });
 
   Future<User> setMembershipPremium(bool enabled);

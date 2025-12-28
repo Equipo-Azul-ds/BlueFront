@@ -48,6 +48,7 @@ import 'features/library/presentation/pages/kahoots_category_page.dart';
 import 'features/library/presentation/pages/kahoot_detail_page.dart';
 import 'features/user/presentation/user_providers.dart';
 import 'features/user/presentation/pages/access_gate_page.dart';
+import 'features/user/presentation/pages/profile_page.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
@@ -246,6 +247,14 @@ class MyApp extends StatelessWidget {
         ),
         routes: {
           '/dashboard': (context) => DashboardPage(),
+          '/profile': (context) {
+            final auth = Provider.of<dynamic>(context, listen: false) as dynamic;
+            final user = (auth as dynamic).currentUser;
+            if (user == null) {
+              return const AccessGatePage();
+            }
+            return ProfilePage(user: user);
+          },
           // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
           '/create': (context) {
             final args = ModalRoute.of(context)?.settings.arguments;

@@ -118,7 +118,74 @@ class UserRepositoryImpl implements UserRepository {
   @override
   Future<void> edit(User user) async {
     final uri = Uri.parse('$baseUrl/user/${user.id}');
-    final res = await _patch(uri, user.toJson());
+    final body = <String, dynamic>{
+      'userName': user.userName,
+      'email': user.email,
+      'userType': user.userType,
+      'avatarUrl': user.avatarUrl,
+      'name': user.name,
+      if (user.description.isNotEmpty) 'description': user.description,
+      if (user.hashedPassword.isNotEmpty) 'hashedPassword': user.hashedPassword,
+      if (user.hashedPassword.isNotEmpty) 'password': user.hashedPassword,
+    };
+    // Debug: imprime payload de PATCH
+    // ignore: avoid_print
+    print('[user_repo] PATCH $uri body=$body');
+    final res = await _patch(uri, body);
+    if (res.statusCode >= 400) {
+      // ignore: avoid_print
+      print('[user_repo] PATCH $uri -> ${res.statusCode} ${res.body}');
+    }
+    _ensureSuccess(res, allowed: {200, 204});
+  }
+
+  @override
+  Future<void> partialEdit(String id, Map<String, dynamic> fields) async {
+    final uri = Uri.parse('$baseUrl/user/$id');
+    // Build minimal allowed body: only include present keys.
+    final body = <String, dynamic>{};
+    for (final entry in fields.entries) {
+      final k = entry.key;
+      var v = entry.value;
+      if (v == null) continue;
+      if (k == 'avatarUrl' && v is String) {
+        final s = v as String;
+        final startsHttp = s.startsWith('http://') || s.startsWith('https://');
+        if (!startsHttp) {
+          v = 'https://ui-avatars.com/api/?name=&background=0D47A1&color=fff';
+        }
+      }
+      if (k == 'theme' && v is String) {
+        final lower = (v as String).toLowerCase();
+        v = lower.contains('dark') ? 'dark' : 'light';
+      }
+      if (k == 'language' && v is String) {
+        final lower = (v as String).toLowerCase();
+        v = lower.startsWith('en') ? 'en' : 'es';
+      }
+      if (k == 'userName' ||
+          k == 'email' ||
+          k == 'userType' ||
+          k == 'avatarUrl' ||
+          k == 'name' ||
+          k == 'description' ||
+          k == 'theme' ||
+          k == 'language' ||
+          k == 'gameStreak' ||
+          k == 'hashedPassword' ||
+          k == 'password') {
+        body[k] = v;
+      }
+    }
+    // Do NOT auto-mirror hashed -> password; only include what caller intends.
+    // Debug: imprime payload de PATCH
+    // ignore: avoid_print
+    print('[user_repo] PATCH $uri body=$body');
+    final res = await _patch(uri, body);
+    if (res.statusCode >= 400) {
+      // ignore: avoid_print
+      print('[user_repo] PATCH $uri -> ${res.statusCode} ${res.body}');
+    }
     _ensureSuccess(res, allowed: {200, 204});
   }
 
@@ -143,25 +210,97 @@ class UserRepositoryImpl implements UserRepository {
 
   @override
   Future<User> updateSettings({
+    String? id,
+    String? userName,
+    String? email,
     String? name,
+    String? description,
     String? avatarUrl,
+    String? userType,
+    String? hashedPassword,
     String? theme,
     String? language,
+    int? gameStreak,
   }) async {
-    final id = await currentUserIdProvider();
-    if (id == null || id.isEmpty) {
+    final currentId = await currentUserIdProvider();
+    if (currentId == null || currentId.isEmpty) {
       throw Exception('No current user id available');
     }
-    final uri = Uri.parse('$baseUrl/user/$id');
+    final uri = Uri.parse('$baseUrl/user/$currentId');
+    // Sanitize avatar if provided
+    String? safeAvatar = avatarUrl;
+    if (safeAvatar != null && safeAvatar.isNotEmpty) {
+      final startsHttp = safeAvatar.startsWith('http://') || safeAvatar.startsWith('https://');
+      if (!startsHttp) {
+        safeAvatar = 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName ?? '')}&background=0D47A1&color=fff';
+      }
+    }
+    // Normalize theme if provided
+    String? safeTheme = theme;
+    if (safeTheme != null && safeTheme.isNotEmpty) {
+      final lower = safeTheme.toLowerCase();
+      if (lower.contains('dark')) {
+        safeTheme = 'dark';
+      } else {
+        safeTheme = 'light';
+      }
+    }
+    // Normalize language if provided
+    String? safeLang = language;
+    if (safeLang != null && safeLang.isNotEmpty) {
+      final lower = safeLang.toLowerCase();
+      if (lower.startsWith('en')) {
+        safeLang = 'en';
+      } else {
+        safeLang = 'es';
+      }
+    }
+    // Normalize game streak if provided
+    int? safeStreak = gameStreak;
+    if (safeStreak != null) {
+      if (safeStreak < 0) safeStreak = 0;
+    }
     final body = <String, dynamic>{
+      if (userName != null) 'userName': userName,
+      if (email != null) 'email': email,
       if (name != null) 'name': name,
-      if (avatarUrl != null) 'avatarUrl': avatarUrl,
-      if (theme != null) 'theme': theme,
-      if (language != null) 'language': language,
+      if (description != null) 'description': description,
+      if (safeAvatar != null) 'avatarUrl': safeAvatar,
+      if (userType != null) 'userType': userType,
+      if (hashedPassword != null && hashedPassword.isNotEmpty) 'hashedPassword': hashedPassword,
+      if (safeTheme != null) 'theme': safeTheme,
+      if (safeLang != null) 'language': safeLang,
+      if (safeStreak != null) 'gameStreak': safeStreak,
     };
+    // Debug: imprime payload de PATCH
+    // ignore: avoid_print
+    print('[user_repo] PATCH $uri body=$body');
     final res = await _patch(uri, body);
-    _ensureSuccess(res);
-    return User.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    if (res.statusCode >= 400) {
+      // ignore: avoid_print
+      print('[user_repo] PATCH $uri -> ${res.statusCode} ${res.body}');
+    }
+    _ensureSuccess(res, allowed: {200, 204});
+
+    // Algunos endpoints pueden responder 204 o cuerpo vacío; maneja eso de forma segura
+    final trimmed = res.body.trim();
+    if (res.statusCode == 204 || trimmed.isEmpty) {
+      final refreshed = await getOneById(currentId);
+      if (refreshed == null) {
+        throw Exception('Patch succeeded but user could not be reloaded');
+      }
+      return refreshed;
+    }
+    try {
+      return User.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    } catch (e) {
+      // Si el cuerpo no es JSON válido, intenta re-fetch.
+      final refreshed = await getOneById(currentId);
+      if (refreshed == null) {
+        throw Exception('Patch succeeded but response was invalid and user could not be reloaded');
+      }
+      return refreshed;
+    }
   }
 
   @override
