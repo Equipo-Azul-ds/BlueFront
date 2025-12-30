@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../provider/AdminNotificationProvider.dart';
+import '../../../Notifications/Presentacion/Provider/NotificationProvider.dart';
 
 class NotificationAdminPage extends StatefulWidget {
   const NotificationAdminPage({super.key});
@@ -12,7 +12,7 @@ class NotificationAdminPage extends StatefulWidget {
 class _NotificationAdminPageState extends State<NotificationAdminPage> {
   final _bodyController = TextEditingController();
 
-  void _submit(AdminNotificationProvider provider) async {
+  void _submit(NotificationProvider provider) async {
     if ( _bodyController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor escribe un mensaje')),
@@ -34,7 +34,7 @@ class _NotificationAdminPageState extends State<NotificationAdminPage> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<AdminNotificationProvider>();
+    final provider = context.watch<NotificationProvider>();
 
     return DefaultTabController(
       length: 2,

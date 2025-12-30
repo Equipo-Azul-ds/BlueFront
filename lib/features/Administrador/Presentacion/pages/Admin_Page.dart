@@ -69,7 +69,7 @@ class AdminPage extends StatelessWidget {
               context,
               'Gestión de Categorias',
               Icons.quiz,
-              '/admin/categorias',
+              '/admin/categories',
             ),
             _buildAdminButton(
               context,

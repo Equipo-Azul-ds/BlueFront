@@ -16,9 +16,12 @@ import 'features/Administrador/Presentacion/pages/Admin_Page.dart';
 import 'features/Administrador/Presentacion/pages/CategoryManagementPage.dart';
 import 'features/Administrador/Presentacion/pages/Persona_Page.dart';
 import 'features/Administrador/Presentacion/pages/UserManagementPage.dart';
-import 'features/Administrador/Presentacion/provider/AdminNotificationProvider.dart';
+import 'features/Notifications/Presentacion/Provider/NotificationProvider.dart';
 import 'features/Administrador/Presentacion/provider/CategotyManagementProvider.dart';
 import 'features/Administrador/Presentacion/provider/UserManagementProvider.dart';
+import 'features/Notifications/Presentacion/pages/NotificationHistoryPage.dart';
+import 'features/Notifications/infraestructura/Datasource/NotificationDatasource.dart';
+import 'features/Notifications/infraestructura/Repositorios/NotificationRepository.dart';
 import 'features/discovery/domain/Repositories/IDiscoverRepository.dart';
 import 'features/discovery/infraestructure/dataSource/ThemeRemoteDataSource.dart';
 import 'features/discovery/infraestructure/dataSource/kahootRemoteDataSource.dart';
@@ -62,17 +65,30 @@ import 'features/library/presentation/pages/library_page.dart';
 import 'features/library/presentation/pages/kahoots_category_page.dart';
 import 'features/library/presentation/pages/kahoot_detail_page.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
 // API base railway: 'https://backcomun-production.up.railway.app'
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://backcomun-production.up.railway.app',
+  defaultValue: 'https://backcomun-gc5j.onrender.com/',
 );
 
-void main() {
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("Mensaje recibido en segundo plano: ${message.messageId}");
+}
+
+Future<void> main() async {
   // Mostrar en consola la URL base que la app está usando (útil para depuración)
   print('API_BASE_URL = $apiBaseUrl');
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
+  // Configurar el handler de segundo plano
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   runApp(MyApp());
 }
 
@@ -152,7 +168,14 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) => AdminNotificationProvider(),
+          create: (context) => NotificationProvider(
+            repository: NotificationRepository(
+              dataSource: NotificationRemoteDataSource(
+                baseUrl: apiBaseUrl,
+                client: context.read<http.Client>(),
+              ),
+            ),
+          )..initNotifications(),
         ),
         Provider<SlideProvider>(create: (_) => SlideProviderImpl()),
         Provider<SinglePlayerGameRepositoryImpl>(
@@ -288,100 +311,107 @@ class MyApp extends StatelessWidget {
         ),
       ],
 
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Trivvy',
-        theme: ThemeData(
-          fontFamily: 'Onest',
-          primarySwatch: createMaterialColor(AppColor.primary),
-          primaryColor: AppColor.primary,
-          scaffoldBackgroundColor: AppColor.background,
-          appBarTheme: AppBarTheme(
-            backgroundColor: AppColor.primary,
-            iconTheme: IconThemeData(color: AppColor.onPrimary),
-            titleTextStyle: TextStyle(
-              color: AppColor.onPrimary,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          floatingActionButtonTheme: FloatingActionButtonThemeData(
-            backgroundColor: AppColor.secundary,
-            foregroundColor: AppColor.onPrimary,
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColor.secundary,
-              foregroundColor: AppColor.onPrimary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+
+      child: Builder(
+        builder: (context) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'Trivvy',
+            scaffoldMessengerKey: context.read<NotificationProvider>().messengerKey,
+            theme: ThemeData(
+              fontFamily: 'Onest',
+              primarySwatch: createMaterialColor(AppColor.primary),
+              primaryColor: AppColor.primary,
+              scaffoldBackgroundColor: AppColor.background,
+              appBarTheme: AppBarTheme(
+                backgroundColor: AppColor.primary,
+                iconTheme: IconThemeData(color: AppColor.onPrimary),
+                titleTextStyle: TextStyle(
+                  color: AppColor.onPrimary,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              floatingActionButtonTheme: FloatingActionButtonThemeData(
+                backgroundColor: AppColor.secundary,
+                foregroundColor: AppColor.onPrimary,
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.secundary,
+                  foregroundColor: AppColor.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              iconTheme: IconThemeData(color: AppColor.primary),
+              colorScheme: ColorScheme.fromSwatch(
+                primarySwatch: createMaterialColor(AppColor.primary),
+              ).copyWith(secondary: AppColor.accent),
+              pageTransitionsTheme: const PageTransitionsTheme(
+                builders: {
+                  TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+                  TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+                },
               ),
             ),
-          ),
-          iconTheme: IconThemeData(color: AppColor.primary),
-          colorScheme: ColorScheme.fromSwatch(
-            primarySwatch: createMaterialColor(AppColor.primary),
-          ).copyWith(secondary: AppColor.accent),
-          pageTransitionsTheme: const PageTransitionsTheme(
-            builders: {
-              TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
-              TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+            initialRoute: '/dashboard',
+            routes: {
+              '/dashboard': (context) => DashboardPage(),
+              // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
+              '/create': (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                Quiz? template;
+                bool explicitClear = false;
+                if (args is Quiz) template = args;
+                if (args is Map && args['clear'] == true) explicitClear = true;
+                // Si no se pasa plantilla, limpiamos cualquier quiz en edición previo
+                // cuando se pida explícitamente limpiar (via FAB / create),
+                // o cuando no haya un `currentQuiz` establecido, o cuando el
+                // `currentQuiz` tenga un id vacío (indica una instancia local
+                // que no debe reutilizarse para una nueva creación).
+                final quizBloc = Provider.of<QuizEditorBloc>(
+                  context,
+                  listen: false,
+                );
+                final shouldClear =
+                    template == null &&
+                    (explicitClear ||
+                        quizBloc.currentQuiz == null ||
+                        (quizBloc.currentQuiz?.quizId.isEmpty ?? false));
+                if (shouldClear) {
+                  quizBloc.clear();
+                }
+                return QuizEditorPage(template: template);
+              },
+              '/questionEditor': (context) {
+                final args =
+                    ModalRoute.of(context)!.settings.arguments
+                        as Map<String, String>;
+                return QuestionEditorPage(
+                  quizId: args['quizId']!,
+                  questionId: args['questionId']!,
+                );
+              },
+              '/templateSelector': (context) => TemplateSelectorPage(),
+              //Comentoados por ahora
+              //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
+              //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
+              '/discover': (context) => const DiscoverScreen(),
+              '/library': (context) => LibraryPage(),
+              '/kahoots-category': (context) => const KahootsCategoryPage(),
+              '/kahoot-detail': (context) => const KahootDetailPage(),
+              '/persona': (context) => const PersonaPage(),
+              '/admin': (context) => const AdminPage(),
+              '/admin/users': (context) => const UserManagementPage(),
+              '/admin/categories': (context) => const CategoryManagementPage(),
+              '/admin/notifications': (context) => const NotificationAdminPage(),
+              '/notifications-history': (context) => const NotificationsHistoryPage(),
             },
-          ),
-        ),
-        initialRoute: '/dashboard',
-        routes: {
-          '/dashboard': (context) => DashboardPage(),
-          // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
-          '/create': (context) {
-            final args = ModalRoute.of(context)?.settings.arguments;
-            Quiz? template;
-            bool explicitClear = false;
-            if (args is Quiz) template = args;
-            if (args is Map && args['clear'] == true) explicitClear = true;
-            // Si no se pasa plantilla, limpiamos cualquier quiz en edición previo
-            // cuando se pida explícitamente limpiar (via FAB / create),
-            // o cuando no haya un `currentQuiz` establecido, o cuando el
-            // `currentQuiz` tenga un id vacío (indica una instancia local
-            // que no debe reutilizarse para una nueva creación).
-            final quizBloc = Provider.of<QuizEditorBloc>(
-              context,
-              listen: false,
-            );
-            final shouldClear =
-                template == null &&
-                (explicitClear ||
-                    quizBloc.currentQuiz == null ||
-                    (quizBloc.currentQuiz?.quizId.isEmpty ?? false));
-            if (shouldClear) {
-              quizBloc.clear();
-            }
-            return QuizEditorPage(template: template);
-          },
-          '/questionEditor': (context) {
-            final args =
-                ModalRoute.of(context)!.settings.arguments
-                    as Map<String, String>;
-            return QuestionEditorPage(
-              quizId: args['quizId']!,
-              questionId: args['questionId']!,
-            );
-          },
-          '/templateSelector': (context) => TemplateSelectorPage(),
-          //Comentoados por ahora
-          //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
-          //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
-          '/discover': (context) => const DiscoverScreen(),
-          '/library': (context) => LibraryPage(),
-          '/kahoots-category': (context) => const KahootsCategoryPage(),
-          '/kahoot-detail': (context) => const KahootDetailPage(),
-          '/persona': (context) => const PersonaPage(),
-          '/admin': (context) => const AdminPage(),
-          '/admin/users': (context) => const UserManagementPage(),
-          '/admin/categories': (context) => const CategoryManagementPage(),
-          '/admin/notifications': (context) => const NotificationAdminPage()
-        },
-        home: DashboardPage(), //Pagina inicial
+            home: DashboardPage(), //Pagina inicial
+          );
+        }
       ),
     );
   }
