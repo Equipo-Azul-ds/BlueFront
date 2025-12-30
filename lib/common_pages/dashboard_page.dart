@@ -635,6 +635,11 @@ class _HomePageContentState extends State<HomePageContent> {
   Widget build(BuildContext context) {
     // Obtener el bloc si es necesario en el futuro
     final quizBloc = Provider.of<QuizEditorBloc>(context);
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    final user = auth.currentUser;
+    final displayName = (user != null && user.name.trim().isNotEmpty)
+        ? user.name.trim()
+        : (user?.userName ?? 'Jugador');
     // Si el navegador pasó un cuestionario creado como argumento, se inserta en userQuizzes
     //para que sea visible inmediatamente sin llamar al backend.
     final args = ModalRoute.of(context)?.settings.arguments;
@@ -833,7 +838,7 @@ class _HomePageContentState extends State<HomePageContent> {
                               children: [
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Hola, Jugador!',
+                                  'Hola, $displayName!',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: constraints.maxWidth * 0.07,
