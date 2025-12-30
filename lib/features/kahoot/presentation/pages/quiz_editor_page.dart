@@ -757,7 +757,12 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                             // Texto de la pregunta (usando controller persistente para preservar cursor)
                             TextField(
                               controller: _questionController,
+                              enabled: (selectedQuestion.mediaUrl == null || selectedQuestion.mediaUrl!.isEmpty),
                               onChanged: (val) {
+                                if (selectedQuestion.mediaUrl != null && selectedQuestion.mediaUrl!.isNotEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Borra la imagen para editar el texto.')));
+                                  return;
+                                }
                                 final q = selectedQuestion;
                                 final updated = Q.Question(
                                   questionId: q.questionId,
@@ -849,6 +854,11 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
                             // Subir imagen para la pregunta
                             media.MediaUpload(onMediaSelected: (file) async {
+                              // Si hay texto, no permitir subir imagen hasta que se borre
+                              if (_questionController.text.trim().isNotEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Borra el texto de la pregunta antes de agregar una imagen.')));
+                                return;
+                              }
                               final q = selectedQuestion;
                               final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
                               try {
