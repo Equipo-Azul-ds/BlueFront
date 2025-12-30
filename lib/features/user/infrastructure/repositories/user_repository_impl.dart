@@ -99,8 +99,11 @@ class UserRepositoryImpl implements UserRepository {
                   user.avatarUrl.startsWith('https://')))
           ? user.avatarUrl
           : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(user.userName)}&background=0D47A1&color=fff',
-      if (user.name.isNotEmpty) 'name': user.name,
+      'name': user.name.trim(),
     };
+    // Debug: confirma que el nombre se está enviando en el body
+    // ignore: avoid_print
+    print('[user_repository] create body name="${body['name']}" userName="${body['userName']}"');
     // Debug ligero para diagnosticar errores del backend
     // Nota: no imprime la contraseña en claro, solo el hash.
     // Puedes retirar esto en producción si no lo necesitas.

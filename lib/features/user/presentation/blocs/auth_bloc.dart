@@ -141,6 +141,8 @@ class AuthBloc extends ChangeNotifier {
     return _run<User?>(() async {
       final id = const Uuid().v4();
       final hashed = BCrypt.hashpw(password, BCrypt.gensalt());
+      // Usa exactamente el nombre que el usuario ingresó en el formulario (ya validado como no vacío)
+      final safeName = name.trim();
       final safeAvatar = avatarUrl.trim().isEmpty
           ? 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName)}&background=0D47A1&color=fff'
           : avatarUrl.trim();
@@ -152,7 +154,7 @@ class AuthBloc extends ChangeNotifier {
           hashedPassword: hashed,
           userType: userType,
           avatarUrl: safeAvatar,
-          name: name,
+          name: safeName,
         ),
       );
       // Luego busca al usuario recién creado (mock) para setear currentUser
@@ -160,6 +162,27 @@ class AuthBloc extends ChangeNotifier {
       currentUser = createdUser;
       await storage.write('currentUserId', createdUser.id);
       await storage.write('hashedPassword', hashed);
+
+      // Si por alguna razón el backend devolvió name vacío, fuerza un PATCH inmediato con name e invariantes.
+      if (createdUser.name.trim().isEmpty && safeName.isNotEmpty) {
+        // ignore: avoid_print
+        print('[auth] signup detected empty name, patching with safeName="$safeName"');
+        currentUser = await updateSettings(
+          UpdateUserSettingsParams(
+            userName: createdUser.userName,
+            email: createdUser.email,
+            name: safeName,
+            description: createdUser.description,
+            avatarUrl: createdUser.avatarUrl,
+            userType: createdUser.userType,
+            hashedPassword: hashed,
+            theme: createdUser.theme,
+            language: createdUser.language,
+            gameStreak: createdUser.gameStreak,
+          ),
+        );
+      }
+
       return currentUser;
     });
   }

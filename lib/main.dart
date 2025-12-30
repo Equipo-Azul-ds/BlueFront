@@ -255,6 +255,8 @@ class MyApp extends StatelessWidget {
             }
             return ProfilePage(user: user);
           },
+          // Ruta explícita para la vista de bienvenida
+          '/welcome': (context) => const AccessGatePage(),
           // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
           '/create': (context) {
             final args = ModalRoute.of(context)?.settings.arguments;

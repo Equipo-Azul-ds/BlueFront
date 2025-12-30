@@ -5,6 +5,7 @@ import '../../domain/entities/User.dart';
 import '../blocs/auth_bloc.dart';
 import 'avatar_picker_page.dart';
 import '../../../library/presentation/providers/library_provider.dart';
+import '../pages/access_gate_page.dart';
 
 class ProfilePage extends StatefulWidget {
   final User user;
@@ -221,7 +222,7 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: AppColor.primary,
         actions: [
           TextButton(
-            onPressed: auth.isLoading ? null : () => _logout(auth),
+            onPressed: auth.isLoading ? null : () => _confirmLogout(auth),
             child: const Text('Cerrar sesión', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -267,10 +268,27 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  void _logout(AuthBloc auth) async {
-    await auth.logout();
-    if (!mounted) return;
-    Navigator.of(context).pop();
+  Future<void> _confirmLogout(AuthBloc auth) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cerrar sesión'),
+        content: const Text('¿Seguro que deseas cerrar sesión?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sí')),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await auth.logout();
+      if (!mounted) return;
+      // Usa el Navigator raíz para reemplazar toda la app stack por la vista de bienvenida
+      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+        '/welcome',
+        (route) => false,
+      );
+    }
   }
 
   Widget _header(User u) {

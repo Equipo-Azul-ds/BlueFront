@@ -1296,6 +1296,17 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Si no hay usuario (tras logout), redirige inmediatamente a la pantalla de bienvenida
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    if (auth.currentUser == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context, rootNavigator: true)
+            .pushNamedAndRemoveUntil('/welcome', (route) => false);
+      });
+      // Devuelve un contenedor vacío mientras se realiza la navegación
+      return const SizedBox.shrink();
+    }
     return Scaffold(
       backgroundColor: AppColor.background,
       body: IndexedStack(index: _currentIndex, children: _buildPages(context)),
