@@ -50,8 +50,9 @@ class _HomePageContentState extends State<HomePageContent> {
         // Se intenta cargar los quizzes del usuario. Si no hay un authorId en currentQuiz,
         // utiliza un authorId de prueba por defecto para que el Dashboard muestre
         // los quizzes creados durante el desarrollo o pruebas.
+        final auth = Provider.of<AuthBloc>(context, listen: false);
         const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
-        var authorIdCandidate = quizBloc.currentQuiz?.authorId ?? '';
+        var authorIdCandidate = auth.currentUser?.id ?? quizBloc.currentQuiz?.authorId ?? '';
         if (authorIdCandidate.isEmpty) authorIdCandidate = defaultTestAuthorId;
 
         setState(() => _loadingUserQuizzes = true);
@@ -440,13 +441,16 @@ class _HomePageContentState extends State<HomePageContent> {
                             // Realizar una petición POST para crear la copia del quiz en el backend (se construye el DTO a continuación)
                             Navigator.of(ctx).pop();
 
+                            final auth = Provider.of<AuthBloc>(context, listen: false);
                             const defaultTestAuthorId =
-                                'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+                              'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
                             final authorIdCandidate =
-                                (q.authorId.isEmpty ||
-                                    q.authorId.contains('placeholder'))
+                              (auth.currentUser?.id ?? '').isNotEmpty
+                                ? auth.currentUser!.id
+                                : ((q.authorId.isEmpty ||
+                                  q.authorId.contains('placeholder'))
                                 ? defaultTestAuthorId
-                                : q.authorId;
+                                : q.authorId);
 
                             // Mapear preguntas y respuestas a los DTOs Create* para la petición de duplicado.
                             // NO se generan ni se reasignan IDs aquí: el backend debe asignar los nuevos identificadores.
@@ -996,6 +1000,11 @@ class _HomePageContentState extends State<HomePageContent> {
                         }
                       }
 
+                      final auth = Provider.of<AuthBloc>(context, listen: false);
+                      final authorName = (auth.currentUser?.id == q.authorId && (auth.currentUser?.name.isNotEmpty ?? false))
+                          ? auth.currentUser!.name
+                          : q.authorId;
+
                       return GestureDetector(
                         onLongPress: () async {
                           if (coverId != null && !coverId.startsWith('http')) {
@@ -1022,6 +1031,7 @@ class _HomePageContentState extends State<HomePageContent> {
                         },
                         child: KahootCard(
                           kahoot: q,
+                          authorNameOverride: authorName,
                           coverBytes: cachedBytes,
                           coverUrlOverride: cachedUrlOverride,
                           onTap: () => _showQuizOptions(context, q),
@@ -1136,8 +1146,13 @@ class _HomePageContentState extends State<HomePageContent> {
                 childCount: recommendedKahoots.length,
                 itemBuilder: (context, index) {
                   final kahoot = recommendedKahoots[index];
+                  final auth = Provider.of<AuthBloc>(context, listen: false);
+                  final authorName = (auth.currentUser?.id == kahoot.authorId && (auth.currentUser?.name.isNotEmpty ?? false))
+                      ? auth.currentUser!.name
+                      : kahoot.authorId;
                   return KahootCard(
                     kahoot: kahoot,
+                    authorNameOverride: authorName,
                     onTap: () => Navigator.pushNamed(
                       context,
                       '/gameDetail',
