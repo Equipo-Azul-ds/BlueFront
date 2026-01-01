@@ -47,6 +47,16 @@ import 'features/library/presentation/pages/library_page.dart';
 import 'features/library/presentation/pages/kahoots_category_page.dart';
 import 'features/library/presentation/pages/kahoot_detail_page.dart';
 
+import 'features/subscriptions/domain/repositories/subscription_repository.dart';
+import 'features/subscriptions/application/usecases/subscribe_user_usecase.dart';
+import 'features/subscriptions/application/usecases/get_subscription_status_usecase.dart';
+import 'features/subscriptions/application/usecases/cancel_subscription_usecase.dart';
+import 'features/subscriptions/infrastructure/repositories/simulated_subscription_repository.dart';
+import 'features/subscriptions/infrastructure/repositories/subscription_repository_impl.dart';
+import 'features/subscriptions/presentation/provider/subscription_provider.dart';
+import 'features/subscriptions/presentation/screens/plans_screen.dart';
+import 'features/subscriptions/presentation/screens/subscription_management_screen.dart';
+
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
 const String apiBaseUrl = String.fromEnvironment(
@@ -197,6 +207,33 @@ class MyApp extends StatelessWidget {
             getKahootProgress: context.read<GetKahootProgressUseCase>(),
           ),
         ),
+        //Epica Suscripción
+        Provider<ISubscriptionRepository>(
+          create: (_) => SimulatedSubscriptionRepository(),
+        ),
+        Provider<SubscribeUserUseCase>(
+          create: (context) =>
+              SubscribeUserUseCase(context.read<ISubscriptionRepository>()),
+        ),
+        Provider<GetSubscriptionStatusUseCase>(
+          create: (context) => GetSubscriptionStatusUseCase(
+            context.read<ISubscriptionRepository>(),
+          ),
+        ),
+        Provider<CancelSubscriptionUseCase>(
+          create: (context) => CancelSubscriptionUseCase(
+            context.read<ISubscriptionRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider<SubscriptionProvider>(
+          create: (context) => SubscriptionProvider(
+            subscribeUserUseCase: context.read<SubscribeUserUseCase>(),
+            getSubscriptionStatusUseCase: context
+                .read<GetSubscriptionStatusUseCase>(),
+            cancelSubscriptionUseCase: context
+                .read<CancelSubscriptionUseCase>(),
+          ),
+        ),
       ],
 
       child: MaterialApp(
@@ -286,6 +323,9 @@ class MyApp extends StatelessWidget {
           '/library': (context) => LibraryPage(), // Agregar si existe
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),
+          '/subscriptions': (context) => const PlansScreen(),
+          '/subscription-management': (context) =>
+              const SubscriptionManagementScreen(),
         },
         home: DashboardPage(), //Pagina inicial
       ),

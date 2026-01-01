@@ -18,6 +18,10 @@ import '../features/kahoot/domain/entities/Quiz.dart';
 import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import '../features/media/presentation/blocs/media_editor_bloc.dart';
 import '../features/library/presentation/pages/library_page.dart';
+import '../features/library/presentation/providers/library_provider.dart';
+
+import 'package:Trivvy/features/subscriptions/presentation/utils/subscription_guard.dart';
+import 'package:Trivvy/features/subscriptions/presentation/screens/subscription_gate_page.dart';
 
 class HomePageContent extends StatefulWidget {
   const HomePageContent({super.key});
@@ -1267,9 +1271,7 @@ class _DashboardPageState extends State<DashboardPage> {
     ), // 1: Descubre (Placeholder)
     SizedBox.shrink(), // 2: Placeholder for FAB
     LibraryPage(), // 3: Biblioteca (Épica 7)
-    Scaffold(
-      body: Center(child: Text('Perfil Page')),
-    ), // 4: Perfil (Placeholder)
+    SubscriptionGatePage(), // 4: Perfil (Placeholder) Como no está perfil estoy probando aqui la suscripción
   ];
 
   void _onItemTapped(int index) {
@@ -1293,6 +1295,24 @@ class _DashboardPageState extends State<DashboardPage> {
       body: IndexedStack(index: _currentIndex, children: _pages),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
+          // Obtenemos el LibraryProvider (listen: false porque estamos en una función)
+          final libraryProvider = Provider.of<LibraryProvider>(
+            context,
+            listen: false,
+          );
+
+          // Obtenemos el total de Kahoots creados
+          final totalCreados = libraryProvider.createdKahoots.length;
+
+          // Aplicamos el Guard: Si devuelve 'false', el Guard ya mostró el diálogo y cortamos aquí.
+          if (!SubscriptionGuard.checkLimit(
+            context,
+            currentCount: totalCreados,
+            maxFree: 1,
+            itemName: 'Kahoots',
+          )) {
+            return; // Detenemos la ejecución
+          }
           // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo
           final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
           quizBloc.clear();

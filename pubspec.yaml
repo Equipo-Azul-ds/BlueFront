@@ -67,11 +67,13 @@ dependencies:
   # Escáner de códigos QR/cámara
   mobile_scanner: ^5.0.2
   path_provider: ^2.0.14
+  intl: ^0.20.2
   
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  mocktail: ^1.0.0
 
   # The "flutter_lints" package below contains a set of recommended lints...
   flutter_lints: ^6.0.0
