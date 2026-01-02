@@ -11,6 +11,9 @@ import '../application/get_user_by_name_usecase.dart';
 import '../application/update_user_settings_usecase.dart';
 import '../presentation/blocs/auth_bloc.dart';
 import '../../../local/secure_storage.dart';
+import '../../groups/domain/repositories/GroupRepository.dart';
+import '../../groups/infrastructure/repositories/group_repository_impl.dart';
+import '../../groups/presentation/blocs/groups_bloc.dart';
 
 class UserProviders extends StatelessWidget {
   final Widget child;
@@ -33,7 +36,7 @@ class UserProviders extends StatelessWidget {
             };
           };
 
-          final repo = UserRepositoryImpl(
+          final userRepo = UserRepositoryImpl(
             baseUrl: baseUrl,
             headersProvider: headersProvider,
             currentUserIdProvider: () async => await storage.read('currentUserId'),
@@ -41,16 +44,43 @@ class UserProviders extends StatelessWidget {
           );
 
           return AuthBloc(
-            repository: repo,
-            createUser: CreateUserUseCase(repo),
-            editUser: EditUserUseCase(repo),
-            getCurrentUser: GetCurrentUserUseCase(repo),
-            getUserByName: GetUserByNameUseCase(repo),
-            updateSettings: UpdateUserSettingsUseCase(repo),
+            repository: userRepo,
+            createUser: CreateUserUseCase(userRepo),
+            editUser: EditUserUseCase(userRepo),
+            getCurrentUser: GetCurrentUserUseCase(userRepo),
+            getUserByName: GetUserByNameUseCase(userRepo),
+            updateSettings: UpdateUserSettingsUseCase(userRepo),
             storage: storage,
           );
         },
-        child: child,
+        child: MultiProvider(
+          providers: [
+            Provider<GroupRepository>(
+              create: (context) {
+                final storage = SecureStorage.instance;
+                final headersProvider = () async {
+                  final token = await storage.read('token');
+                  return {
+                    if (token != null) 'Authorization': 'Bearer $token',
+                    'Accept': 'application/json',
+                  };
+                };
+                return GroupRepositoryImpl(
+                  baseUrl: baseUrl,
+                  headersProvider: headersProvider,
+                  client: http.Client(),
+                );
+              },
+            ),
+            ChangeNotifierProvider<GroupsBloc>(
+              create: (context) => GroupsBloc(
+                repository: context.read<GroupRepository>(),
+                auth: context.read<AuthBloc>(),
+              ),
+            ),
+          ],
+          child: child,
+        ),
       ),
     );
   }
