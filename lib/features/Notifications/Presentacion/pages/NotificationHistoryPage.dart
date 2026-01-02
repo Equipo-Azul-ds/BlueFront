@@ -4,8 +4,22 @@ import '../../../../core/constants/colors.dart';
 import '../Provider/NotificationProvider.dart';
 
 
-class NotificationsHistoryPage extends StatelessWidget {
+class NotificationsHistoryPage extends StatefulWidget {
   const NotificationsHistoryPage({super.key});
+
+  @override
+  State<NotificationsHistoryPage> createState() => _NotificationsHistoryPageState();
+}
+
+class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().fetchHistory();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,6 +32,20 @@ class NotificationsHistoryPage extends StatelessWidget {
         backgroundColor: AppColor.primary,
         foregroundColor: AppColor.onPrimary,
         elevation: 0,
+        actions: [
+          // Botón de Activar
+          IconButton(
+            icon: const Icon(Icons.notifications_active, color: Colors.greenAccent),
+            tooltip: 'Activar Notificaciones',
+            onPressed: () => provider.enableNotifications(),
+          ),
+          // Botón de Desactivar
+          IconButton(
+            icon: const Icon(Icons.notifications_off, color: Colors.redAccent),
+            tooltip: 'Desactivar Notificaciones',
+            onPressed: () => provider.disableNotifications(),
+          ),
+        ],
       ),
       body: provider.history.isEmpty
           ? const Center(

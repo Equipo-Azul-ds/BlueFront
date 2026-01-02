@@ -69,8 +69,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
-// Por defecto apunta al backend desplegado en Railway
-// API base railway: 'https://backcomun-production.up.railway.app'
+// Por defecto apunta al backend desplegado en Render
+// API base railway: 'https://backcomun-gc5j.onrender.com/'
+// https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: 'https://backcomun-gc5j.onrender.com/',
@@ -105,7 +106,7 @@ class MyApp extends StatelessWidget {
 
         Provider<IUserDataSource>(
           create: (context) => UserRemoteDataSourceImpl( // Usa 'context' aquí
-            baseUrl2: apiBaseUrl,
+            baseUrl: apiBaseUrl,
             cliente: context.read<http.Client>(), // Ahora buscará al Provider<http.Client> de arriba
           ),
         ),

@@ -13,15 +13,9 @@ class NotificationProvider extends ChangeNotifier {
 
   NotificationProvider({required this.repository});
   // Historial con la estructura de la entidad
-  final List<NotificationEntity> _history = [
-    NotificationEntity(
-      id: '1',
-      type: 'admin_notification',
-      message: 'Mantenimiento preventivo el viernes',
-      isRead: true,
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-  ];
+  List<NotificationEntity> _history = [];
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
 
   bool _isSending = false;
 
@@ -99,7 +93,7 @@ class NotificationProvider extends ChangeNotifier {
     messengerKey.currentState?.showSnackBar(snackBar);
   }
 
-  /// Registra el token FCM en el servidor usando el DTO RegisterDeviceDto
+
   Future<void> registerDeviceToken(String fcmToken) async {
     try {
       // Se envía el token y el deviceType 'android' como indica el esqueleto JSON
@@ -111,8 +105,6 @@ class NotificationProvider extends ChangeNotifier {
   }
 
 
-
-  /// Elimina el token
   Future<void> logoutDevice(String fcmToken) async {
     try {
       await repository.unregisterToken(fcmToken); // [cite: 4]
@@ -123,17 +115,21 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> fetchHistory() async {
+    _isLoading = true;
+    notifyListeners();
+
     try {
-      final List<dynamic> data = await repository.getHistory();
-      _history.clear();
-      _history.addAll(data.map((json) => NotificationEntity.fromJson(json)).toList());
-      notifyListeners();
+      final data = await repository.getHistory();
+      _history = data;
+      print("Historial cargado: ${_history.length} elementos");
     } catch (e) {
-      print("Error al cargar historial: $e");
+      print("Error real al cargar historial: $e");
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
-  /// Acción implícita: Marcar como leída
   Future<void> markAsRead(String id) async {
     try {
       await repository.markAsRead(id); //
@@ -148,16 +144,30 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Implementación PROPIA de envío de administrador (No simulación)
+  Future<void> enableNotifications() async {
+    String? token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      await registerDeviceToken(token); // Llama al POST /notifications/register-device
+      notifyListeners();
+    }
+  }
+
+  Future<void> disableNotifications() async {
+    String? token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      await logoutDevice(token); // Llama al DELETE /notifications/unregister-device
+      notifyListeners();
+    }
+  }
+
+
   Future<bool> sendAdminNotification(String messageText) async {
     try {
       _isSending = true;
       notifyListeners();
 
-      // Llamada real al backend
       await repository.sendAdminNotification(messageText);
 
-      // Opcional: Recargar historial tras enviar
       await fetchHistory();
 
       _isSending = false;
@@ -166,6 +176,7 @@ class NotificationProvider extends ChangeNotifier {
     } catch (e) {
       _isSending = false;
       notifyListeners();
+      print("Error en envío: $e");
       return false;
     }
   }
@@ -174,7 +185,7 @@ class NotificationProvider extends ChangeNotifier {
     // 1. Creamos un objeto que simule la estructura de RemoteMessage de Firebase
     // Basado en el tipo de notificación del backend
     final String mockTitle = "Aviso del Sistema";
-    final String mockBody = "¡Prueba de notificación exitosa con tus colores!";
+    final String mockBody = "¡Prueba de notificación exitosa";
 
     // 2. Mostramos el SnackBar usando tus colores de AppColor
     final snackBar = SnackBar(

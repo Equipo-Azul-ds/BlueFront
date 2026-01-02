@@ -17,7 +17,6 @@ class NotificationEntity {
     this.resourceId,
   });
 
-  // --- AÑADE ESTE FACTORY CONSTRUCTOR ---
   factory NotificationEntity.fromJson(Map<String, dynamic> json) {
     return NotificationEntity(
       id: json['id'] as String, //
@@ -30,7 +29,6 @@ class NotificationEntity {
     );
   }
 
-  // Útil para enviar datos al servidor si fuera necesario
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -42,7 +40,6 @@ class NotificationEntity {
     };
   }
 
-  // Método copyWith para actualizar el estado (ej: marcar como leída)
   NotificationEntity copyWith({
     String? id,
     String? type,

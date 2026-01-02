@@ -19,7 +19,10 @@ class NotificationRemoteDataSource implements INotificationDataSource {
       body: jsonEncode({"token": token, "deviceType": deviceType}), //
     );
 
-    if (response.statusCode != 201) throw Exception('Error al registrar dispositivo'); //
+    if (response.statusCode != 201) {
+      throw Exception(
+        'Error al registrar dispositivo');
+    }
   }
 
   @override
@@ -27,19 +30,31 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     final response = await client.delete(
       Uri.parse('$baseUrl/notifications/unregister-device'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({"token": token}), // [cite: 4]
+      body: jsonEncode({"token": token}),
     );
 
-    if (response.statusCode != 204) throw Exception('Error al anular registro'); // [cite: 4]
+    if (response.statusCode != 204) {
+      throw Exception(
+        'Error al anular registro'); // [cite: 4]
+    }
   }
+
   @override
   Future<List<dynamic>> getNotificationHistory() async {
     final response = await client.get(
-      Uri.parse('$baseUrl/notifications'), //
-      headers: {'Authorization': 'Bearer YOUR_TOKEN'},
+      Uri.parse('$baseUrl/notifications'),
+      headers: {
+        'Content-Type': 'application/json',
+        // 'Authorization': 'Bearer ...'
+      },
     );
-    if (response.statusCode == 200) return jsonDecode(response.body); //
-    throw Exception('Error al recuperar historial');
+
+    if (response.statusCode == 200) {
+      // IMPORTANTE: Solo decodificar el JSON, no convertir a Entity aquí
+      return jsonDecode(response.body) as List<dynamic>;
+    } else {
+      throw Exception('Error al recuperar historial: ${response.statusCode}');
+    }
   }
 
   @override
@@ -58,13 +73,19 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     }
   }
 
-// Método real para el Administrador
   @override
   Future<void> sendAdminNotification(String message) async {
-    await client.post(
-      Uri.parse('$baseUrl/notifications/send-admin'), // Endpoint inferido para admin
-      headers: {'Content-Type': 'application/json'},
+    final response = await client.post(
+      Uri.parse('$baseUrl/notifications/send-admin'), // Endpoint real
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer YOUR_TOKEN', // Descomenta si tu API requiere token
+      },
       body: jsonEncode({"message": message}),
     );
+
+    if (response.statusCode != 201) {
+      throw Exception('Error al enviar notificación: ${response.body}');
+    }
   }
 }

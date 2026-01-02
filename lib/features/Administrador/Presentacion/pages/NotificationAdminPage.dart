@@ -12,22 +12,38 @@ class NotificationAdminPage extends StatefulWidget {
 class _NotificationAdminPageState extends State<NotificationAdminPage> {
   final _bodyController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<NotificationProvider>().fetchHistory();
+    });
+  }
+
   void _submit(NotificationProvider provider) async {
-    if ( _bodyController.text.isEmpty) {
+    if (_bodyController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Por favor escribe un mensaje')),
       );
       return;
     }
 
-    final success = await provider.sendAdminNotification(
-      _bodyController.text,
-    );
+    final success = await provider.sendAdminNotification(_bodyController.text);
 
     if (success && mounted) {
       _bodyController.clear();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notificación enviada con éxito (Simulado)')),
+        const SnackBar(
+          content: Text('Notificación enviada con éxito al servidor'),
+          backgroundColor: Colors.green, // Feedback visual de éxito
+        ),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error al conectar con el servidor'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -62,7 +78,7 @@ class _NotificationAdminPageState extends State<NotificationAdminPage> {
                     controller: _bodyController,
                     maxLines: 4,
                     decoration: const InputDecoration(
-                      labelText: 'Mensaje (Cuerpo)',
+                      labelText: 'Mensaje',
                       border: OutlineInputBorder(),
                     ),
                   ),

@@ -9,11 +9,10 @@ import '../../Dominio/entidad/User.dart';
 
 
 class UserRemoteDataSourceImpl implements IUserDataSource {
-  final String baseUrl = "https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io";
+  final String baseUrl;
   final http.Client cliente;
-  final String baseUrl2;
 
-  UserRemoteDataSourceImpl({required this.baseUrl2, required this.cliente}) {
+  UserRemoteDataSourceImpl({required this.baseUrl, required this.cliente}) {
     try {
       print('UserRemoteDataSource initialized with baseUrl=$baseUrl');
     } catch (_) {}

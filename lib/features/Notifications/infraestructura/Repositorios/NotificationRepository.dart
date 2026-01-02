@@ -10,11 +10,16 @@ class NotificationRepository implements INotificationRepository {
 
   @override
   Future<List<NotificationEntity>> getHistory() async {
-    // Llama al GET /notifications
+
     final List<dynamic> rawData = await dataSource.getNotificationHistory();
 
-    // Mapea la lista de DTOs a Entidades
-    return rawData.map((json) => NotificationEntity.fromJson(json)).toList();
+    return rawData.map((item) {
+      if (item is NotificationEntity) {
+        return item;
+      }
+      // Si es un Map (JSON crudo), lo convertimos
+      return NotificationEntity.fromJson(item as Map<String, dynamic>);
+    }).toList();
   }
 
   @override
