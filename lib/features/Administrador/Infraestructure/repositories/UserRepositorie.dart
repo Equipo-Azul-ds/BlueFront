@@ -1,5 +1,4 @@
 import 'package:dartz/dartz.dart';
-// Ajusta tus imports
 import '../../../../core/errors/failures.dart';
 import '../../../../core/errors/exception.dart';
 import '../../Aplication/DataSource/IUserDataSource.dart';
@@ -33,10 +32,11 @@ class UserRepositoryImpl implements IUserRepository {
       final pagination = response.pagination;
       final paginatedList = PaginatedUserList(
         users: users,
-        totalCount: pagination['totalCount'] as int,
-        totalPages: pagination['totalPages'] as int,
-        page: pagination['page'] as int,
-        limit: pagination['limit'] as int,
+        // Usamos int.tryParse o casting seguro por si vienen como Strings
+        totalCount: _toInt(pagination['totalCount']),
+        totalPages: _toInt(pagination['totalPages']),
+        page: _toInt(pagination['page']),
+        limit: _toInt(pagination['limit']),
       );
 
       try { print('UserRepositoryImpl.getUsers -> SUCCESS, ${users.length} users fetched'); } catch (_) {}
@@ -72,4 +72,10 @@ class UserRepositoryImpl implements IUserRepository {
       return Left(NetworkFailure());
     }
   }
+}
+
+int _toInt(dynamic value) {
+  if (value is int) return value;
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
 }

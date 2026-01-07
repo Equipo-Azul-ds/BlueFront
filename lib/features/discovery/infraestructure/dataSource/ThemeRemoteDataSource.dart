@@ -31,20 +31,9 @@ class ThemeRemoteDataSource implements IThemeRemoteDataSource {
       );
 
       if (response.statusCode == 200) {
-
-
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body) as Map<String, dynamic>;
-
-        // PASO 2: Extraer la lista de temas usando la clave "categories"
-        if (!jsonResponse.containsKey('categories')) {
-          throw ServerException(message: 'Respuesta de temas no contiene la clave "categories".');
-        }
-
-        final List<dynamic> jsonList = jsonResponse['categories'] as List<dynamic>;
-
-        // PASO 3: Pasar la lista extraída al DTO
-        print('ThemeRemoteDataSource.fetchThemes -> SUCCESS, extracted ${jsonList.length} categories.');
-        return ThemeListResponseDto.fromListJson(jsonList);
+        final dynamic jsonBody = jsonDecode(response.body);
+        
+        return ThemeListResponseDto.fromDynamicJson(jsonBody);
 
       } else {
         final msg = 'Fallo al cargar temas: ${response.statusCode} - ${response.body}';
@@ -58,52 +47,4 @@ class ThemeRemoteDataSource implements IThemeRemoteDataSource {
     }
   }
 
-  @override
-  Future<void> createTheme(String name) async {
-    final uri = Uri.parse('$baseUrl/explore/categories');
-    final response = await cliente.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer admin_token', // Sustituir por tu sistema de tokens
-      },
-      body: jsonEncode({'theme': name}),
-    );
-
-    if (response.statusCode != 201) {
-      throw ServerException(message: 'Error al crear el tema');
-    }
-  }
-
-  @override
-  Future<void> updateTheme(String categoryId, String name) async {
-    final uri = Uri.parse('$baseUrl/explore/categories/$categoryId');
-    final response = await cliente.patch(
-      uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer admin_token',
-      },
-      body: jsonEncode({'theme': name}),
-    );
-
-    if (response.statusCode != 200) {
-      throw ServerException(message: 'Error al actualizar el tema');
-    }
-  }
-
-  @override
-  Future<void> deleteTheme(String categoryId) async {
-    final uri = Uri.parse('$baseUrl/explore/categories/$categoryId');
-    final response = await cliente.delete(
-      uri,
-      headers: {
-        'Authorization': 'Bearer admin_token',
-      },
-    );
-
-    if (response.statusCode != 204) {
-      throw ServerException(message: 'Error al eliminar el tema');
-    }
-  }
 }

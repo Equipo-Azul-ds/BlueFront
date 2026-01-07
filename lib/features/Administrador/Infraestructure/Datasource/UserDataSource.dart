@@ -41,7 +41,7 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
   Future<PaginatedResponse> fetchUsers(UserQueryParams params) async {
     final uri = _buildUri(
       '/users',
-      params.toMap(), // toMap() contiene q, limit, page, orderBy, order
+      params.toMap(),
     );
 
     try {
@@ -52,17 +52,11 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
+        // 1. Decodificamos sin forzar el tipo Map
+        final dynamic jsonBody = json.decode(response.body);
 
-        final List<UserDto> users = (jsonResponse['data'] as List)
-            .map((item) => UserDto.fromJson(item as Map<String, dynamic>))
-            .toList();
-
-        return PaginatedResponse(
-          data: users,
-          pagination: jsonResponse['pagination'] as Map<String, dynamic>,
-        );
-
+        // 2. Usamos el factory flexible que creamos arriba
+        return PaginatedResponse.fromDynamicJson(jsonBody);
       } else if (response.statusCode == 400) {
         throw ServerException(message: "400: Parámetros de consulta inválidos.");
       } else {
@@ -77,7 +71,6 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
     }
   }
 
-  // Implementaciones dummy para otras funciones
   @override
   Future<UserEntity> toggleUserStatus(String userId, String status) async {
     final uri = Uri.parse('$baseUrl/users/$userId');

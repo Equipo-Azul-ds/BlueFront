@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../../Application/DTO/NotificationListResponseDTO.dart';
 import '../../Application/DataSource/INotificationDatasource.dart';
 
 
@@ -40,20 +41,38 @@ class NotificationRemoteDataSource implements INotificationDataSource {
   }
 
   @override
-  Future<List<dynamic>> getNotificationHistory() async {
-    final response = await client.get(
-      Uri.parse('$baseUrl/notifications'),
-      headers: {
-        'Content-Type': 'application/json',
-        // 'Authorization': 'Bearer ...'
+  Future<NotificationListResponseDto> getNotificationHistory({
+    int limit = 20,
+    int page = 1,
+  }) async {
+    // Construimos la URI con los parámetros de búsqueda
+    final uri = Uri.parse('$baseUrl/notifications').replace(
+      queryParameters: {
+        'limit': limit.toString(),
+        'page': page.toString(),
       },
     );
 
-    if (response.statusCode == 200) {
-      // IMPORTANTE: Solo decodificar el JSON, no convertir a Entity aquí
-      return jsonDecode(response.body) as List<dynamic>;
-    } else {
-      throw Exception('Error al recuperar historial: ${response.statusCode}');
+    try {
+      print('NotificationRemoteDataSource.getNotificationHistory -> GET $uri');
+
+      final response = await client.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          // 'Authorization': 'Bearer $token', // Agregar el token aquí
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic jsonBody = jsonDecode(response.body);
+        return NotificationListResponseDto.fromDynamicJson(jsonBody);
+      } else {
+        throw Exception('Error al recuperar historial: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error en getNotificationHistory: $e');
+      rethrow;
     }
   }
 
@@ -76,10 +95,10 @@ class NotificationRemoteDataSource implements INotificationDataSource {
   @override
   Future<void> sendAdminNotification(String message) async {
     final response = await client.post(
-      Uri.parse('$baseUrl/notifications/send-admin'), // Endpoint real
+      Uri.parse('$baseUrl/admin/notifications'), // Endpoint real
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer YOUR_TOKEN', // Descomenta si tu API requiere token
+        'Authorization': 'Bearer YOUR_TOKEN',
       },
       body: jsonEncode({"message": message}),
     );

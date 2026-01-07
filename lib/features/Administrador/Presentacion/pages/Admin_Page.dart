@@ -65,12 +65,12 @@ class AdminPage extends StatelessWidget {
               Icons.people_alt,
               '/admin/users', // Esta ruta ya coincide con la de main.dart
             ),
-            _buildAdminButton(
+            /*_buildAdminButton(
               context,
               'Gestión de Categorias',
               Icons.quiz,
               '/admin/categories',
-            ),
+            ),*/
             _buildAdminButton(
               context,
               'Gestión de Notificaciones',

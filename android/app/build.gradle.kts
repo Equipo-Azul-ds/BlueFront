@@ -20,8 +20,8 @@ dependencies {
 
 android {
     namespace = "com.example.trivvy"
-    //compileSdk = flutter.compileSdkVersion
-    compileSdk = 36
+    compileSdk = flutter.compileSdkVersion
+    //compileSdk = 36
     ndkVersion = flutter.ndkVersion
     //ndkVersion = "29.0.14206865"
 

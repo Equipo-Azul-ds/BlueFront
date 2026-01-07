@@ -111,6 +111,8 @@ class KahootListItem extends StatelessWidget {
                                   Text(
                                     source,
                                     style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   const SizedBox(width: 4),
                                   const Icon(Icons.check_circle, size: 12, color: Colors.blue),

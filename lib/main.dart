@@ -14,8 +14,10 @@ import 'features/Administrador/Infraestructure/Datasource/UserDataSource.dart';
 import 'features/Administrador/Infraestructure/repositories/UserRepositorie.dart';
 import 'features/Administrador/Presentacion/pages/Admin_Page.dart';
 import 'features/Administrador/Presentacion/pages/CategoryManagementPage.dart';
+import 'features/Administrador/Presentacion/pages/DashboardPage.dart';
 import 'features/Administrador/Presentacion/pages/Persona_Page.dart';
 import 'features/Administrador/Presentacion/pages/UserManagementPage.dart';
+import 'features/Administrador/Presentacion/provider/DashboardProvider.dart';
 import 'features/Notifications/Presentacion/Provider/NotificationProvider.dart';
 import 'features/Administrador/Presentacion/provider/CategotyManagementProvider.dart';
 import 'features/Administrador/Presentacion/provider/UserManagementProvider.dart';
@@ -70,11 +72,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Render
-// API base railway: 'https://backcomun-gc5j.onrender.com/'
+// API base 1: 'https://backcomun-gc5j.onrender.com/'
+// API base 2: https://quizzy-backend-0wh2.onrender.com/api
 // https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://backcomun-gc5j.onrender.com/',
+  defaultValue: 'https://quizzy-backend-0wh2.onrender.com/api',
 );
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -131,7 +134,6 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
-// 3. El Provider debe leer el UseCase
         ChangeNotifierProvider(
           create: (context) => UserManagementProvider(
             getUserListUseCase: context.read<GetUserListUseCase>(),
@@ -208,6 +210,21 @@ class MyApp extends StatelessWidget {
         Provider<GetSummaryUseCase>(
           create: (context) =>
               GetSummaryUseCase(context.read<SinglePlayerGameRepository>()),
+        ),
+
+        ChangeNotifierProxyProvider4<IDiscoverRepository, ThemeRepository, NotificationProvider, IUserRepository, DashboardProvider>(
+          create: (context) => DashboardProvider(
+            quizRepository: context.read<IDiscoverRepository>(),
+            themeRepository: context.read<ThemeRepository>(),
+            notificationRepository: context.read<NotificationProvider>().repository,
+            userRepository: context.read<IUserRepository>(),
+          ),
+          update: (context, quiz, theme, notif, user, previous) => DashboardProvider(
+            quizRepository: quiz,
+            themeRepository: theme,
+            notificationRepository: notif.repository,
+            userRepository: user,
+          )..loadDashboardData(),
         ),
 
 
@@ -406,9 +423,10 @@ class MyApp extends StatelessWidget {
               '/persona': (context) => const PersonaPage(),
               '/admin': (context) => const AdminPage(),
               '/admin/users': (context) => const UserManagementPage(),
-              '/admin/categories': (context) => const CategoryManagementPage(),
+              //'/admin/categories': (context) => const CategoryManagementPage(),
               '/admin/notifications': (context) => const NotificationAdminPage(),
               '/notifications-history': (context) => const NotificationsHistoryPage(),
+              '/admin/dashboard': (context) => const AdminDashboardPage(),
             },
             home: DashboardPage(), //Pagina inicial
           );

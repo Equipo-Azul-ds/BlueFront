@@ -58,8 +58,8 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        return KahootSearchResponseDto.fromJson(jsonResponse);
+        final dynamic jsonBody = json.decode(response.body);
+        return KahootSearchResponseDto.fromDynamicJson(jsonBody);
       } else if (response.statusCode == 400) {
         // Correcto manejo del 400 Bad Request
         throw ServerException(message: "400: Parámetros de búsqueda inválidos.");
@@ -95,8 +95,9 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonBody = json.decode(response.body);
-        return KahootSearchResponseDto.fromJson(jsonBody);
+        final dynamic jsonBody = json.decode(response.body);
+
+        return KahootSearchResponseDto.fromDynamicJson(jsonBody);
       } else {
         final msg = 'Error al recuperar Kahoots destacados: ${response.statusCode} - ${response.body}';
         print('KahootRemoteDataSource.fetchFeaturedKahoots -> $msg');

@@ -5,13 +5,7 @@ import '../dtos/userDTO.dart';
 import '../dtos/user_query_params.dart';
 
 
-// Modelo de respuesta para la paginación que maneja el UserDataSource.dart
-class PaginatedResponse {
-  final List<UserDto> data;
-  final Map<String, dynamic> pagination;
 
-  PaginatedResponse({required this.data, required this.pagination});
-}
 
 abstract class IUserDataSource {
   // Retorna el objeto de respuesta paginado (que contiene los DTOs)

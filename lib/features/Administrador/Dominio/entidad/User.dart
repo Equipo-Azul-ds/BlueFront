@@ -1,5 +1,5 @@
 enum UserStatus { active, blocked }
-enum UserType { student, teacher, admin }
+enum UserType { user, student, teacher, admin }
 
 class UserEntity {
   final String id;

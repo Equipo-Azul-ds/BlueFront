@@ -43,33 +43,4 @@ class ThemeRepository implements IThemeRepository {
     }
   }
 
-  @override
-  Future<Either<Failure, void>> createTheme(String name) async {
-    try {
-      await remoteDataSource.createTheme(name);
-      return const Right(null);
-    } catch (e) {
-      return Left(UnknownFailure(detail: e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, void>> updateTheme(String id, String name) async {
-    try {
-      await remoteDataSource.updateTheme(id, name);
-      return const Right(null);
-    } catch (e) {
-      return Left(UnknownFailure(detail: e.toString()));
-    }
-  }
-
-  @override
-  Future<Either<Failure, void>> deleteTheme(String id) async {
-    try {
-      await remoteDataSource.deleteTheme(id);
-      return const Right(null);
-    } catch (e) {
-      return Left(UnknownFailure(detail: e.toString()));
-    }
-  }
 }
