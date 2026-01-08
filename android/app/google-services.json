@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "437076464594",
+    "project_id": "trivvy-9bef9",
+    "storage_bucket": "trivvy-9bef9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:437076464594:android:27c1ee1bc07f631e4bee0b",
+        "android_client_info": {
+          "package_name": "com.example.trivvy"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAv3DI_B2-Z5QG-yYYumN411Z40yi9Htd4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

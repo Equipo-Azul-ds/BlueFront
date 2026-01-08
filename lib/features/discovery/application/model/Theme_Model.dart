@@ -2,7 +2,7 @@ import '../../domain/entities/theme.dart';
 
 
 
-class ThemeModel extends ThemeEntity {
+class ThemeModel extends ThemeVO {
 
   const ThemeModel({
     required super.name,
@@ -16,8 +16,8 @@ class ThemeModel extends ThemeEntity {
     );
   }
 
-  ThemeEntity toEntity() {
-    return ThemeEntity(
+  ThemeVO toEntity() {
+    return ThemeVO(
       name: name,
     );
   }
