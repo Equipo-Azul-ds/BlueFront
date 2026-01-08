@@ -77,7 +77,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 // https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://quizzy-backend-0wh2.onrender.com/api',
+  defaultValue: 'https://backcomun-gc5j.onrender.com/',
 );
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
