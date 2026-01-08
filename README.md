@@ -77,4 +77,4 @@ flutter build web --release --web-renderer html --dart-define=API_BASE_URL=https
 - Para iOS, abre `ios/Runner.xcworkspace` y verifica firma de código.
 
 ## Autores
-Massiel Perozo, Israel Mejias, Daila Arcia, Alejandro Seijas y Jose Briceño (Backend)
+Massiel Perozo, Israel Mejias, Daila Arcia, Alejandro Seijas, Jose Briceño (Backend) y Daniel Garcia (Backend)
