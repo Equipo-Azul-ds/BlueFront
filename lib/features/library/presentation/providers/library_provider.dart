@@ -18,7 +18,7 @@ class LibraryProvider with ChangeNotifier {
   final UpdateKahootProgressUseCase _updateProgress;
   final GetKahootProgressUseCase _getKahootProgress;
 
-  final String _testUserId = '33db2a9f-ed60-4161-ab98-b7cd8b079fa7';
+  final String _testUserId = 'massielprueba';
   String get userId => _testUserId;
   LibraryProvider({
     required GetCreatedKahootsUseCase getCreated,
@@ -72,6 +72,8 @@ class LibraryProvider with ChangeNotifier {
 
       _state = LibraryState.loaded;
     } catch (e) {
+      _createdKahoots = [];
+      _favoriteKahoots = [];
       _state = LibraryState.error;
       debugPrint('Error al cargar listas de la biblioteca: $e');
     }

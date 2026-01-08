@@ -48,7 +48,7 @@ import 'features/library/presentation/pages/kahoot_detail_page.dart';
 // Por defecto apunta al backend desplegado en Railway
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://backcomun-production.up.railway.app',
+  defaultValue: 'https://backcomun-gc5j.onrender.com',
 );
 
 void main() {
