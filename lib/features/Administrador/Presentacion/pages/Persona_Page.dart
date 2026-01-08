@@ -47,18 +47,6 @@ class PersonaPage extends StatelessWidget {
 
             ElevatedButton.icon(
               onPressed: () {
-                context.read<NotificationProvider>().simulateIncomingNotification();
-              },
-              icon: const Icon(Icons.bug_report),
-              label: const Text('Simular Notificación Push'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColor.error, // Rojo para indicar que es de prueba
-                foregroundColor: Colors.white,
-              ),
-            ),
-
-            ElevatedButton.icon(
-              onPressed: () {
                 context.read<NotificationProvider>().printCurrentToken();
               },
               icon: const Icon(Icons.key),
