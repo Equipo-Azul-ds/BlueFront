@@ -9,16 +9,16 @@ import '../widget/KahootSearch.dart';
 
 final kDummyThemes = [
   ThemeEntity(
-      name: 'Matemáticas',
+    name: 'Matemáticas',
   ),
   ThemeEntity(
-      name: 'Historia',
+    name: 'Historia',
   ),
   ThemeEntity(
-      name: 'Ciencia',
+    name: 'Ciencia',
   ),
   ThemeEntity(
-      name: 'Arte',
+    name: 'Arte',
   ),
 ];
 
@@ -35,9 +35,8 @@ class DiscoverScreen extends StatefulWidget {
 class _DiscoverScreenState extends State<DiscoverScreen> {
 
   final TextEditingController _searchController = TextEditingController();
-  /*List<ThemeEntity> _themes = [];
-  bool _isLoading = true;
-  String? _error;*/
+  //List<ThemeEntity> _themes = [];
+  //bool _isLoading = true;
   List<ThemeEntity> _themes = kDummyThemes;
   bool _isLoading = false;
   String? _error;
@@ -46,7 +45,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   @override
   void initState() {
     super.initState();
-    //Future.microtask(() => _fetchThemes());
+    // Future.microtask(() => _fetchThemes());
 
     _searchController.addListener(_onSearchChanged);
   }

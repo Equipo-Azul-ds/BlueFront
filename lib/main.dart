@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+
+import 'core/constants/colors.dart';
+
 import 'features/discovery/domain/Repositories/IDiscoverRepository.dart';
 import 'features/discovery/infraestructure/dataSource/ThemeRemoteDataSource.dart';
 import 'features/discovery/infraestructure/dataSource/kahootRemoteDataSource.dart';
 import 'features/discovery/infraestructure/repositories/DiscoverRepository.dart';
 import 'features/discovery/infraestructure/repositories/ThemeRepository.dart';
 import 'features/discovery/presentation/pages/discover_page.dart';
-import 'core/constants/colors.dart';
+
 import 'common_pages/dashboard_page.dart';
 import 'features/challenge/domain/repositories/single_player_game_repository.dart';
 import 'features/challenge/infrastructure/repositories/single_player_game_repository_impl.dart';
@@ -43,6 +46,10 @@ import 'features/library/presentation/providers/library_provider.dart';
 import 'features/library/presentation/pages/library_page.dart';
 import 'features/library/presentation/pages/kahoots_category_page.dart';
 import 'features/library/presentation/pages/kahoot_detail_page.dart';
+import 'features/groups/presentation/pages/groups_page.dart';
+import 'features/user/presentation/user_providers.dart';
+import 'features/user/presentation/pages/access_gate_page.dart';
+import 'features/user/presentation/pages/profile_page.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
@@ -64,32 +71,6 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<http.Client>(create: (_) => http.Client()),
-
-        //Estos son los proveedores para los repositorios (inyeccion de dependencias)
-        Provider<ThemeRemoteDataSource>(
-          create: (context) => ThemeRemoteDataSource(
-            baseUrl: apiBaseUrl,
-            cliente: context.read<http.Client>(),
-          ),
-        ),
-        Provider<ThemeRepository>(
-          create: (context) => ThemeRepository(
-            remoteDataSource: context.read<ThemeRemoteDataSource>(),
-          ),
-        ),
-        Provider<KahootRemoteDataSource>(
-          create: (context) => KahootRemoteDataSource(
-            baseUrl: apiBaseUrl,
-            cliente: context.read<http.Client>(),
-          ),
-        ),
-        Provider<IDiscoverRepository>(
-          create: (context) => DiscoverRepository(
-            remoteDataSource: context.read<KahootRemoteDataSource>(),
-          ),
-        ),
-        //Blocs para el estado
         Provider<SlideProvider>(create: (_) => SlideProviderImpl()),
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
@@ -224,7 +205,9 @@ class MyApp extends StatelessWidget {
         ),
       ],
 
-      child: MaterialApp(
+      child: UserProviders(
+        baseUrl: apiBaseUrl,
+        child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Trivvy',
         theme: ThemeData(
@@ -265,9 +248,18 @@ class MyApp extends StatelessWidget {
             },
           ),
         ),
-        initialRoute: '/dashboard',
         routes: {
           '/dashboard': (context) => DashboardPage(),
+          '/profile': (context) {
+            final auth = Provider.of<dynamic>(context, listen: false) as dynamic;
+            final user = (auth as dynamic).currentUser;
+            if (user == null) {
+              return const AccessGatePage();
+            }
+            return ProfilePage(user: user);
+          },
+          // Ruta explícita para la vista de bienvenida
+          '/welcome': (context) => const AccessGatePage(),
           // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
           '/create': (context) {
             final args = ModalRoute.of(context)?.settings.arguments;
@@ -307,12 +299,14 @@ class MyApp extends StatelessWidget {
           //Comentoados por ahora
           //'/joinLobby': (context) => JoinLobbyPage(), // Agregar si existe
           //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
-          '/discover': (context) => DiscoverScreen(), // Agregar si existe
+          '/discover': (context) => const DiscoverScreen(),
           '/library': (context) => LibraryPage(), // Agregar si existe
+          '/groups': (context) => const GroupsPage(),
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),
         },
-        home: DashboardPage(), //Pagina inicial
+        home: const AccessGatePage(), // Pagina inicial de onboarding/auth
+      ),
       ),
     );
   }

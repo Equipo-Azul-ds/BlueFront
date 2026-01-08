@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/library_provider.dart';
+import '../../../user/presentation/blocs/auth_bloc.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
@@ -10,12 +11,21 @@ class LibraryPage extends StatefulWidget {
 }
 
 class _LibraryPageState extends State<LibraryPage> {
+  String? _userId;
+
   @override
   void initState() {
     super.initState();
     // La carga se inicia cuando la página se inserta en el IndexedStack por primera vez.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LibraryProvider>().loadAllLists();
+      final auth = Provider.of<AuthBloc>(context, listen: false);
+      final uid = auth.currentUser?.id;
+      setState(() {
+        _userId = uid;
+      });
+      if (uid != null) {
+        Provider.of<LibraryProvider>(context, listen: false).loadAllLists(uid);
+      }
     });
   }
 
@@ -54,8 +64,11 @@ class _LibraryPageState extends State<LibraryPage> {
           title: 'Tus Kahoots',
           onTap: () {
             Navigator.of(context).pushNamed('/kahoots-category').then((_) {
-              if (!mounted) return;
-              context.read<LibraryProvider>().loadAllLists();
+              if (!mounted || _userId == null) return;
+              Provider.of<LibraryProvider>(
+                context,
+                listen: false,
+              ).loadAllLists(_userId!);
             });
           },
         ),
@@ -66,7 +79,7 @@ class _LibraryPageState extends State<LibraryPage> {
         _buildCategoryTile(
           icon: Icons.group,
           title: 'Grupos de Estudio',
-          onTap: () {},
+          onTap: () => Navigator.of(context).pushNamed('/groups'),
         ),
         _buildCategoryTile(
           icon: Icons.school_outlined,

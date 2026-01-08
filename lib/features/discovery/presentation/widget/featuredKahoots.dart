@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../../kahoot/domain/entities/kahoot.dart';
-import '../../domain/Repositories/IDiscoverRepository.dart';
-import '../../infraestructure/repositories/DiscoverRepository.dart';
 import 'kahootListItem.dart';
-
 
 final kDummyKahoots = [
   Kahoot(
@@ -45,6 +41,7 @@ final kDummyKahoots = [
   ),
 ];
 
+
 class FeaturedKahoots extends StatefulWidget {
   const FeaturedKahoots({
     super.key,
@@ -67,42 +64,6 @@ class _FeaturedKahootsState extends State<FeaturedKahoots> {
     super.initState();
     //Future.microtask(_fetchFeaturedKahoots);
   }
-
-  Future<void> _fetchFeaturedKahoots() async {
-    try {
-      final repository = context.read<IDiscoverRepository>();
-      const limit = 10;
-
-      final result = await repository.getFeaturedKahoots(limit: limit);
-
-      result.fold(
-            (failure) {
-          if (mounted) {
-            setState(() {
-              _error = 'Error al cargar Kahoots destacados: ${failure.runtimeType}';
-              _isLoading = false;
-            });
-          }
-        },
-            (kahoots) {
-          if (mounted) {
-            setState(() {
-              _kahoots = kahoots;
-              _isLoading = false;
-            });
-          }
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = 'Ocurrió un error inesperado: $e';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
 
   @override
   Widget build(BuildContext context) {

@@ -18,6 +18,8 @@ import '../features/kahoot/domain/entities/Quiz.dart';
 import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import '../features/media/presentation/blocs/media_editor_bloc.dart';
 import '../features/library/presentation/pages/library_page.dart';
+import '../features/user/presentation/pages/profile_page.dart';
+import '../features/user/presentation/blocs/auth_bloc.dart';
 
 class HomePageContent extends StatefulWidget {
   const HomePageContent({super.key});
@@ -48,8 +50,9 @@ class _HomePageContentState extends State<HomePageContent> {
         // Se intenta cargar los quizzes del usuario. Si no hay un authorId en currentQuiz,
         // utiliza un authorId de prueba por defecto para que el Dashboard muestre
         // los quizzes creados durante el desarrollo o pruebas.
+        final auth = Provider.of<AuthBloc>(context, listen: false);
         const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
-        var authorIdCandidate = quizBloc.currentQuiz?.authorId ?? '';
+        var authorIdCandidate = auth.currentUser?.id ?? quizBloc.currentQuiz?.authorId ?? '';
         if (authorIdCandidate.isEmpty) authorIdCandidate = defaultTestAuthorId;
 
         setState(() => _loadingUserQuizzes = true);
@@ -438,13 +441,16 @@ class _HomePageContentState extends State<HomePageContent> {
                             // Realizar una petición POST para crear la copia del quiz en el backend (se construye el DTO a continuación)
                             Navigator.of(ctx).pop();
 
+                            final auth = Provider.of<AuthBloc>(context, listen: false);
                             const defaultTestAuthorId =
-                                'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+                              'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
                             final authorIdCandidate =
-                                (q.authorId.isEmpty ||
-                                    q.authorId.contains('placeholder'))
+                              (auth.currentUser?.id ?? '').isNotEmpty
+                                ? auth.currentUser!.id
+                                : ((q.authorId.isEmpty ||
+                                  q.authorId.contains('placeholder'))
                                 ? defaultTestAuthorId
-                                : q.authorId;
+                                : q.authorId);
 
                             // Mapear preguntas y respuestas a los DTOs Create* para la petición de duplicado.
                             // NO se generan ni se reasignan IDs aquí: el backend debe asignar los nuevos identificadores.
@@ -633,6 +639,11 @@ class _HomePageContentState extends State<HomePageContent> {
   Widget build(BuildContext context) {
     // Obtener el bloc si es necesario en el futuro
     final quizBloc = Provider.of<QuizEditorBloc>(context);
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    final user = auth.currentUser;
+    final displayName = (user != null && user.name.trim().isNotEmpty)
+        ? user.name.trim()
+        : (user?.userName ?? 'Jugador');
     // Si el navegador pasó un cuestionario creado como argumento, se inserta en userQuizzes
     //para que sea visible inmediatamente sin llamar al backend.
     final args = ModalRoute.of(context)?.settings.arguments;
@@ -831,7 +842,7 @@ class _HomePageContentState extends State<HomePageContent> {
                               children: [
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Hola, Jugador!',
+                                  'Hola, $displayName!',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: constraints.maxWidth * 0.07,
@@ -989,6 +1000,11 @@ class _HomePageContentState extends State<HomePageContent> {
                         }
                       }
 
+                      final auth = Provider.of<AuthBloc>(context, listen: false);
+                      final authorName = (auth.currentUser?.id == q.authorId && (auth.currentUser?.name.isNotEmpty ?? false))
+                          ? auth.currentUser!.name
+                          : q.authorId;
+
                       return GestureDetector(
                         onLongPress: () async {
                           if (coverId != null && !coverId.startsWith('http')) {
@@ -1015,6 +1031,7 @@ class _HomePageContentState extends State<HomePageContent> {
                         },
                         child: KahootCard(
                           kahoot: q,
+                          authorNameOverride: authorName,
                           coverBytes: cachedBytes,
                           coverUrlOverride: cachedUrlOverride,
                           onTap: () => _showQuizOptions(context, q),
@@ -1129,8 +1146,13 @@ class _HomePageContentState extends State<HomePageContent> {
                 childCount: recommendedKahoots.length,
                 itemBuilder: (context, index) {
                   final kahoot = recommendedKahoots[index];
+                  final auth = Provider.of<AuthBloc>(context, listen: false);
+                  final authorName = (auth.currentUser?.id == kahoot.authorId && (auth.currentUser?.name.isNotEmpty ?? false))
+                      ? auth.currentUser!.name
+                      : kahoot.authorId;
                   return KahootCard(
                     kahoot: kahoot,
+                    authorNameOverride: authorName,
                     onTap: () => Navigator.pushNamed(
                       context,
                       '/gameDetail',
@@ -1260,21 +1282,31 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
-    HomePageContent(), // 0: Inicio
-    Scaffold(
-      body: Center(child: Text('Descubre Page')),
-    ), // 1: Descubre (Placeholder)
-    SizedBox.shrink(), // 2: Placeholder for FAB
-    LibraryPage(), // 3: Biblioteca (Épica 7)
-    Scaffold(
-      body: Center(child: Text('Perfil Page')),
-    ), // 4: Perfil (Placeholder)
-  ];
+  List<Widget> _buildPages(BuildContext context) {
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    final currentUser = auth.currentUser;
+    return [
+      const HomePageContent(), // 0: Inicio
+      const Scaffold(
+        body: Center(child: Text('Descubre Page')),
+      ), // 1: Descubre (Placeholder)
+      const SizedBox.shrink(), // 2: Placeholder for FAB
+      const LibraryPage(), // 3: Biblioteca
+      currentUser == null
+          ? const Scaffold(
+              body: Center(child: Text('Inicia sesión para ver tu perfil')),
+            )
+          : ProfilePage(user: currentUser), // 4: Perfil
+    ];
+  }
 
   void _onItemTapped(int index) {
     if (index == 2) {
       Navigator.pushNamed(context, '/create');
+      return;
+    }
+    if (index == 1) {
+      Navigator.pushReplacementNamed(context, '/discover');
       return;
     }
     setState(() {
@@ -1284,9 +1316,20 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Si no hay usuario (tras logout), redirige inmediatamente a la pantalla de bienvenida
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    if (auth.currentUser == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(context, rootNavigator: true)
+            .pushNamedAndRemoveUntil('/welcome', (route) => false);
+      });
+      // Devuelve un contenedor vacío mientras se realiza la navegación
+      return const SizedBox.shrink();
+    }
     return Scaffold(
       backgroundColor: AppColor.background,
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: IndexedStack(index: _currentIndex, children: _buildPages(context)),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo

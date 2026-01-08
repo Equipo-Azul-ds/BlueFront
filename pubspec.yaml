@@ -10,9 +10,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  #isar: ^3.1.0+1
+  #isar_flutter_libs: ^3.1.0
   dartz: ^0.10.1
   equatable: ^2.0.5
-  dio: ^5.4.0
   mockito: ^5.0.0
   build_runner: ^2.0.0
 
@@ -23,6 +24,12 @@ dependencies:
 
   provider: ^6.0.5
   uuid: ^3.0.6
+
+  # Hashing para passwords
+  bcrypt: ^1.1.3
+
+  # Cache/placeholder para imágenes remotas
+  cached_network_image: ^3.3.1
 
 
   # Para grid irregulares
@@ -39,6 +46,7 @@ dependencies:
 
   # Confetti celebration
   confetti: ^0.7.0
+
 
   # Para reproducir videos
   video_player: ^2.8.1
