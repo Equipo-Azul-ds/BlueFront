@@ -9,7 +9,14 @@ class KahootCard extends StatelessWidget{
   final String? coverUrlOverride;
   final bool isLocalCopy;
 
-  KahootCard({required this.kahoot, required this.onTap, this.coverBytes, this.coverUrlOverride, this.isLocalCopy = false});
+  const KahootCard({
+    super.key,
+    required this.kahoot,
+    required this.onTap,
+    this.coverBytes,
+    this.coverUrlOverride,
+    this.isLocalCopy = false,
+  });
 
   @override
   Widget build(BuildContext context){

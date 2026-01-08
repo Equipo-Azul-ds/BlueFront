@@ -30,7 +30,7 @@ class MediaUpload extends StatelessWidget{
         child: previewBytes != null
           ? Image.memory(previewBytes!, fit: BoxFit.cover, width: double.infinity)
           : (previewUrl != null && previewUrl!.startsWith('http')
-              ? Image.network(previewUrl!, fit: BoxFit.cover, width: double.infinity, errorBuilder: (_, __, ___) => Center(child: Icon(Icons.broken_image)))
+              ? Image.network(previewUrl!, fit: BoxFit.cover, width: double.infinity, errorBuilder: (_, _, _) => Center(child: Icon(Icons.broken_image)))
               : Center(child: Icon(Icons.image, size: base * 0.08))),
       ),
     );

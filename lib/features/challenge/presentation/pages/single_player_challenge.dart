@@ -3,29 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
+import 'package:Trivvy/core/constants/answer_option_palette.dart';
+import 'package:Trivvy/core/utils/countdown_service.dart';
+import 'package:Trivvy/core/widgets/answer_option_card.dart';
+import 'package:Trivvy/core/widgets/standard_dialogs.dart';
+import 'package:Trivvy/core/widgets/game_ui_kit.dart';
 
 import '../../application/dtos/single_player_dtos.dart';
 import '../../domain/entities/single_player_game.dart';
 import '../blocs/single_player_challenge_bloc.dart';
 import 'single_player_challenge_results.dart';
-
-const Color _optionBlue = Color(0xFF1C6BFF);
-const Color _optionRed = Color(0xFFFF5C7A);
-const Color _optionGreen = Color(0xFF34C759);
-const Color _optionYellow = Color(0xFFFFC857);
-
-const List<Color> optionColors = [
-  _optionBlue,
-  _optionRed,
-  _optionGreen,
-  _optionYellow,
-];
-const List<IconData> optionIcons = [
-  Icons.change_history_rounded,
-  Icons.diamond_outlined,
-  Icons.circle_outlined,
-  Icons.square_outlined,
-];
 
 // Pantalla principal del desafío single-player.
 // Responsable de mostrar la pregunta actual, temporizador, opciones y el
@@ -53,12 +40,12 @@ class _SinglePlayerChallengeScreenState
   late SinglePlayerChallengeBloc bloc;
   bool _blocInitialized = false;
 
-  int? _selectedIndex;
+  final CountdownService _countdown = CountdownService();
+  DateTime? _countdownIssuedAt;
+  final Set<int> _selectedIndexes = <int>{};
   bool _answerRevealed = false;
   bool _hasEvaluation = false;
-  Timer? _countdownTimer;
   int _timeRemaining = 0;
-  Timer? _autoAdvanceTimer;
   SlideDTO? _displayedSlide;
   SlideDTO? _pendingSlide;
   late final AnimationController _reviewController;
@@ -102,10 +89,12 @@ class _SinglePlayerChallengeScreenState
 
         launchFuture.catchError((error) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('No se pudo iniciar el juego: $error')),
+          showBlockingErrorDialog(
+            context: context,
+            title: 'No se pudo iniciar el juego',
+            message: '$error',
+            onExit: () => Navigator.of(context).pop(),
           );
-          Navigator.of(context).pop();
         });
       });
 
@@ -143,7 +132,7 @@ class _SinglePlayerChallengeScreenState
 
     _cancelTimers();
     setState(() {
-      _selectedIndex = null;
+      _selectedIndexes.clear();
       _answerRevealed = false;
       _hasEvaluation = false;
       _displayedSlide = slide;
@@ -157,33 +146,39 @@ class _SinglePlayerChallengeScreenState
   // _startCountdown: inicia un Timer que decrementa el contador cada
   // segundo y llama a _onTimeExpired cuando llega a 0.
   void _startCountdown(int seconds) {
-    _countdownTimer?.cancel();
-    _timeRemaining = seconds;
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      setState(() {
-        _timeRemaining = _timeRemaining - 1;
-      });
-      if (_timeRemaining <= 0) {
-        t.cancel();
-        _onTimeExpired();
-      }
+    _countdown.cancel();
+    final issuedAt = DateTime.now();
+    _countdownIssuedAt = issuedAt;
+    final initial = _countdown.computeRemaining(
+      issuedAt: issuedAt,
+      timeLimitSeconds: seconds,
+    );
+    setState(() {
+      _timeRemaining = initial;
     });
+    _countdown.start(
+      issuedAt: issuedAt,
+      timeLimitSeconds: seconds,
+      onTick: (remaining) {
+        if (!mounted) return;
+        setState(() => _timeRemaining = remaining);
+      },
+      onElapsed: _onTimeExpired,
+    );
   }
 
   // _onTimeExpired: tiempo agotado -> enviamos null como respuesta.
   void _onTimeExpired() {
-    _submitAnswer(null);
+    if (_answerRevealed) return;
+    if (_selectedIndexes.isEmpty) {
+      _submitAnswer(null);
+      return;
+    }
+    _submitAnswer(_selectedIndexes.toList()..sort());
   }
 
   void _cancelTimers() {
-    _countdownTimer?.cancel();
-    _countdownTimer = null;
-    _autoAdvanceTimer?.cancel();
-    _autoAdvanceTimer = null;
+    _countdown.cancel();
     if (_reviewController.isAnimating) {
       _reviewController.stop();
       _reviewController.reset();
@@ -193,27 +188,42 @@ class _SinglePlayerChallengeScreenState
   // _submitAnswer: construye PlayerAnswer con el tiempo usado y llama
   // al BLoC. Muestra la UI de revisión y arranca el AnimationController
   // que mostrará el progreso circular durante el periodo de review.
-  Future<void> _submitAnswer(int? selectedIdx) async {
+  Future<void> _submitAnswer(List<int>? selectedIdxs) async {
     final currentDisplayed = _displayedSlide ?? bloc.currentSlide;
     if (bloc.currentGame == null || currentDisplayed == null) return;
 
     if (_answerRevealed) return;
 
+    _countdown.cancel();
+
     final totalSeconds = currentDisplayed.timeLimitSeconds;
     final timeUsedSeconds = totalSeconds - _timeRemaining;
-    final timeUsedMs = (timeUsedSeconds * 1000).round();
-    final serverAnswerIndex = selectedIdx == null
+    final int rawElapsedMs = _countdownIssuedAt != null
+      ? DateTime.now().difference(_countdownIssuedAt!).inMilliseconds
+      : (timeUsedSeconds * 1000).round();
+    final int timeUsedMs =
+      rawElapsedMs.clamp(0, totalSeconds * 1000).toInt();
+    final serverAnswerIndexes = selectedIdxs == null
         ? null
-        : _serverIndexForButton(currentDisplayed, selectedIdx);
+        : selectedIdxs
+              .map((idx) => _serverIndexForButton(currentDisplayed, idx))
+              .whereType<int>()
+              .toList();
+    final normalizedServerIndexes =
+        serverAnswerIndexes == null || serverAnswerIndexes.isEmpty
+        ? null
+        : (serverAnswerIndexes..sort());
 
     final playerAnswer = PlayerAnswer(
       slideId: currentDisplayed.slideId,
-      answerIndex: serverAnswerIndex == null ? null : [serverAnswerIndex],
+      answerIndex: normalizedServerIndexes,
       timeUsedMs: timeUsedMs,
     );
 
     setState(() {
-      _selectedIndex = selectedIdx;
+      _selectedIndexes
+        ..clear()
+        ..addAll(selectedIdxs ?? const <int>[]);
       _answerRevealed = true;
       _hasEvaluation = false;
       _displayedEvaluated = null;
@@ -234,6 +244,24 @@ class _SinglePlayerChallengeScreenState
     _reviewController.forward();
   }
 
+  bool _supportsMultipleAnswers(SlideDTO slide) {
+    final normalized = slide.questionType.trim().toLowerCase();
+    const multiEnums = <String>{
+      'multi_select',
+      'multiple_select',
+      'multiple_choice',
+      'multiple_answer',
+      'multiple_answers',
+      'multi_answer',
+      'multi_answers',
+      'checkbox',
+    };
+    if (multiEnums.contains(normalized)) return true;
+    return normalized.contains('multi') ||
+        normalized.contains('multiple') ||
+        normalized.contains('checkbox');
+  }
+
   // _applyPendingOrAdvance: llamado cuando finaliza la ventana de
   // revisión. Si se ha encolado una slide la aplicamos; si el intento
   // terminó, navegamos a la pantalla de resultados; si no, tomamos la
@@ -245,7 +273,7 @@ class _SinglePlayerChallengeScreenState
       setState(() {
         _displayedSlide = _pendingSlide;
         _pendingSlide = null;
-        _selectedIndex = null;
+        _selectedIndexes.clear();
         _answerRevealed = false;
         _hasEvaluation = false;
       });
@@ -261,8 +289,7 @@ class _SinglePlayerChallengeScreenState
     if (finished && mounted && currentGame != null) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) =>
-              SinglePlayerChallengeResultsScreen(
+          builder: (_) => SinglePlayerChallengeResultsScreen(
             gameId: currentGame.gameId,
             initialSummaryGame: currentGame,
           ),
@@ -273,7 +300,7 @@ class _SinglePlayerChallengeScreenState
 
     setState(() {
       _displayedSlide = bloc.currentSlide;
-      _selectedIndex = null;
+      _selectedIndexes.clear();
       _answerRevealed = false;
       _hasEvaluation = false;
     });
@@ -308,18 +335,22 @@ class _SinglePlayerChallengeScreenState
           final answers = slide.options;
           final qText = slide.questionText;
           final mediaUrl = slide.mediaUrl;
+          final bool isMultiSelect = _supportsMultipleAnswers(slide);
 
           // Construye las opciones
           Widget buildOption(int idx, double optionWidth) {
             final ansText = answers[idx].text ?? '';
-            final baseColor = optionColors[idx % optionColors.length];
-            final icon = optionIcons[idx % optionIcons.length];
+            final baseColor = answerOptionColors[idx % answerOptionColors.length];
+            final icon = answerOptionIcons[idx % answerOptionIcons.length];
 
-            final bool isSelected = _selectedIndex == idx;
+            final bool isSelected = _selectedIndexes.contains(idx);
             final bool reveal = _answerRevealed;
-            final int? correctIdx =
-                _buttonIndexForServer(answers, b.lastCorrectIndex);
-            final bool isCorrect = reveal && correctIdx != null && correctIdx == idx;
+            final int? correctIdx = _buttonIndexForServer(
+              answers,
+              b.lastCorrectIndex,
+            );
+            final bool isCorrect =
+                reveal && correctIdx != null && correctIdx == idx;
 
             Color backgroundColor = baseColor;
             IconData? indicatorIcon;
@@ -327,53 +358,47 @@ class _SinglePlayerChallengeScreenState
               backgroundColor = isCorrect
                   ? AppColor.success
                   : (isSelected ? AppColor.error : baseColor);
-              indicatorIcon = isCorrect ? Icons.check : Icons.close;
+              if (isCorrect) {
+                indicatorIcon = Icons.check;
+              } else if (isSelected) {
+                indicatorIcon = Icons.close;
+              }
             }
 
             return SizedBox(
               width: optionWidth,
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: ElevatedButton(
-                  onPressed: reveal
+                child: AnswerOptionCard(
+                  layout: Axis.horizontal,
+                  text: ansText,
+                  icon: icon,
+                  color: backgroundColor,
+                  selected: isSelected,
+                  disabled: reveal,
+                  trailing:
+                      indicatorIcon != null ? Icon(indicatorIcon, size: 22) : null,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 20,
+                    horizontal: 14,
+                  ),
+                  onTap: reveal
                       ? null
                       : () {
-                          _countdownTimer?.cancel();
-                          _submitAnswer(idx);
+                          if (isMultiSelect) {
+                            setState(() {
+                              if (isSelected) {
+                                _selectedIndexes.remove(idx);
+                              } else {
+                                _selectedIndexes.add(idx);
+                              }
+                            });
+                            return;
+                          }
+
+                          _countdown.cancel();
+                          _submitAnswer([idx]);
                         },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: backgroundColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 50,
-                      horizontal: 10,
-                    ),
-                    elevation: 8,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Icon(icon, size: 24),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          ansText,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.start,
-                        ),
-                      ),
-                      if (reveal) ...[
-                        const SizedBox(width: 8),
-                        Icon(indicatorIcon, size: 24),
-                      ],
-                    ],
-                  ),
                 ),
               ),
             );
@@ -421,28 +446,19 @@ class _SinglePlayerChallengeScreenState
 
           // Construye el Area de los bloques para preguntas
           Widget buildQuestionArea() {
-            return Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: SurfaceCard(
+                padding:
+                    const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                child: Text(
+                  qText,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColor.primary,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
                   ),
-                ],
-              ),
-              child: Text(
-                qText,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColor.primary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
                 ),
               ),
             );
@@ -450,9 +466,11 @@ class _SinglePlayerChallengeScreenState
 
           // Barra para mostrar resultados
           Widget buildReviewBar() {
+            final bool isUnanswered = _selectedIndexes.isEmpty;
             final bool isCorrect =
-                _displayedEvaluated?.wasCorrect ??
-                (b.lastResult?.evaluatedAnswer.wasCorrect ?? false);
+                !isUnanswered &&
+                (_displayedEvaluated?.wasCorrect ??
+                    (b.lastResult?.evaluatedAnswer.wasCorrect ?? false));
             final int pointsEarned = isCorrect
                 ? (_displayedEvaluated?.pointsEarned ??
                       (b.lastResult?.evaluatedAnswer.pointsEarned ?? 0))
@@ -465,13 +483,24 @@ class _SinglePlayerChallengeScreenState
                 child: Column(
                   children: [
                     Text(
-                      isCorrect ? 'Correcto' : 'Incorrecto',
+                      isUnanswered
+                          ? 'Tiempo agotado'
+                          : (isCorrect ? 'Correcto' : 'Incorrecto'),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    if (isUnanswered)
+                      const Text(
+                        'Sin responder',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     if (isCorrect)
                       Text(
                         '+$pointsEarned',
@@ -488,6 +517,8 @@ class _SinglePlayerChallengeScreenState
           }
 
           final bool canShowReviewUi = _answerRevealed && _hasEvaluation;
+          final bool canSubmitMulti =
+              isMultiSelect && !_answerRevealed && _selectedIndexes.isNotEmpty;
 
           return Scaffold(
             body: Container(
@@ -505,76 +536,123 @@ class _SinglePlayerChallengeScreenState
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        SafeArea(
-                          child: Column(
-                            key: ValueKey<String>(slide.slideId),
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  top: _answerRevealed ? 0 : 20.0,
-                                ),
-                                child: Column(
-                                  children: [
-                                    if (!_answerRevealed)
-                                      Container(
-                                        width: 60,
-                                        height: 60,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: Colors.white54,
-                                            width: 2,
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SafeArea(
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 720,
+                                  ),
+                                  child: SingleChildScrollView(
+                                    padding: EdgeInsets.only(
+                                      top: _answerRevealed ? 0 : 20,
+                                      left: 12,
+                                      right: 12,
+                                      bottom: isMultiSelect ? 92 : 24,
+                                    ),
+                                    child: Column(
+                                      key: ValueKey<String>(slide.slideId),
+                                      children: [
+                                        if (!_answerRevealed)
+                                          Container(
+                                            width: 60,
+                                            height: 60,
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white54,
+                                                width: 2,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              '$_timeRemaining',
+                                              style: const TextStyle(
+                                                color: AppColor.primary,
+                                                fontSize: 28,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                           ),
-                                        ),
-                                        child: Text(
-                                          '$_timeRemaining',
-                                          style: const TextStyle(
-                                            color: AppColor.primary,
-                                            fontSize: 28,
-                                            fontWeight: FontWeight.bold,
+                                        const SizedBox(height: 14),
+                                        buildQuestionArea(),
+                                        if (mediaUrl != null) ...[
+                                          const SizedBox(height: 28),
+                                          buildMedia(mediaUrl),
+                                        ],
+                                        const SizedBox(height: 18),
+                                        if (isMultiSelect &&
+                                            !_answerRevealed) ...[
+                                          Text(
+                                            'Selecciona una o más opciones',
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.9,
+                                              ),
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
-                                        ),
-                                      ),
-                                    const SizedBox(height: 14),
-                                    buildQuestionArea(),
-                                    if (mediaUrl != null) ...[
-                                      const SizedBox(height: 50),
-                                      buildMedia(mediaUrl),
-                                    ],
-                                  ],
-                                ),
-                              ),
+                                          const SizedBox(height: 10),
+                                        ],
 
-                              // Layoyt Dinamico
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final availableWidth = constraints.maxWidth;
-                                  final optionWidth =
-                                      (availableWidth - 32) /
-                                      (answers.length == 1 ? 1 : 2);
-                                  return Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8.0,
-                                      vertical: 8.0,
+                                        // Layout Dinamico
+                                        LayoutBuilder(
+                                          builder: (context, inner) {
+                                            final availableWidth =
+                                                inner.maxWidth;
+                                            final optionWidth =
+                                                (availableWidth - 32) /
+                                                (answers.length == 1 ? 1 : 2);
+                                            return Wrap(
+                                              alignment: WrapAlignment.center,
+                                              spacing: 0,
+                                              runSpacing: 0,
+                                              children: List.generate(
+                                                answers.length,
+                                                (i) =>
+                                                    buildOption(i, optionWidth),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ],
                                     ),
-                                    child: Wrap(
-                                      alignment: WrapAlignment.center,
-                                      spacing: 0,
-                                      runSpacing: 0,
-                                      children: List.generate(
-                                        answers.length,
-                                        (i) => buildOption(i, optionWidth),
-                                      ),
-                                    ),
-                                  );
-                                },
+                                  ),
+                                ),
                               ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
+
+                        if (isMultiSelect && !_answerRevealed)
+                          Positioned(
+                            left: 16,
+                            right: 16,
+                            bottom: 16,
+                            child: SafeArea(
+                              top: false,
+                              child: Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 720,
+                                  ),
+                                  child: PrimaryButton(
+                                    onPressed: canSubmitMulti
+                                        ? () => _submitAnswer(
+                                              _selectedIndexes.toList()
+                                                ..sort(),
+                                            )
+                                        : null,
+                                    icon: Icons.send_rounded,
+                                    label:
+                                        'Enviar (${_selectedIndexes.length})',
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
 
                         if (canShowReviewUi)
                           Positioned.fill(
@@ -627,21 +705,15 @@ class _SinglePlayerChallengeScreenState
                           top: 10,
                           right: 10,
                           child: SafeArea(
-                            child: ElevatedButton(
+                            child: SecondaryButton(
+                              expanded: false,
+                              icon: Icons.exit_to_app_rounded,
+                              label: 'Salir',
                               onPressed: () {
                                 Navigator.of(
                                   context,
                                 ).popUntil((route) => route.isFirst);
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: AppColor.primary,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                              ),
-                              child: const Text('Salir'),
                             ),
                           ),
                         ),

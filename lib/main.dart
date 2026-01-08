@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:provider/provider.dart';
@@ -24,6 +26,14 @@ import 'features/media/application/upload_media_usecase.dart';
 import 'features/media/application/get_media_usecase.dart';
 import 'features/media/application/delete_media_usecase.dart';
 import 'features/kahoot/domain/entities/Quiz.dart';
+import 'features/gameSession/domain/repositories/multiplayer_session_repository.dart';
+import 'features/gameSession/domain/repositories/multiplayer_session_realtime.dart';
+import 'features/gameSession/application/use_cases/multiplayer_session_usecases.dart';
+import 'features/gameSession/infrastructure/datasources/multiplayer_session_remote_data_source.dart';
+import 'features/gameSession/infrastructure/realtime/multiplayer_session_realtime_impl.dart';
+import 'features/gameSession/infrastructure/repositories/multiplayer_session_repository_impl.dart';
+import 'features/gameSession/infrastructure/socket/multiplayer_socket_client.dart';
+import 'features/gameSession/presentation/controllers/multiplayer_session_controller.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
@@ -34,7 +44,9 @@ const String apiAuthToken = String.fromEnvironment('API_AUTH_TOKEN', defaultValu
 
 void main() {
   // Mostrar en consola la URL base que la app está usando (útil para depuración)
-  print('API_BASE_URL = $apiBaseUrl');
+  if (kDebugMode) {
+    debugPrint('API_BASE_URL = $apiBaseUrl');
+  }
   runApp(MyApp());
 }
 
@@ -94,11 +106,98 @@ class MyApp extends StatelessWidget {
             getSummaryUseCase: context.read<GetSummaryUseCase>(),
           ),
         ),
+        Provider<Dio>(
+          create: (_) => Dio(
+            BaseOptions(
+              baseUrl: apiBaseUrl,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 10),
+              sendTimeout: const Duration(seconds: 10),
+            ),
+          ),
+        ),
         //Estos son los proveedores para los repositorios (inyeccion de dependencias)
         // Repositorios con configuración mínima (ajusta baseUrl según tu entorno)
         Provider<QuizRepository>(create: (_)=> QuizRepositoryImpl(baseUrl: apiBaseUrl)),
         Provider<MediaRepository>(create: (_)=> MediaRepositoryImpl(baseUrl: apiBaseUrl)),
         Provider<StorageProviderRepository>(create: (_)=> StorageProviderRepositoryImpl(baseUrl: apiBaseUrl)),
+        Provider<MultiplayerSessionRemoteDataSource>(
+          create: (context) => MultiplayerSessionRemoteDataSourceImpl(
+            dio: context.read<Dio>(),
+            tokenProvider: () async => apiAuthToken,
+          ),
+        ),
+        Provider<MultiplayerSocketClient>(
+          create: (_) => MultiplayerSocketClient(
+            baseUrl: apiBaseUrl,
+            defaultTokenProvider: () async => apiAuthToken,
+          ),
+        ),
+        Provider<MultiplayerSessionRepository>(
+          create: (context) => MultiplayerSessionRepositoryImpl(
+            remoteDataSource: context.read<MultiplayerSessionRemoteDataSource>(),
+          ),
+        ),
+        Provider<MultiplayerSessionRealtime>(
+          create: (context) => MultiplayerSessionRealtimeImpl(
+            socketClient: context.read<MultiplayerSocketClient>(),
+          ),
+        ),
+        Provider<InitializeHostLobbyUseCase>(
+          create: (context) => InitializeHostLobbyUseCase(
+            repository: context.read<MultiplayerSessionRepository>(),
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<ResolvePinFromQrTokenUseCase>(
+          create: (context) => ResolvePinFromQrTokenUseCase(
+            repository: context.read<MultiplayerSessionRepository>(),
+          ),
+        ),
+        Provider<JoinLobbyUseCase>(
+          create: (context) => JoinLobbyUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<LeaveSessionUseCase>(
+          create: (context) => LeaveSessionUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<EmitHostStartGameUseCase>(
+          create: (context) => EmitHostStartGameUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<EmitHostNextPhaseUseCase>(
+          create: (context) => EmitHostNextPhaseUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<EmitHostEndSessionUseCase>(
+          create: (context) => EmitHostEndSessionUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<SubmitPlayerAnswerUseCase>(
+          create: (context) => SubmitPlayerAnswerUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => MultiplayerSessionController(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+            initializeHostLobbyUseCase: context.read<InitializeHostLobbyUseCase>(),
+            resolvePinFromQrTokenUseCase:
+                context.read<ResolvePinFromQrTokenUseCase>(),
+            joinLobbyUseCase: context.read<JoinLobbyUseCase>(),
+            leaveSessionUseCase: context.read<LeaveSessionUseCase>(),
+            emitHostStartGameUseCase: context.read<EmitHostStartGameUseCase>(),
+            emitHostNextPhaseUseCase: context.read<EmitHostNextPhaseUseCase>(),
+            emitHostEndSessionUseCase: context.read<EmitHostEndSessionUseCase>(),
+            submitPlayerAnswerUseCase: context.read<SubmitPlayerAnswerUseCase>(),
+          ),
+        ),
         // Blocs / ChangeNotifiers
         ChangeNotifierProvider(create: (context)=> QuizEditorBloc(context.read<QuizRepository>())),
         ChangeNotifierProvider(create: (context)=> MediaEditorBloc(

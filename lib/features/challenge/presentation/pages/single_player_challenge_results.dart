@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Trivvy/core/constants/colors.dart';
+import 'package:Trivvy/core/widgets/game_ui_kit.dart';
 import '../../application/use_cases/single_player_usecases.dart';
 import '../../domain/entities/single_player_game.dart';
 import '../blocs/single_player_results_bloc.dart';
@@ -94,19 +95,33 @@ class _SinglePlayerChallengeResultsScreenState
             return Scaffold(
               body: SafeArea(
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Error: ${bloc.error}",
-                        style: const TextStyle(color: AppColor.error),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: SurfaceCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "Error: ${bloc.error}",
+                            style: const TextStyle(color: AppColor.error),
+                          ),
+                          const SizedBox(height: 12),
+                          PrimaryButton(
+                            label: "Reintentar",
+                            icon: Icons.refresh_rounded,
+                            onPressed: () => bloc.retry(widget.gameId),
+                          ),
+                          const SizedBox(height: 10),
+                          SecondaryButton(
+                            label: "Volver al inicio",
+                            icon: Icons.arrow_back,
+                            onPressed: () => Navigator.of(context)
+                                .popUntil((route) => route.isFirst),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: () => bloc.retry(widget.gameId),
-                        child: const Text("Reintentar"),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -175,15 +190,12 @@ class _SinglePlayerChallengeResultsScreenState
                             opacity: _fade,
                             child: ScaleTransition(
                               scale: _scale,
-                              child: Container(
+                              child: SurfaceCard(
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 24.0,
                                   horizontal: 16.0,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
+                                borderRadius: 14,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
@@ -261,7 +273,7 @@ class _SinglePlayerChallengeResultsScreenState
                                           vertical: 8,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: AppColor.primary.withOpacity(0.08),
+                                          color: AppColor.primary.withValues(alpha: 0.08),
                                           borderRadius: BorderRadius.circular(999),
                                         ),
                                         child: Row(
@@ -269,14 +281,14 @@ class _SinglePlayerChallengeResultsScreenState
                                           children: [
                                             Icon(
                                               Icons.speed_rounded,
-                                              color: AppColor.primary.withOpacity(0.9),
+                                              color: AppColor.primary.withValues(alpha: 0.9),
                                               size: 18,
                                             ),
                                             const SizedBox(width: 6),
                                             Text(
                                               '$accuracyLabel% de precisión',
                                               style: TextStyle(
-                                                color: AppColor.primary.withOpacity(0.9),
+                                                color: AppColor.primary.withValues(alpha: 0.9),
                                                 fontWeight: FontWeight.w600,
                                               ),
                                             ),
@@ -299,10 +311,10 @@ class _SinglePlayerChallengeResultsScreenState
                           child: Row(
                             children: [
                               Expanded(
-                                child: ElevatedButton(
+                                child: PrimaryButton(
+                                  label: "Rematch",
+                                  icon: Icons.restart_alt_rounded,
                                   onPressed: () {
-                                    // `StartAttemptUseCase` se encargará de crear o
-                                    // reanudar un intento cuando se solicite un rematch.
                                     Navigator.of(context).pushReplacement(
                                       MaterialPageRoute(
                                         builder: (_) => SinglePlayerChallengeScreen(
@@ -311,37 +323,17 @@ class _SinglePlayerChallengeResultsScreenState
                                       ),
                                     );
                                   },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: AppColor.primary,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    "Rematch",
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: ElevatedButton(
+                                child: SecondaryButton(
+                                  label: "Volver al inicio",
+                                  icon: Icons.home_rounded,
                                   onPressed: () {
                                     Navigator.of(context)
                                         .popUntil((route) => route.isFirst);
                                   },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColor.accent,
-                                    foregroundColor: AppColor.onPrimary,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    "Volver al inicio",
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
                                 ),
                               ),
                             ],

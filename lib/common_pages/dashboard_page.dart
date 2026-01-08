@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '/features/gameSession/presentation/pages/join_game.dart';
+import '/features/gameSession/presentation/pages/host_lobby.dart';
 import '../common_widgets/kahoot_card.dart';
 import '../common_widgets/main_bottom_nav_bar.dart';
 import '../core/constants/colors.dart';
@@ -243,22 +244,42 @@ class _HomePageContentState extends State<HomePageContent> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () async {
-                                  Navigator.of(ctx).pop();
-                                  await _startSinglePlayerQuiz(context, q);
-                                },
-                                icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                                label: const Text('Jugar en modo solitario'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColor.secundary,
-                                  foregroundColor: AppColor.onPrimary,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      Navigator.of(ctx).pop();
+                                      await _startSinglePlayerQuiz(context, q);
+                                    },
+                                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                                    label: const Text('Jugar en modo solitario'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColor.secundary,
+                                      foregroundColor: AppColor.onPrimary,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      Navigator.of(ctx).pop();
+                                      await _startHostingQuiz(context, q);
+                                    },
+                                    icon: const Icon(Icons.wifi_tethering_rounded, size: 20),
+                                    label: const Text('Hostear en vivo'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColor.primary,
+                                      foregroundColor: AppColor.onPrimary,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 12),
                             Row(
@@ -424,6 +445,24 @@ class _HomePageContentState extends State<HomePageContent> {
           ),
         );
       }
+    );
+  }
+
+  Future<void> _startHostingQuiz(BuildContext context, Quiz quiz) async {
+    final kahootId = quiz.quizId.trim();
+    if (kahootId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este quiz debe estar sincronizado para poder hostearlo.')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HostLobbyScreen(
+          kahootId: kahootId,
+        ),
+      ),
     );
   }
 

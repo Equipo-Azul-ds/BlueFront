@@ -193,9 +193,9 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
     }
     final payload = <String, dynamic>{
       'slideId': slideId,
-      'answerIndex': selectedIndexes.isEmpty ? null : selectedIndexes.first,
+      'answerIndex': List<int>.from(selectedIndexes),
       'timeElapsedSeconds': (playerAnswer.timeUsedMs / 1000).round(),
-    }..removeWhere((key, value) => value == null);
+    };
 
     http.Response response;
     final headers = await _buildJsonHeaders();
@@ -357,7 +357,7 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
   }) {
     if (payload is Map) {
       return _extractGameFromPayload(
-        Map<String, dynamic>.from(payload as Map),
+        Map<String, dynamic>.from(payload),
         fallbackAttemptId: fallbackAttemptId,
         fallbackKahootId: fallbackKahootId,
         fallbackPlayerId: fallbackPlayerId,
@@ -369,7 +369,7 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
 
   SlideDTO? _parseSlide(dynamic raw) {
     if (raw is! Map) return null;
-    final map = Map<String, dynamic>.from(raw as Map);
+    final map = Map<String, dynamic>.from(raw);
     final slideId = map['slideId']?.toString() ?? map['id']?.toString();
     if (slideId == null || slideId.isEmpty) return null;
 
@@ -385,7 +385,7 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
       for (var i = 0; i < optionsRaw.length; i++) {
         final optionEntry = optionsRaw[i];
         if (optionEntry is! Map) continue;
-        final optionMap = Map<String, dynamic>.from(optionEntry as Map);
+        final optionMap = Map<String, dynamic>.from(optionEntry);
         final index = _asInt(optionMap['index']) ?? i;
         final textValue = optionMap['text'] ?? optionMap['answerText'];
         final optMedia = optionMap['mediaID']?.toString() ??
