@@ -46,12 +46,16 @@ import 'features/library/presentation/providers/library_provider.dart';
 import 'features/library/presentation/pages/library_page.dart';
 import 'features/library/presentation/pages/kahoots_category_page.dart';
 import 'features/library/presentation/pages/kahoot_detail_page.dart';
+import 'features/groups/presentation/pages/groups_page.dart';
+import 'features/user/presentation/user_providers.dart';
+import 'features/user/presentation/pages/access_gate_page.dart';
+import 'features/user/presentation/pages/profile_page.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Railway
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://backcomun-production.up.railway.app',
+  defaultValue: 'https://backcomun-gc5j.onrender.com',
 );
 
 void main() {
@@ -199,7 +203,9 @@ class MyApp extends StatelessWidget {
         ),
       ],
 
-      child: MaterialApp(
+      child: UserProviders(
+        baseUrl: apiBaseUrl,
+        child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Trivvy',
         theme: ThemeData(
@@ -240,9 +246,18 @@ class MyApp extends StatelessWidget {
             },
           ),
         ),
-        initialRoute: '/dashboard',
         routes: {
           '/dashboard': (context) => DashboardPage(),
+          '/profile': (context) {
+            final auth = Provider.of<dynamic>(context, listen: false) as dynamic;
+            final user = (auth as dynamic).currentUser;
+            if (user == null) {
+              return const AccessGatePage();
+            }
+            return ProfilePage(user: user);
+          },
+          // Ruta explícita para la vista de bienvenida
+          '/welcome': (context) => const AccessGatePage(),
           // /create ahora acepta opcionalmente una `Quiz` como argumento (plantilla)
           '/create': (context) {
             final args = ModalRoute.of(context)?.settings.arguments;
@@ -284,10 +299,12 @@ class MyApp extends StatelessWidget {
           //'/gameDetail': (context) => GameDetailPage(), // Agregar si existe
           '/discover': (context) => const DiscoverScreen(),
           '/library': (context) => LibraryPage(), // Agregar si existe
+          '/groups': (context) => const GroupsPage(),
           '/kahoots-category': (context) => const KahootsCategoryPage(),
           '/kahoot-detail': (context) => const KahootDetailPage(),
         },
-        home: DashboardPage(), //Pagina inicial
+        home: const AccessGatePage(), // Pagina inicial de onboarding/auth
+      ),
       ),
     );
   }
