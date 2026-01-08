@@ -124,7 +124,8 @@ class _DashboardPageState extends State<AdminDashboardPage> {
                     ? 5
                     : provider.categoryPopularity.length,
                 itemBuilder: (context, index) {
-                  final entry = provider.categoryPopularity.entries.elementAt(index);
+                  final entry = provider.categoryPopularity.entries.elementAt(
+                      index);
 
                   return Container(
                     margin: const EdgeInsets.only(bottom: 10),
@@ -137,12 +138,14 @@ class _DashboardPageState extends State<AdminDashboardPage> {
                         backgroundColor: Colors.blue.withOpacity(0.2),
                         child: Text(
                           '${index + 1}',
-                          style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              color: Colors.blue, fontWeight: FontWeight.bold),
                         ),
                       ),
                       title: Text(
                         entry.key,
-                        style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+                        style: const TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.w500),
                       ),
                       trailing: Text(
                         '${entry.value} Kahoots',
@@ -160,9 +163,10 @@ class _DashboardPageState extends State<AdminDashboardPage> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color, {String? subtitle}) {
+  Widget _buildStatCard(String title, String value, IconData icon, Color color,
+      {String? subtitle}) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColor.card,
         borderRadius: BorderRadius.circular(15),
@@ -175,25 +179,39 @@ class _DashboardPageState extends State<AdminDashboardPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(icon, color: color, size: 28),
+              Icon(icon, color: color, size: 24),
               if (subtitle != null)
                 const Icon(Icons.arrow_upward, color: Colors.green, size: 16),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
+          const SizedBox(height: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
