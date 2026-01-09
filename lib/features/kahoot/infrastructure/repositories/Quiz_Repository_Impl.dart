@@ -8,6 +8,7 @@ import '../../domain/repositories/QuizRepository.dart';
 class QuizRepositoryImpl implements QuizRepository {
   final String baseUrl;
   final http.Client cliente;
+  String? _currentUserId;
 
   QuizRepositoryImpl({required this.baseUrl, http.Client? client})
       : cliente = client ?? http.Client() {
@@ -70,14 +71,20 @@ class QuizRepositoryImpl implements QuizRepository {
     final method = isNew ? 'POST' : 'PUT';
 
     // Construir payload según el contrato del backend (mapea nombres y evita enviar IDs locales)
-    final payload = _quizToApiPayload(quiz);
+    _currentUserId = quiz.authorId.trim();
+
+    final payload = _quizToApiPayload(
+      quiz,
+      includeIds: !isNew,
+      allowEmptyAnswers: !isNew,
+    );
     final body = jsonEncode(payload);
     final prettyBody = const JsonEncoder.withIndent('  ').convert(payload);
     // Headers: enviar el userId del currentUser (incluye variantes por compatibilidad)
     if (!_isUuidV4(quiz.authorId)) {
       print('QuizRepositoryImpl.save -> authorId no parece UUID v4: "${quiz.authorId}"');
     }
-    final headers = _headers(userId: quiz.authorId, json: true);
+    final headers = _headers(userId: _currentUserId ?? quiz.authorId, json: true);
 
     // Debug logs: imprimir URL, método, headers y body para ayudar a reproducir errores 500 del servidor.
     try {
@@ -166,7 +173,11 @@ class QuizRepositoryImpl implements QuizRepository {
   }
 
   /// Mapea la entidad interna [Quiz] al payload que espera el backend.
-  Map<String, dynamic> _quizToApiPayload(Quiz quiz) {
+  Map<String, dynamic> _quizToApiPayload(
+    Quiz quiz, {
+    bool includeIds = false,
+    bool allowEmptyAnswers = false,
+  }) {
     // Fallback authorId público para pruebas si el cliente todavía contiene el placeholder.
     const fallbackAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
     final String authorId = quiz.authorId.trim();
@@ -197,15 +208,17 @@ class QuizRepositoryImpl implements QuizRepository {
         ? 'Public'
         : (visRaw.toLowerCase() == 'private' ? 'Private' : visRaw));
 
-    // Status respetando el contrato; por defecto publica.
-    final statusValue = _safeString(quiz.status ?? 'Publish');
+    // Status: para updates se prefiere "Draft" si no viene; para create mantenemos Publish por compatibilidad previa.
+    final statusValue = allowEmptyAnswers
+      ? _safeString(quiz.status ?? 'Draft')
+      : _safeString(quiz.status ?? 'Publish');
 
     void _assertQuestionValid(String text, List<Map<String, dynamic>> answers) {
       final qText = text.trim();
       if (qText.isEmpty) {
         throw Exception('La pregunta necesita enunciado.');
       }
-      if (answers.isEmpty) {
+      if (!allowEmptyAnswers && answers.isEmpty) {
         throw Exception('Cada pregunta necesita respuestas.');
       }
     }
@@ -226,7 +239,7 @@ class QuizRepositoryImpl implements QuizRepository {
         ? _safeString(quiz.themeId)
         : fallbackAuthorId; // backend exige themeId
 
-    return {
+    final payload = <String, dynamic>{
       'authorId': authorId,
       'title': _safeString(quiz.title),
       'description': _safeString(quiz.description),
@@ -237,40 +250,63 @@ class QuizRepositoryImpl implements QuizRepository {
       'status': statusValue,
       'category': _safeString(quiz.category ?? 'Tecnología'),
       'themeId': safeThemeId,
-      'questions': quiz.questions.map((q) {
-        final answers = q.answers.map((a) {
+      'questions': quiz.questions.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final q = entry.value;
+        final answersList = q.answers.map((a) {
           final mediaId = _maybeMediaId(a.mediaUrl);
           final textRaw = _safeString(a.text).trim();
           final text = textRaw.isEmpty ? null : textRaw;
           _assertAnswerValid(text ?? '', mediaId);
-          return {
+          final answerMap = <String, dynamic>{
             'text': text,
             'mediaId': mediaId,
             'isCorrect': a.isCorrect,
           };
+          if (includeIds) answerMap['id'] = a.answerId;
+          return answerMap;
         }).toList();
 
         final qText = _safeString(q.text);
-        _assertQuestionValid(qText, answers);
+        if (!(allowEmptyAnswers && answersList.isEmpty)) {
+          _assertQuestionValid(qText, answersList);
+        }
 
-        return {
+        final questionMap = <String, dynamic>{
           'text': qText.trim(),
           // backend espera mediaId (id de media). Si no existe, enviar null.
           'mediaId': _maybeMediaId(q.mediaUrl),
           'type': _mapQuestionType(_safeString(q.type)),
           'timeLimit': q.timeLimit,
           'points': q.points,
-          'answers': answers,
+          'position': idx,
+          'answers': answersList.isEmpty && allowEmptyAnswers ? null : answersList,
         };
+
+        if (includeIds) {
+          questionMap['id'] = q.questionId;
+        }
+
+        return questionMap;
       }).toList(),
     };
+
+    if (includeIds) {
+      payload['id'] = quiz.quizId;
+    }
+
+    return payload;
   }
 
   @override 
   Future<Quiz?> find(String id) async {
     final url = '$baseUrl/kahoots/$id';
-    try { print('QuizRepositoryImpl.find -> GET $url'); } catch (_) {}
-    final response = await cliente.get(Uri.parse(url));
+    final headers = _headers(userId: _currentUserId ?? '', json: false);
+    try {
+      print('QuizRepositoryImpl.find -> GET $url');
+      print('Request headers: $headers');
+    } catch (_) {}
+    final response = await cliente.get(Uri.parse(url), headers: headers);
     if (response.statusCode == 200){
       final jsonResponse = jsonDecode(response.body);
       return Quiz.fromJson(jsonResponse);
@@ -289,9 +325,11 @@ class QuizRepositoryImpl implements QuizRepository {
     }
 
     final url = '$baseUrl/kahoots/$id';
+    final headers = _headers(userId: _currentUserId ?? '', json: false);
     try {
       print('QuizRepositoryImpl.delete -> DELETE $url');
-      final response = await cliente.delete(Uri.parse(url));
+      print('Request headers: $headers');
+      final response = await cliente.delete(Uri.parse(url), headers: headers);
       print('QuizRepositoryImpl.delete -> Response status: ${response.statusCode} body: ${response.body}');
       // El backend puede devolver 200 o 204
       if (response.statusCode != 204 && response.statusCode != 200){
@@ -310,8 +348,13 @@ class QuizRepositoryImpl implements QuizRepository {
     // Devuelve un array JSON con los kahoots del autor (200 -> lista de quizzes).
     // Los errores 5xx se tratan como transitorios y devuelven lista vacía; los 4xx se propagan.
     final url = '$baseUrl/kahoots/user/$authorId';
-    try { print('QuizRepositoryImpl.searchByAuthor -> GET $url'); } catch (_) {}
-    final response = await cliente.get(Uri.parse(url));
+    _currentUserId = authorId.trim();
+    final headers = _headers(userId: authorId, json: false);
+    try {
+      print('QuizRepositoryImpl.searchByAuthor -> GET $url');
+      print('Request headers: $headers');
+    } catch (_) {}
+    final response = await cliente.get(Uri.parse(url), headers: headers);
 
     try { print('QuizRepositoryImpl.searchByAuthor -> Response status: ${response.statusCode}'); } catch (_) {}
 

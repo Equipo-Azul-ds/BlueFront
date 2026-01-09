@@ -328,6 +328,8 @@ class _HomePageContentState extends State<HomePageContent> {
                                     Navigator.of(ctx).pop();
                                     try {
                                       if (q.quizId.isNotEmpty && !q.isLocal) {
+                                        // Pre-cargar el quiz seleccionado en el bloc para que la UI muestre ese mismo quiz mientras llega el fetch
+                                        quizBloc.setCurrentQuiz(q);
                                         // Carga el quiz completo en el Bloc (actualiza currentQuiz antes de navegar al editor)
                                         await quizBloc.loadQuiz(q.quizId);
                                       } else {
@@ -363,6 +365,15 @@ class _HomePageContentState extends State<HomePageContent> {
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            SizedBox(height: 6),
+                            Text(
+                              'ID: ${q.quizId.isNotEmpty ? q.quizId : '(sin id)'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                                fontFeatures: const [FontFeature.tabularFigures()],
+                              ),
+                            ),
                             SizedBox(height: 8),
                             // Template / Theme info
                             Text(
@@ -395,6 +406,8 @@ class _HomePageContentState extends State<HomePageContent> {
                               Navigator.of(ctx).pop();
                               try {
                                 if (q.quizId.isNotEmpty && !q.isLocal) {
+                                  // Pre-cargar el quiz seleccionado en el bloc para que la UI muestre ese mismo quiz mientras llega el fetch
+                                  quizBloc.setCurrentQuiz(q);
                                   await quizBloc.loadQuiz(q.quizId);
                                 } else {
                                   WidgetsBinding.instance.addPostFrameCallback(
