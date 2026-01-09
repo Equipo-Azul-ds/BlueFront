@@ -34,17 +34,14 @@ class KahootsCategoryPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
 
-          // Filtramos los creados para no mostrar borradores en esta vista
-          final publishedKahoots = provider.createdKahoots
-              .where((k) => k.status != 'Borrador')
-              .toList();
+          final allCreatedKahoots = provider.createdKahoots;
 
           return ListView(
             children: [
               _buildCategoryTile(
                 context,
                 'Creados',
-                publishedKahoots,
+                allCreatedKahoots,
                 Icons.inventory_2,
               ),
 

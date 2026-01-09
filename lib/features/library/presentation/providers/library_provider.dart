@@ -57,6 +57,7 @@ class LibraryProvider with ChangeNotifier {
 
   Future<void> loadAllLists() async {
     final currentId = userId;
+    print('DEBUG BIBLIOTECA: Pidiendo kahoots para el usuario ID: $currentId');
 
     if (currentId == null) {
       _state = LibraryState.initial;

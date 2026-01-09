@@ -22,6 +22,8 @@ class _ProfilePageState extends State<ProfilePage> {
   late String _type;
   bool _libraryLoaded = false;
   String _avatarUrl = '';
+  static const String adminRoute = '/admin';
+  static const String notificationsHistoryRoute = '/notifications-history';
 
   @override
   void initState() {
@@ -273,6 +275,36 @@ class _ProfilePageState extends State<ProfilePage> {
               _securitySection(auth),
               const SizedBox(height: 16),
               _dangerZone(auth),
+              const SizedBox(height: 24),
+
+              ElevatedButton.icon(
+                onPressed: () => Navigator.pushNamed(context, notificationsHistoryRoute),
+                icon: const Icon(Icons.history),
+                label: const Text('Historial de Notificaciones'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  textStyle: const TextStyle(fontSize: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pushNamed(adminRoute),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  textStyle: const TextStyle(fontSize: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Ir a Página de Administrador'),
+              ),
+
+              const SizedBox(height: 30),
             ],
           ),
         ),

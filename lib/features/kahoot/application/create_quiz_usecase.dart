@@ -81,7 +81,7 @@ class CreateQuizUsecase {
             return fetched;
           }
 
-            // Reintenta una vez tras una breve espera en caso de consistencia eventual
+          // Reintenta una vez tras una breve espera en caso de consistencia eventual
           await Future.delayed(const Duration(milliseconds: 500));
           final fetchedRetry = await repository.find(created.quizId);
           if (fetchedRetry != null) {
@@ -89,14 +89,14 @@ class CreateQuizUsecase {
             return fetchedRetry;
           }
 
-            // Si no se encuentra tras el reintento, considerarlo un error: recurso no accesible
-          final msg = 'Creado en respuesta, pero no se pudo verificar la existencia del quiz id=${created.quizId}';
-          print('[CreateQuizUsecase] $msg');
-          throw Exception(msg);
+          // Si no se verifica, continuar retornando el objeto creado para no bloquear el flujo de UI
+          print('[CreateQuizUsecase] Verification unavailable, returning created object directly');
+          return created;
         } catch (e, st) {
-          print('[CreateQuizUsecase] Error during verification: $e');
+          // No bloquear la navegación si la verificación falla por 5xx u otros errores
+          print('[CreateQuizUsecase] Error during verification (non-fatal): $e');
           print(st);
-          rethrow;
+          return created;
         }
       }
 
