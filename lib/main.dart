@@ -90,7 +90,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Render
-// API base 1: 'https://backcomun-gc5j.onrender.com/'
+// API base 1: 'https://backcomun-gc5j.onrender.com'
 // API base 2: https://quizzy-backend-0wh2.onrender.com/api
 // https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
