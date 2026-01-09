@@ -4,7 +4,7 @@ class DeleteKahootUseCase {
   final QuizRepository repository;
   DeleteKahootUseCase(this.repository);
 
-  Future<void> run(String quizId) async {
-    await repository.delete(quizId);
+  Future<void> run(String quizId, String userId) async {
+    await repository.delete(quizId, userId);
   }
 }

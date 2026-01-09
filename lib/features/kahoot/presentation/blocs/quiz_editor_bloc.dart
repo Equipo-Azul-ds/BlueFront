@@ -88,16 +88,16 @@ class QuizEditorBloc extends ChangeNotifier {
   }
 
   // Elimina un quiz
-  Future<void> deleteQuiz(String quizId) async {
+  Future<void> deleteQuiz(Quiz quiz) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
 
     try {
       final useCase = DeleteKahootUseCase(repository);
-      await useCase.run(quizId);
+      await useCase.run(quiz.quizId, quiz.authorId);
       // Si el quiz eliminado era el current, limpiamos
-      if (currentQuiz?.quizId == quizId) currentQuiz = null;
+      if (currentQuiz?.quizId == quiz.quizId) currentQuiz = null;
     } catch (e) {
       errorMessage = 'Error al eliminar el Quiz: $e';
     } finally {
