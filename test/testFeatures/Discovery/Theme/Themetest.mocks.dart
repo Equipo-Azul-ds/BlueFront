@@ -312,18 +312,18 @@ class MockThemeRepository extends _i1.Mock implements _i10.ThemeRepository {
           as _i4.ThemeRemoteDataSource);
 
   @override
-  _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeEntity>>> getThemes() =>
+  _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeVO>>> getThemes() =>
       (super.noSuchMethod(
             Invocation.method(#getThemes, []),
             returnValue:
                 _i6.Future<
-                  _i5.Either<_i11.Failure, List<_i12.ThemeEntity>>
+                  _i5.Either<_i11.Failure, List<_i12.ThemeVO>>
                 >.value(
-                  _FakeEither_5<_i11.Failure, List<_i12.ThemeEntity>>(
+                  _FakeEither_5<_i11.Failure, List<_i12.ThemeVO>>(
                     this,
                     Invocation.method(#getThemes, []),
                   ),
                 ),
           )
-          as _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeEntity>>>);
+          as _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeVO>>>);
 }

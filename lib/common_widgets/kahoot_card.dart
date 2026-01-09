@@ -8,8 +8,9 @@ class KahootCard extends StatelessWidget{
   final Uint8List? coverBytes;
   final String? coverUrlOverride;
   final bool isLocalCopy;
+  final String? authorNameOverride;
 
-  KahootCard({required this.kahoot, required this.onTap, this.coverBytes, this.coverUrlOverride, this.isLocalCopy = false});
+  KahootCard({required this.kahoot, required this.onTap, this.coverBytes, this.coverUrlOverride, this.isLocalCopy = false, this.authorNameOverride});
 
   @override
   Widget build(BuildContext context){
@@ -104,7 +105,7 @@ class KahootCard extends StatelessWidget{
                   ),
                   SizedBox(height: 6),
                   Text(
-                    '${kahoot.authorId} • ${kahoot.questions.length} preguntas',
+                    '${authorNameOverride ?? kahoot.authorId} • ${kahoot.questions.length} preguntas',
                     style: TextStyle(
                       color: Colors.grey,
                       fontSize: base * 0.03,

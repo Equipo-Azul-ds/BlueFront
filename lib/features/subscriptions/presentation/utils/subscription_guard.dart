@@ -4,7 +4,6 @@ import '../provider/subscription_provider.dart';
 import '../screens/plans_screen.dart';
 
 class SubscriptionGuard {
-  /// 1. Verificador de Funciones Exclusivas (Ej: Tipos de preguntas advanced)
   static bool checkPremium(
     BuildContext context, {
     required String featureName,
@@ -23,9 +22,6 @@ class SubscriptionGuard {
     return true;
   }
 
-  /// 2. Verificador de Límites de Cantidad (Ej: Máximo 5 Kahoots)
-  /// [currentCount] es el número actual de elementos que tiene el usuario.
-  /// [maxFree] es el límite permitido para el plan gratuito.
   static bool checkLimit(
     BuildContext context, {
     required int currentCount,

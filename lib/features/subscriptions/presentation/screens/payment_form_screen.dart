@@ -6,7 +6,12 @@ import '../provider/subscription_provider.dart';
 
 class PaymentFormScreen extends StatefulWidget {
   final String planId;
-  const PaymentFormScreen({super.key, required this.planId});
+  final String userId;
+  const PaymentFormScreen({
+    super.key,
+    required this.planId,
+    required this.userId,
+  });
 
   @override
   State<PaymentFormScreen> createState() => _PaymentFormScreenState();
@@ -41,23 +46,41 @@ class _PaymentFormScreenState extends State<PaymentFormScreen> {
   }
 
   void _handlePayment() async {
+    // Validación básica de campos
+    if (_numberController.text.isEmpty || _nameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, completa los datos de la tarjeta'),
+        ),
+      );
+      return;
+    }
+
     setState(() => _isProcessing = true);
+
+    // Simulación de procesamiento de pasarela
     await Future.delayed(const Duration(seconds: 3));
 
     if (!mounted) return;
+
     final provider = context.read<SubscriptionProvider>();
-    await provider.purchasePlan(widget.planId);
 
-    setState(() => _isProcessing = false);
+    try {
+      // Pasamos el userId y el planId al provider para activar el Premium en el backend
+      await provider.purchasePlan(widget.userId, widget.planId);
 
-    if (provider.isPremium) {
-      _showCelebrationOverlay();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(provider.errorMessage ?? 'Error en la transacción'),
-        ),
-      );
+      setState(() => _isProcessing = false);
+
+      if (provider.isPremium) {
+        _showCelebrationOverlay();
+      } else {
+        throw Exception(provider.errorMessage ?? 'Error en la transacción');
+      }
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 

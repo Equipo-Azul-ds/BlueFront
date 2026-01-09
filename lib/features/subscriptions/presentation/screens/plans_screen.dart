@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:Trivvy/features/user/presentation/blocs/auth_bloc.dart';
 import '../provider/subscription_provider.dart';
 import '../widgets/plan_card.dart';
 import 'payment_form_screen.dart';
@@ -9,6 +10,10 @@ class PlansScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Obtenemos el usuario autenticado
+    final auth = context.watch<AuthBloc>();
+    final userId = auth.currentUser?.id ?? '';
+
     final subProvider = context.watch<SubscriptionProvider>();
     final currentPlanId = subProvider.subscription?.planId ?? 'plan_free';
 
@@ -21,7 +26,7 @@ class PlansScreen extends StatelessWidget {
               child: Column(
                 children: [
                   const Text(
-                    'Mejora tu experiencia en Trivvy',
+                    'Mejora tu experiencia',
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 24),
@@ -32,14 +37,12 @@ class PlansScreen extends StatelessWidget {
                     price: 'Gratis',
                     isPremium: false,
                     isCurrentPlan: currentPlanId == 'plan_free',
-                    features: const [
-                      'Hasta 5 quices creados',
-                      'Tipos de pregunta: Quiz y Verdadero/Falso',
-                    ],
+                    features: const ['Hasta 5 quices creados'],
                     onSelected: () => _handlePlanSelection(
                       context,
                       'plan_free',
                       currentPlanId,
+                      userId,
                     ),
                   ),
 
@@ -51,15 +54,12 @@ class PlansScreen extends StatelessWidget {
                     price: '\$9.99/mes',
                     isPremium: true,
                     isCurrentPlan: currentPlanId == 'plan_premium',
-                    features: const [
-                      'Kahoots ilimitados',
-                      'Acceso a todos los tipos de pregunta',
-                      'Personalización de temas visuales',
-                    ],
+                    features: const ['Kahoots ilimitados'],
                     onSelected: () => _handlePlanSelection(
                       context,
                       'plan_premium',
                       currentPlanId,
+                      userId,
                     ),
                   ),
 
@@ -81,50 +81,56 @@ class PlansScreen extends StatelessWidget {
     BuildContext context,
     String selectedPlanId,
     String currentPlanId,
+    String userId,
   ) {
     if (selectedPlanId == currentPlanId) return;
 
     if (selectedPlanId == 'plan_free') {
-      // Si pasa de Premium a Gratis, se procesa directamente o con confirmación
-      _showDowngradeDialog(context);
+      _showDowngradeDialog(context, userId); // Pasar userId al diálogo
     } else {
-      // Si va a Premium, enviamos al formulario de pago
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => PaymentFormScreen(planId: selectedPlanId),
+          builder: (_) => PaymentFormScreen(
+            planId: selectedPlanId,
+            userId: userId, // Pasar userId al formulario de pago
+          ),
         ),
       );
     }
   }
 
-  void _showDowngradeDialog(BuildContext context) {
+  void _showDowngradeDialog(BuildContext context, String userId) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         title: const Text('Cambiar al Plan Gratis'),
         content: const Text(
-          '¿Estás seguro? Perderás el acceso a la creación ilimitada y todos tus beneficios Premium',
+          '¿Estás seguro? Perderás el acceso a los beneficios Premium.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () async {
-              // Ejecutamos el cambio de plan
-              await context.read<SubscriptionProvider>().purchasePlan(
-                'plan_free',
-              );
+              try {
+                // Enviamos userId y planId
+                await context.read<SubscriptionProvider>().purchasePlan(
+                  userId,
+                  'plan_free',
+                );
 
-              if (!context.mounted) return;
-
-              // Cerramos el diálogo
-              Navigator.pop(context);
-
-              // Volvemos a la raíz
-              Navigator.of(context).popUntil((route) => route.isFirst);
+                if (!context.mounted) return;
+                Navigator.pop(ctx);
+                Navigator.of(context).popUntil(
+                  (route) => route.isFirst || route.settings.name == '/profile',
+                );
+              } catch (e) {
+                // El error ya lo maneja el provider para mostrarlo en pantalla
+                Navigator.pop(ctx);
+              }
             },
             child: const Text('Confirmar'),
           ),

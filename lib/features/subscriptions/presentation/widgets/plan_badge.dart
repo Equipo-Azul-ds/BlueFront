@@ -14,7 +14,7 @@ class PlanBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         // Dorado para Premium, Gris azulado para Free
-        color: isPremium ? const Color(0xFFFFD700) : Colors.blueGrey.shade300,
+        color: isPremium ? const Color(0xFFFFD700) : Colors.grey.shade400,
         borderRadius: BorderRadius.circular(20),
         boxShadow: isPremium
             ? [

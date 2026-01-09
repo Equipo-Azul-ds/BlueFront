@@ -8,6 +8,7 @@ import '../blocs/quiz_editor_bloc.dart';
 import '../../domain/entities/Question.dart' as Q;
 import '../../domain/entities/Answer.dart' as A;
 import '../../domain/entities/Quiz.dart';
+import '../../../user/presentation/blocs/auth_bloc.dart';
  
 import '../../../../common_widgets/media_upload.dart' as media;
 import '../../application/dtos/create_quiz_dto.dart';
@@ -91,10 +92,14 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
         if (quizBloc.currentQuiz != null) return; // ya hay un quiz cargado -> no sobrescribir
+        final auth = Provider.of<AuthBloc>(context, listen: false);
         const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+        final resolvedAuthorId = (auth.currentUser?.id ?? '').isNotEmpty
+            ? auth.currentUser!.id
+            : ((quizBloc.currentQuiz?.authorId == null || (quizBloc.currentQuiz!.authorId.contains('placeholder'))) ? defaultTestAuthorId : quizBloc.currentQuiz!.authorId);
         final newQuiz = Quiz(
           quizId: '',
-          authorId: (quizBloc.currentQuiz?.authorId == null || (quizBloc.currentQuiz!.authorId.contains('placeholder'))) ? defaultTestAuthorId : quizBloc.currentQuiz!.authorId,
+          authorId: resolvedAuthorId,
           title: '',
           description: '',
           visibility: 'private',
@@ -163,6 +168,7 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
   Future<void> _saveQuiz() async {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+    final auth = Provider.of<AuthBloc>(context, listen: false);
     // Intenta leer los valores del formulario si está presente (paso 1). 
     // Si el formulario no está montado (estamos en el paso 2), 
     // utiliza los valores ya almacenados en `quizBloc.currentQuiz` 
@@ -220,8 +226,9 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
     }
 
     final dto = CreateQuizDto(
-      // Usar un authorId por defecto para pruebas cuando currentQuiz no tenga un author válido o contenga 'placeholder'
+      // Prioriza el currentUser.id; si falta, usa el authorId actual o el default de pruebas
       authorId: (() {
+        if ((auth.currentUser?.id ?? '').isNotEmpty) return auth.currentUser!.id;
         const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
         final aid = quizBloc.currentQuiz?.authorId ?? '';
         if (aid.isEmpty || aid.contains('placeholder')) return defaultTestAuthorId;
@@ -757,7 +764,12 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
                             // Texto de la pregunta (usando controller persistente para preservar cursor)
                             TextField(
                               controller: _questionController,
+                              enabled: (selectedQuestion.mediaUrl == null || selectedQuestion.mediaUrl!.isEmpty),
                               onChanged: (val) {
+                                if (selectedQuestion.mediaUrl != null && selectedQuestion.mediaUrl!.isNotEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Borra la imagen para editar el texto.')));
+                                  return;
+                                }
                                 final q = selectedQuestion;
                                 final updated = Q.Question(
                                   questionId: q.questionId,
@@ -849,6 +861,11 @@ class _QuizEditorPageState extends State<QuizEditorPage>{
 
                             // Subir imagen para la pregunta
                             media.MediaUpload(onMediaSelected: (file) async {
+                              // Si hay texto, no permitir subir imagen hasta que se borre
+                              if (_questionController.text.trim().isNotEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Borra el texto de la pregunta antes de agregar una imagen.')));
+                                return;
+                              }
                               final q = selectedQuestion;
                               final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
                               try {

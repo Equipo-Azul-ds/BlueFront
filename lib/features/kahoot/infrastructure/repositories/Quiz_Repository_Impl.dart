@@ -8,11 +8,66 @@ import '../../domain/repositories/QuizRepository.dart';
 class QuizRepositoryImpl implements QuizRepository {
   final String baseUrl;
   final http.Client cliente;
+  String? _currentUserId;
 
   QuizRepositoryImpl({required this.baseUrl, http.Client? client})
       : cliente = client ?? http.Client() {
     try {
       print('QuizRepositoryImpl initialized with baseUrl=$baseUrl');
+    } catch (_) {}
+  }
+
+  // Traduce los tipos usados en el cliente a los que espera el backend.
+  String _mapQuestionType(String raw) {
+    final t = raw.trim().toLowerCase();
+    if (t == 'quiz' || t == 'single') return 'single';
+    if (t == 'multiple') return 'multiple';
+    if (t == 'true_false' || t == 'true-false' || t == 'truefalse') return 'true_false';
+    return raw; // deja pasar valores inesperados para que el backend falle explícitamente
+  }
+
+  // Valida formato UUID v4 simple.
+  bool _isUuidV4(String s) {
+    final re = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
+    return re.hasMatch(s.trim());
+  }
+
+  // Limpia prefijos locales (q_/a_) para que el backend reciba solo UUIDs.
+  String _sanitizeId(String? raw) {
+    if (raw == null) return '';
+    final trimmed = raw.trim();
+    if (trimmed.startsWith('q_') || trimmed.startsWith('a_')) {
+      return trimmed.substring(2);
+    }
+    return trimmed;
+  }
+
+  // Construye headers según contrato: Content-Type y x-debug-user-id.
+  Map<String, String> _headers({required String userId, bool json = false}) {
+    final id = userId.trim();
+    final h = <String, String>{
+      'Accept': 'application/json',
+    };
+    if (json) h['Content-Type'] = 'application/json';
+    if (id.isNotEmpty) {
+      h['x-debug-user-id'] = id;
+    }
+    return h;
+  }
+
+  // Imprime cadenas largas en bloques para evitar truncado en logcat/terminal.
+  void _logLarge(String label, String content, {int chunkSize = 800}) {
+    try {
+      final total = content.length;
+      if (total == 0) {
+        print('$label [empty]');
+        return;
+      }
+      for (int i = 0; i < total; i += chunkSize) {
+        final end = (i + chunkSize < total) ? i + chunkSize : total;
+        print('$label [$i-$end]: ${content.substring(i, end)}');
+      }
+      print('$label length=$total');
     } catch (_) {}
   }
 
@@ -26,22 +81,36 @@ class QuizRepositoryImpl implements QuizRepository {
     final method = isNew ? 'POST' : 'PUT';
 
     // Construir payload según el contrato del backend (mapea nombres y evita enviar IDs locales)
-    final body = jsonEncode(_quizToApiPayload(quiz));
+    _currentUserId = quiz.authorId.trim();
+
+    final payload = _quizToApiPayload(
+      quiz,
+      includeIds: !isNew,
+      allowEmptyAnswers: !isNew,
+    );
+    final body = jsonEncode(payload);
+    final prettyBody = const JsonEncoder.withIndent('  ').convert(payload);
+    // Headers: enviar el userId del currentUser (incluye variantes por compatibilidad)
+    if (!_isUuidV4(quiz.authorId)) {
+      print('QuizRepositoryImpl.save -> authorId no parece UUID v4: "${quiz.authorId}"');
+    }
+    final headers = _headers(userId: _currentUserId ?? quiz.authorId, json: true);
 
     // Debug logs: imprimir URL, método, headers y body para ayudar a reproducir errores 500 del servidor.
     try {
       print('QuizRepositoryImpl.save -> $method $url');
-      print('Request headers: ${{'Content-Type': 'application/json'}}');
-      print('Request body: $body');
+      print('Request headers: $headers');
+      _logLarge('Request body (pretty)', prettyBody);
+      _logLarge('Request body (raw)', body);
     } catch (_) {}
 
     final uri = Uri.parse(url);
     http.Response response;
     try {
       if (method == 'POST') {
-        response = await cliente.post(uri, headers: {'Content-Type': 'application/json'}, body: body);
+        response = await cliente.post(uri, headers: headers, body: body);
       } else {
-        response = await cliente.put(uri, headers: {'Content-Type': 'application/json'}, body: body);
+        response = await cliente.put(uri, headers: headers, body: body);
       }
     } catch (e, st) {
       // Error de red o de cliente: imprimir el seguimiento de la pila para que el usuario pueda pegarlo aquí.
@@ -54,7 +123,7 @@ class QuizRepositoryImpl implements QuizRepository {
     try {
       print('Response status: ${response.statusCode}');
       print('Response headers: ${response.headers}');
-      print('Response body: ${response.body}');
+      _logLarge('Response body', response.body);
     } catch (_) {}
 
     // También persiste un archivo de depuración con la solicitud y la respuesta
@@ -114,12 +183,17 @@ class QuizRepositoryImpl implements QuizRepository {
   }
 
   /// Mapea la entidad interna [Quiz] al payload que espera el backend.
-  Map<String, dynamic> _quizToApiPayload(Quiz quiz) {
+  Map<String, dynamic> _quizToApiPayload(
+    Quiz quiz, {
+    bool includeIds = false,
+    bool allowEmptyAnswers = false,
+  }) {
     // Fallback authorId público para pruebas si el cliente todavía contiene el placeholder.
     const fallbackAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
-    final String authorId = (quiz.authorId.isEmpty || quiz.authorId.contains('placeholder'))
-      ? fallbackAuthorId
-      : quiz.authorId;
+    final String authorId = quiz.authorId.trim();
+    if (authorId.isEmpty) {
+      throw Exception('authorId vacío: debe ser el userId del currentUser logeado');
+    }
 
     String _safeString(dynamic v) {
       if (v == null) return '';
@@ -127,59 +201,130 @@ class QuizRepositoryImpl implements QuizRepository {
       return v.toString();
     }
 
-    // Si el valor parece ser una ruta local o una URL en vez de un mediaId válido,
-    // devolvemos null para evitar enviar datos inválidos al backend.
+    // Solo acepta mediaId con formato UUID v4; cualquier otro valor (incluyendo URLs) se envía como null.
     String? _maybeMediaId(String? v) {
       if (v == null) return null;
       final s = v.trim();
       if (s.isEmpty) return null;
-      // heurística: si contiene '/' o '\' o 'http' probablemente no es un id remoto
-      if (s.contains('/') || s.contains('\\') || s.startsWith('http')) return null;
-      // si es muy largo, probablemente sea una path en vez de un id
-      if (s.length > 64) return null;
-      return s;
+      final uuidV4 = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
+      return uuidV4.hasMatch(s) ? s : null;
     }
 
-    // Normalize visibility: backend expects either 'public' or 'private'.
-    var vis = _safeString(quiz.visibility).toLowerCase().trim();
-    if (vis != 'public' && vis != 'private') vis = 'private';
+    // Normaliza a los valores que el backend muestra en el contrato: "Public" / "Private".
+    final visRaw = _safeString(quiz.visibility).trim();
+    final vis = visRaw.isEmpty
+      ? 'Private'
+      : (visRaw.toLowerCase() == 'public'
+        ? 'Public'
+        : (visRaw.toLowerCase() == 'private' ? 'Private' : visRaw));
 
-    return {
-      'authorId': authorId,
+    // Normaliza status al formato esperado: Draft/Publish
+    String _normalizeStatus(String? raw, {required bool isUpdate}) {
+      final v = (raw ?? '').trim().toLowerCase();
+      if (v == 'publish' || v == 'published') return 'Publish';
+      if (v == 'draft') return 'Draft';
+      return isUpdate ? 'Draft' : 'Publish';
+    }
+
+    final statusValue = _normalizeStatus(quiz.status, isUpdate: allowEmptyAnswers);
+
+    void _assertQuestionValid(String text, List<Map<String, dynamic>> answers) {
+      final qText = text.trim();
+      if (qText.isEmpty) {
+        throw Exception('La pregunta necesita enunciado.');
+      }
+      if (!allowEmptyAnswers && answers.isEmpty) {
+        throw Exception('Cada pregunta necesita respuestas.');
+      }
+    }
+
+    void _assertAnswerValid(String text, String? mediaId) {
+      final aText = text.trim();
+      final hasText = aText.isNotEmpty;
+      final hasMedia = mediaId != null && mediaId.trim().isNotEmpty;
+      if (!hasText && !hasMedia) {
+        throw Exception('Cada respuesta debe tener texto o media.');
+      }
+      if (hasText && hasMedia) {
+        throw Exception('La respuesta no puede tener texto y media a la vez.');
+      }
+    }
+
+    final safeThemeId = _safeString(quiz.themeId).isNotEmpty
+        ? _safeString(quiz.themeId)
+        : fallbackAuthorId; // backend exige themeId
+
+    final payload = <String, dynamic>{
       'title': _safeString(quiz.title),
       'description': _safeString(quiz.description),
-      // El backend espera 'coverImageId' (id de recurso). Si no existe, enviar cadena vacía en lugar de null.
-      'coverImageId': _maybeMediaId(quiz.coverImageUrl) ?? '',
+      // El backend espera 'coverImageId' (id de recurso). Si no existe, enviar null.
+      'coverImageId': _maybeMediaId(quiz.coverImageUrl),
       'visibility': vis,
       // Usar los valores del quiz si existen, de lo contrario dejar valores por defecto
-      'status': _safeString(quiz.status ?? 'draft'),
+      'status': statusValue,
       'category': _safeString(quiz.category ?? 'Tecnología'),
-      'themeId': _safeString(quiz.themeId),
-      'questions': quiz.questions.map((q) {
-        return {
-          'questionText': _safeString(q.text),
-          // backend espera mediaId (id de media). Si no existe o es una ruta local, enviar cadena vacía.
-          'mediaId': _maybeMediaId(q.mediaUrl) ?? '',
-          'questionType': _safeString(q.type),
+      'themeId': safeThemeId,
+      'questions': quiz.questions.asMap().entries.map((entry) {
+        final idx = entry.key;
+        final q = entry.value;
+        final answersList = q.answers.map((a) {
+          final mediaId = _maybeMediaId(a.mediaUrl);
+          final textRaw = _safeString(a.text).trim();
+          final text = textRaw.isEmpty ? null : textRaw;
+          _assertAnswerValid(text ?? '', mediaId);
+          final answerMap = <String, dynamic>{
+            'text': text,
+            'mediaId': mediaId,
+            'isCorrect': a.isCorrect,
+          };
+          if (includeIds) answerMap['id'] = _sanitizeId(a.answerId);
+          return answerMap;
+        }).toList();
+
+        final qText = _safeString(q.text);
+        if (!(allowEmptyAnswers && answersList.isEmpty)) {
+          _assertQuestionValid(qText, answersList);
+        }
+
+        final questionMap = <String, dynamic>{
+          'text': qText.trim(),
+          // backend espera mediaId (id de media). Si no existe, enviar null.
+          'mediaId': _maybeMediaId(q.mediaUrl),
+          'type': _mapQuestionType(_safeString(q.type)),
           'timeLimit': q.timeLimit,
           'points': q.points,
-          'answers': q.answers.map((a) {
-            return {
-              'answerText': _safeString(a.text),
-              'mediaId': _maybeMediaId(a.mediaUrl) ?? '',
-              'isCorrect': a.isCorrect,
-            };
-          }).toList(),
+          'position': idx,
+          'answers': answersList.isEmpty && allowEmptyAnswers ? null : answersList,
         };
+
+        if (includeIds) {
+          questionMap['id'] = _sanitizeId(q.questionId);
+        }
+
+        return questionMap;
       }).toList(),
     };
+
+    payload['authorId'] = authorId;
+
+    if (includeIds) {
+      // Algunos backends solo esperan id en la ruta; se omite aquí para evitar 400.
+      // Si llegara a ser requerido, se puede reactivar.
+      // payload['id'] = quiz.quizId;
+    }
+
+    return payload;
   }
 
   @override 
   Future<Quiz?> find(String id) async {
     final url = '$baseUrl/kahoots/$id';
-    try { print('QuizRepositoryImpl.find -> GET $url'); } catch (_) {}
-    final response = await cliente.get(Uri.parse(url));
+    final headers = _headers(userId: _currentUserId ?? '', json: false);
+    try {
+      print('QuizRepositoryImpl.find -> GET $url');
+      print('Request headers: $headers');
+    } catch (_) {}
+    final response = await cliente.get(Uri.parse(url), headers: headers);
     if (response.statusCode == 200){
       final jsonResponse = jsonDecode(response.body);
       return Quiz.fromJson(jsonResponse);
@@ -191,16 +336,23 @@ class QuizRepositoryImpl implements QuizRepository {
   }
 
   @override
-  Future<void> delete(String id) async {
+  Future<void> delete(String id, String userId) async {
     if (id.trim().isEmpty) {
       print('QuizRepositoryImpl.delete -> Ignoring delete request with empty id');
       return;
     }
 
+    _currentUserId = userId.trim();
+    if ((_currentUserId ?? '').isEmpty) {
+      throw Exception('delete requiere userId para enviar x-debug-user-id');
+    }
+
     final url = '$baseUrl/kahoots/$id';
+    final headers = _headers(userId: _currentUserId ?? '', json: false);
     try {
       print('QuizRepositoryImpl.delete -> DELETE $url');
-      final response = await cliente.delete(Uri.parse(url));
+      print('Request headers: $headers');
+      final response = await cliente.delete(Uri.parse(url), headers: headers);
       print('QuizRepositoryImpl.delete -> Response status: ${response.statusCode} body: ${response.body}');
       // El backend puede devolver 200 o 204
       if (response.statusCode != 204 && response.statusCode != 200){
@@ -219,8 +371,13 @@ class QuizRepositoryImpl implements QuizRepository {
     // Devuelve un array JSON con los kahoots del autor (200 -> lista de quizzes).
     // Los errores 5xx se tratan como transitorios y devuelven lista vacía; los 4xx se propagan.
     final url = '$baseUrl/kahoots/user/$authorId';
-    try { print('QuizRepositoryImpl.searchByAuthor -> GET $url'); } catch (_) {}
-    final response = await cliente.get(Uri.parse(url));
+    _currentUserId = authorId.trim();
+    final headers = _headers(userId: authorId, json: false);
+    try {
+      print('QuizRepositoryImpl.searchByAuthor -> GET $url');
+      print('Request headers: $headers');
+    } catch (_) {}
+    final response = await cliente.get(Uri.parse(url), headers: headers);
 
     try { print('QuizRepositoryImpl.searchByAuthor -> Response status: ${response.statusCode}'); } catch (_) {}
 

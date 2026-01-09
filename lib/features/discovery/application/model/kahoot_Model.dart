@@ -1,4 +1,4 @@
-import '../../../kahoot/domain/entities/kahoot.dart';
+import '../../domain/entities/kahoot.dart';
 import 'dart:convert'; // Necesario para DateTime.parse
 
 
