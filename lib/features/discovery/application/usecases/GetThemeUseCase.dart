@@ -11,7 +11,7 @@ class GetThemesUseCase {
   GetThemesUseCase(this.repository);
 
 
-  Future<Either<Failure, List<ThemeEntity>>> execute() async {
+  Future<Either<Failure, List<ThemeVO>>> execute() async {
     return await repository.getThemes();
   }
 }

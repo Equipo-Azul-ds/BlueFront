@@ -9,6 +9,8 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import '../features/Administrador/Presentacion/pages/Persona_Page.dart';
+import '../features/discovery/presentation/pages/discover_page.dart';
 import '/features/gameSession/presentation/pages/join_game.dart';
 import '../common_widgets/kahoot_card.dart';
 import '../common_widgets/main_bottom_nav_bar.dart';
@@ -1282,14 +1284,13 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
 
+
   List<Widget> _buildPages(BuildContext context) {
     final auth = Provider.of<AuthBloc>(context, listen: true);
     final currentUser = auth.currentUser;
     return [
       const HomePageContent(), // 0: Inicio
-      const Scaffold(
-        body: Center(child: Text('Descubre Page')),
-      ), // 1: Descubre (Placeholder)
+      const DiscoverScreen(), // 1: Descubre (Placeholder)
       const SizedBox.shrink(), // 2: Placeholder for FAB
       const LibraryPage(), // 3: Biblioteca
       currentUser == null
@@ -1299,16 +1300,23 @@ class _DashboardPageState extends State<DashboardPage> {
           : ProfilePage(user: currentUser), // 4: Perfil
     ];
   }
-
+  /*
+=======
+  final List<Widget> _pages = const [
+    HomePageContent(), // 0: Inicio
+    DiscoverScreen(), //Discovery
+    SizedBox.shrink(), // 2: Placeholder for FAB
+    LibraryPage(), // 3: Biblioteca (Épica 7)
+    PersonaPage(), // 4: Perfil (Placeholder)
+  ];
+>>>>>>> epica9y11
+*/
   void _onItemTapped(int index) {
     if (index == 2) {
       Navigator.pushNamed(context, '/create');
       return;
     }
-    if (index == 1) {
-      Navigator.pushReplacementNamed(context, '/discover');
-      return;
-    }
+
     setState(() {
       _currentIndex = index;
     });
