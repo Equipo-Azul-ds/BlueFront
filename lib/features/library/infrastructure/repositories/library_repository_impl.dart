@@ -32,6 +32,9 @@ class LibraryRepositoryImpl implements LibraryRepository {
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((item) => Kahoot.fromJson(item)).toList();
+    } else if (response.statusCode == 404) {
+      // Si el backend devuelve 404 cuando no hay datos, manéjalo como lista vacía
+      return [];
     } else {
       throw Exception('Error al obtener creaciones: ${response.statusCode}');
     }
@@ -45,6 +48,9 @@ class LibraryRepositoryImpl implements LibraryRepository {
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((item) => Kahoot.fromJson(item)).toList();
+    } else if (response.statusCode == 404) {
+      // Si el backend devuelve 404 cuando no hay datos, manéjalo como lista vacía
+      return [];
     } else {
       throw Exception('Error al obtener favoritos: ${response.statusCode}');
     }
@@ -58,6 +64,9 @@ class LibraryRepositoryImpl implements LibraryRepository {
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((item) => Kahoot.fromJson(item)).toList();
+    } else if (response.statusCode == 404) {
+      // Si el backend devuelve 404 cuando no hay datos, manéjalo como lista vacía
+      return [];
     } else {
       throw Exception('Error al obtener en progreso: ${response.statusCode}');
     }
@@ -71,6 +80,9 @@ class LibraryRepositoryImpl implements LibraryRepository {
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data.map((item) => Kahoot.fromJson(item)).toList();
+    } else if (response.statusCode == 404) {
+      // Si el backend devuelve 404 cuando no hay datos, manéjalo como lista vacía
+      return [];
     } else {
       throw Exception('Error al obtener completados: ${response.statusCode}');
     }

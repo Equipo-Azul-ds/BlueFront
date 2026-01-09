@@ -11,21 +11,12 @@ class LibraryPage extends StatefulWidget {
 }
 
 class _LibraryPageState extends State<LibraryPage> {
-  String? _userId;
-
   @override
   void initState() {
     super.initState();
     // La carga se inicia cuando la página se inserta en el IndexedStack por primera vez.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = Provider.of<AuthBloc>(context, listen: false);
-      final uid = auth.currentUser?.id;
-      setState(() {
-        _userId = uid;
-      });
-      if (uid != null) {
-        Provider.of<LibraryProvider>(context, listen: false).loadAllLists(uid);
-      }
+      Provider.of<LibraryProvider>(context, listen: false).loadAllLists();
     });
   }
 
@@ -47,15 +38,12 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Widget _buildBody(LibraryProvider provider) {
-    if (provider.state == LibraryState.loading) {
+    // Si está cargando por primera vez, mostramos el indicador
+    if (provider.state == LibraryState.loading &&
+        provider.createdKahoots.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (provider.state == LibraryState.error) {
-      return const Center(child: Text('Error al cargar la biblioteca.'));
-    }
-
-    // La vista principal de la Biblioteca con las categorías de alto nivel
     return ListView(
       children: [
         // Botón principal "Tus Kahoots"
@@ -64,11 +52,11 @@ class _LibraryPageState extends State<LibraryPage> {
           title: 'Tus Kahoots',
           onTap: () {
             Navigator.of(context).pushNamed('/kahoots-category').then((_) {
-              if (!mounted || _userId == null) return;
+              if (!mounted) return;
               Provider.of<LibraryProvider>(
                 context,
                 listen: false,
-              ).loadAllLists(_userId!);
+              ).loadAllLists();
             });
           },
         ),
@@ -81,6 +69,7 @@ class _LibraryPageState extends State<LibraryPage> {
           title: 'Grupos de Estudio',
           onTap: () => Navigator.of(context).pushNamed('/groups'),
         ),
+
         _buildCategoryTile(
           icon: Icons.school_outlined,
           title: 'Cursos',
@@ -98,7 +87,7 @@ class _LibraryPageState extends State<LibraryPage> {
     return ListTile(
       leading: Icon(icon, color: Colors.blue),
       title: Text(title),
-      trailing: const Icon(Icons.arrow_forward_ios),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: onTap,
     );
   }

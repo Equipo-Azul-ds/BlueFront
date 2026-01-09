@@ -27,13 +27,14 @@ class KahootsCategoryPage extends StatelessWidget {
       baseIndex: 3,
       body: Consumer<LibraryProvider>(
         builder: (context, provider, child) {
-          if (provider.state == LibraryState.loading) {
+          // Solo mostramos carga si es la primera vez (listas vacías)
+          if (provider.state == LibraryState.loading &&
+              provider.createdKahoots.isEmpty &&
+              provider.favoriteKahoots.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (provider.state == LibraryState.error) {
-            return const Center(child: Text('Error al cargar Kahoots.'));
-          }
 
+          // Filtramos los creados para no mostrar borradores en esta vista
           final publishedKahoots = provider.createdKahoots
               .where((k) => k.status != 'Borrador')
               .toList();
@@ -85,7 +86,18 @@ class KahootsCategoryPage extends StatelessWidget {
         ListTile(
           leading: Icon(icon, color: Colors.blueGrey),
           title: Text(title),
-          trailing: const Icon(Icons.arrow_forward_ios),
+          // Mostramos la cantidad de Kahoots para que el usuario sepa qué hay dentro
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${kahoots.length}',
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_forward_ios, size: 16),
+            ],
+          ),
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(

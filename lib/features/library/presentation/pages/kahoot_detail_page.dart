@@ -174,7 +174,7 @@ class KahootDetailPage extends StatelessWidget {
                           context,
                           kahoot,
                           progress,
-                          manager.userId,
+                          manager.userId ?? '',
                         ),
                         const Divider(height: 16),
 

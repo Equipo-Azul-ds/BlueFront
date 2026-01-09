@@ -5,8 +5,8 @@ import 'package:Trivvy/features/library/application/get_kahoots_use_cases.dart';
 import 'package:Trivvy/features/library/application/toggle_favorite_use_case.dart';
 import 'package:Trivvy/features/library/application/update_kahoot_progress_usecase.dart';
 import 'package:Trivvy/features/library/application/get_kahoot_progress_usecase.dart';
+import 'package:Trivvy/features/user/presentation/blocs/auth_bloc.dart';
 
-// Definición de los estados para la interfaz de usuario
 enum LibraryState { initial, loading, loaded, error }
 
 class LibraryProvider with ChangeNotifier {
@@ -18,8 +18,10 @@ class LibraryProvider with ChangeNotifier {
   final UpdateKahootProgressUseCase _updateProgress;
   final GetKahootProgressUseCase _getKahootProgress;
 
-  final String _testUserId = 'massielprueba';
-  String get userId => _testUserId;
+  final AuthBloc _authBloc;
+
+  String? get userId => _authBloc.currentUser?.id;
+
   LibraryProvider({
     required GetCreatedKahootsUseCase getCreated,
     required GetFavoriteKahootsUseCase getFavorite,
@@ -28,13 +30,15 @@ class LibraryProvider with ChangeNotifier {
     required ToggleFavoriteUseCase toggleFavorite,
     required UpdateKahootProgressUseCase updateProgress,
     required GetKahootProgressUseCase getKahootProgress,
+    required AuthBloc authBloc,
   }) : _getCreated = getCreated,
        _getFavorite = getFavorite,
        _getInProgress = getInProgress,
        _getCompleted = getCompleted,
        _toggleFavorite = toggleFavorite,
        _updateProgress = updateProgress,
-       _getKahootProgress = getKahootProgress;
+       _getKahootProgress = getKahootProgress,
+       _authBloc = authBloc;
 
   LibraryState _state = LibraryState.initial;
   LibraryState get state => _state;
@@ -52,17 +56,38 @@ class LibraryProvider with ChangeNotifier {
   List<Kahoot> get completedKahoots => _completedKahoots;
 
   Future<void> loadAllLists() async {
+    final currentId = userId;
+
+    if (currentId == null) {
+      _state = LibraryState.initial;
+      notifyListeners();
+      return;
+    }
+
     if (_state == LibraryState.loading) return;
 
     _state = LibraryState.loading;
     notifyListeners();
 
     try {
+      // Si el backend falla por estar vacío, devolvemos una lista vacía por defecto.
       final results = await Future.wait([
-        _getCreated(userId: userId),
-        _getFavorite(userId: userId),
-        _getInProgress(userId: userId),
-        _getCompleted(userId: userId),
+        _getCreated(userId: currentId).catchError((e) {
+          debugPrint('Info: Lista de creados vacía o error: $e');
+          return <Kahoot>[];
+        }),
+        _getFavorite(userId: currentId).catchError((e) {
+          debugPrint('Info: Lista de favoritos vacía o error: $e');
+          return <Kahoot>[];
+        }),
+        _getInProgress(userId: currentId).catchError((e) {
+          debugPrint('Info: Lista en progreso vacía o error: $e');
+          return <Kahoot>[];
+        }),
+        _getCompleted(userId: currentId).catchError((e) {
+          debugPrint('Info: Lista de completados vacía o error: $e');
+          return <Kahoot>[];
+        }),
       ]);
 
       _createdKahoots = results[0];
@@ -72,26 +97,30 @@ class LibraryProvider with ChangeNotifier {
 
       _state = LibraryState.loaded;
     } catch (e) {
-      _createdKahoots = [];
-      _favoriteKahoots = [];
+      // Este bloque solo se ejecutará si algo falla catastróficamente
       _state = LibraryState.error;
-      debugPrint('Error al cargar listas de la biblioteca: $e');
+      debugPrint('Error crítico en la biblioteca: $e');
     }
     notifyListeners();
   }
 
   Future<KahootProgress?> getKahootProgress(String kahootId) {
-    return _getKahootProgress.execute(kahootId: kahootId, userId: userId);
+    final currentId = userId;
+    if (currentId == null) return Future.value(null);
+    return _getKahootProgress.execute(kahootId: kahootId, userId: currentId);
   }
 
   Future<void> toggleFavoriteStatus({
     required String kahootId,
     required bool currentStatus,
   }) async {
+    final currentId = userId;
+    if (currentId == null) return;
+
     await _toggleFavorite.execute(
       kahootId: kahootId,
       isFavorite: !currentStatus,
-      userId: userId,
+      userId: currentId,
     );
 
     await loadAllLists();
@@ -102,14 +131,16 @@ class LibraryProvider with ChangeNotifier {
     required double newPercentage,
     required bool isCompleted,
   }) async {
+    final currentId = userId;
+    if (currentId == null) return;
+
     await _updateProgress.execute(
       kahootId: kahootId,
-      userId: userId,
+      userId: currentId,
       newPercentage: newPercentage,
       isCompleted: isCompleted,
     );
 
-    // Recargar todas las listas para reflejar el cambio en la UI
     await loadAllLists();
   }
 }
