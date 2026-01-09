@@ -8,15 +8,9 @@ class KahootCard extends StatelessWidget{
   final Uint8List? coverBytes;
   final String? coverUrlOverride;
   final bool isLocalCopy;
+  final String? authorNameOverride;
 
-  const KahootCard({
-    super.key,
-    required this.kahoot,
-    required this.onTap,
-    this.coverBytes,
-    this.coverUrlOverride,
-    this.isLocalCopy = false,
-  });
+  KahootCard({required this.kahoot, required this.onTap, this.coverBytes, this.coverUrlOverride, this.isLocalCopy = false, this.authorNameOverride});
 
   @override
   Widget build(BuildContext context){
@@ -49,6 +43,7 @@ class KahootCard extends StatelessWidget{
                       color: Colors.grey[300],
                       child: Icon(Icons.broken_image, color: Colors.grey[600]),
                     ),
+
                   )
                 : (coverUrlOverride != null && coverUrlOverride!.startsWith('http')
                     ? Image.network(
@@ -93,6 +88,7 @@ class KahootCard extends StatelessWidget{
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
+
                       ),
                       if (isLocalCopy && kahoot.title.contains('(copia)')) ...[
                         SizedBox(width: 6),
@@ -109,7 +105,7 @@ class KahootCard extends StatelessWidget{
                   ),
                   SizedBox(height: 6),
                   Text(
-                    '${kahoot.authorId} • ${kahoot.questions.length} preguntas',
+                    '${authorNameOverride ?? kahoot.authorId} • ${kahoot.questions.length} preguntas',
                     style: TextStyle(
                       color: Colors.grey,
                       fontSize: base * 0.03,

@@ -14,3 +14,9 @@ class NetworkFailure extends Failure {
 class ValidationFailure extends Failure {
   ValidationFailure(String message) : super('Error de validacion: $message');
 }
+
+//Manejamos errores en caso de que haya errores inesperados
+class UnknownFailure extends Failure {
+  UnknownFailure({String? detail})
+      : super('Ocurrió un error inesperado${detail != null ? ': $detail' : ''}.');
+}
