@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
+import '../../domain/constants/multiplayer_constants.dart';
 import '../../domain/repositories/multiplayer_session_realtime.dart';
 
 /// Capa delgada sobre `socket_io_client` que estandariza headers de auth,
@@ -37,25 +38,25 @@ class MultiplayerSocketClient {
     final token = params.jwt ?? await _defaultTokenProvider?.call();
     if (token == null || token.isEmpty) {
       _statusController.add(MultiplayerSocketStatus.error);
-      throw StateError('A valid JWT is required to open the multiplayer socket.');
+      throw StateError(MultiplayerConstants.errorMissingJwt);
     }
     final sanitizedToken = token.trim();
     if (sanitizedToken.isEmpty) {
       _statusController.add(MultiplayerSocketStatus.error);
-      throw StateError('A valid JWT is required to open the multiplayer socket.');
+      throw StateError(MultiplayerConstants.errorMissingJwt);
     }
 
     final target = _buildNamespaceUrl();
     final authHeaderValue = 'Bearer $sanitizedToken';
     final headers = {
-      'pin': params.pin,
-      'role': params.role.toHeaderValue(),
-      'jwt': sanitizedToken,
-      'Authorization': authHeaderValue,
-      'authorization': authHeaderValue,
+      MultiplayerConstants.headerPin: params.pin,
+      MultiplayerConstants.headerRole: params.role.toHeaderValue(),
+      MultiplayerConstants.headerJwt: sanitizedToken,
+      MultiplayerConstants.headerAuthorization: authHeaderValue,
+      MultiplayerConstants.headerAuthorizationLower: authHeaderValue,
     };
     final options = io.OptionBuilder()
-        .setTransports(['websocket'])
+        .setTransports(MultiplayerConstants.socketTransports)
         .enableForceNew()
         .disableAutoConnect()
         .setExtraHeaders(headers)

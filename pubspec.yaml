@@ -92,9 +92,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  # The "flutter_lints" package below contains a set of recommended lints...
-  flutter_lints: ^6.0.0
-
   # Para generar íconos de la app
   flutter_launcher_icons: ^0.14.4
 

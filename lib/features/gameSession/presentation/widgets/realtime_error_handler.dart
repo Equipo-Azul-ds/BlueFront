@@ -1,30 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:Trivvy/core/widgets/standard_dialogs.dart';
 
+import '../../application/dtos/multiplayer_socket_events.dart';
 import '../controllers/multiplayer_session_controller.dart';
 
 /// Gestiona errores de conexión/sincronización del socket y muestra un diálogo bloqueante.
 class RealtimeErrorHandler {
-  Map<String, dynamic>? _handledConnectionError;
-  Map<String, dynamic>? _handledSyncError;
+  ConnectionErrorEvent? _handledConnectionError;
+  SyncErrorEvent? _handledSyncError;
 
   void handle({
     required BuildContext context,
     required MultiplayerSessionController controller,
     required VoidCallback onExit,
   }) {
-    final conn = controller.connectionErrorPayload;
+    final conn = controller.connectionErrorDto;
     if (conn != null && !identical(conn, _handledConnectionError)) {
       _handledConnectionError = conn;
-      final message = conn['message']?.toString() ?? 'Error de conexión.';
+      final message = conn.message ?? 'Error de conexión.';
       _showBlockingDialog(context, message, onExit);
       return;
     }
 
-    final sync = controller.syncErrorPayload;
+    final sync = controller.syncErrorDto;
     if (sync != null && !identical(sync, _handledSyncError)) {
       _handledSyncError = sync;
-      final message = sync['message']?.toString() ?? 'Error de sincronización.';
+      final message = sync.message ?? 'Error de sincronización.';
       _showBlockingDialog(context, message, onExit);
     }
   }

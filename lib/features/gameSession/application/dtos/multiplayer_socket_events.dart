@@ -149,6 +149,7 @@ class PlayerGameEndEvent {
     required this.totalQuestions,
     required this.correctAnswers,
     required this.answers,
+    required this.finalPodium,
   });
 
   final String state;
@@ -160,6 +161,8 @@ class PlayerGameEndEvent {
   final int totalQuestions;
   final int correctAnswers;
   final List<PlayerAnswerSummary> answers;
+  /// Top-3 players for podium display. May be empty if backend doesn't send it.
+  final List<LeaderboardEntry> finalPodium;
 
   factory PlayerGameEndEvent.fromJson(Map<String, dynamic> json) {
     final answers = _parseAnswerSummaries(json);
@@ -188,6 +191,7 @@ class PlayerGameEndEvent {
       totalQuestions: totalQuestions,
       correctAnswers: correctAnswers,
       answers: List.unmodifiable(_fillAnswerGaps(answers, totalQuestions)),
+      finalPodium: _parseList(json['finalPodium'], (map) => LeaderboardEntry.fromJson(map)),
     );
   }
 }
@@ -276,6 +280,47 @@ class ConnectionErrorEvent {
 
   factory ConnectionErrorEvent.fromJson(Map<String, dynamic> json) {
     return ConnectionErrorEvent(message: _nullableString(json['message']));
+  }
+}
+
+/// Confirmación de conexión exitosa para el host.
+class HostConnectedSuccessEvent {
+  HostConnectedSuccessEvent({this.message});
+
+  final String? message;
+
+  factory HostConnectedSuccessEvent.fromJson(Map<String, dynamic> json) {
+    return HostConnectedSuccessEvent(message: _nullableString(json['message']));
+  }
+}
+
+/// Confirmación de respuesta enviada por el jugador.
+class PlayerAnswerConfirmationEvent {
+  PlayerAnswerConfirmationEvent({this.received, this.message});
+
+  final bool? received;
+  final String? message;
+
+  factory PlayerAnswerConfirmationEvent.fromJson(Map<String, dynamic> json) {
+    return PlayerAnswerConfirmationEvent(
+      received: _bool(json['received']),
+      message: _nullableString(json['message']),
+    );
+  }
+}
+
+/// Error de juego enviado por el servidor ante comandos inválidos.
+class GameErrorEvent {
+  GameErrorEvent({this.code, this.message});
+
+  final String? code;
+  final String? message;
+
+  factory GameErrorEvent.fromJson(Map<String, dynamic> json) {
+    return GameErrorEvent(
+      code: _nullableString(json['code']),
+      message: _nullableString(json['message']),
+    );
   }
 }
 

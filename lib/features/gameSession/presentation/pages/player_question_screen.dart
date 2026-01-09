@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
 import 'package:Trivvy/core/constants/answer_option_palette.dart';
 import 'package:Trivvy/core/widgets/answer_option_card.dart';
+import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
 
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../controllers/multiplayer_session_controller.dart';
@@ -168,6 +170,15 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
         final maxSelections = _currentMaxSelections;
         if (maxSelections != null && maxSelections > 0) {
           if (_selectedAnswerIds.length >= maxSelections) {
+            // Show feedback that max selections reached
+            HapticFeedback.heavyImpact();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Máximo $maxSelections opciones permitidas'),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
             return;
           }
         }
@@ -187,6 +198,8 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
 
     final controller = context.read<MultiplayerSessionController>();
     setState(() => _answerSubmitted = true);
+    _countdown.cancel();
+    HapticFeedback.mediumImpact();
     final issuedAt = controller.questionStartedAt ?? DateTime.now();
     final elapsedMs = DateTime.now().difference(issuedAt).inMilliseconds;
 
@@ -281,24 +294,7 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
                     ),
                   ],
                   const SizedBox(height: 12),
-                  Container(
-                    width: 72,
-                    height: 72,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white30, width: 2),
-                    ),
-                    child: Text(
-                      '$_timeRemaining',
-                      style: const TextStyle(
-                        color: AppColor.primary,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  _AnimatedTimer(timeRemaining: _timeRemaining),
                   const SizedBox(height: 16),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -377,15 +373,20 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
                           itemBuilder: (context, index) {
                             final option = options[index];
                             final answerId = option.id;
-                            return AnswerOptionCard(
-                              text: option.text,
-                              icon: answerOptionIcons[
-                                  index % answerOptionIcons.length],
-                              color: answerOptionColors[
-                                  index % answerOptionColors.length],
-                              selected: _selectedAnswerIds.contains(answerId),
-                              disabled: _answerSubmitted,
-                              onTap: () => _handleOptionTap(answerId),
+                            return StaggeredFadeSlide(
+                              index: index,
+                              duration: const Duration(milliseconds: 350),
+                              staggerDelay: const Duration(milliseconds: 60),
+                              child: AnswerOptionCard(
+                                text: option.text,
+                                icon: answerOptionIcons[
+                                    index % answerOptionIcons.length],
+                                color: answerOptionColors[
+                                    index % answerOptionColors.length],
+                                selected: _selectedAnswerIds.contains(answerId),
+                                disabled: _answerSubmitted,
+                                onTap: () => _handleOptionTap(answerId),
+                              ),
                             );
                           },
                         );
@@ -456,6 +457,97 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Timer animado con efecto de pulso y cambio de número suave.
+class _AnimatedTimer extends StatefulWidget {
+  const _AnimatedTimer({required this.timeRemaining});
+
+  final int timeRemaining;
+
+  @override
+  State<_AnimatedTimer> createState() => _AnimatedTimerState();
+}
+
+class _AnimatedTimerState extends State<_AnimatedTimer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+  int _previousTime = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _previousTime = widget.timeRemaining;
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedTimer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.timeRemaining != widget.timeRemaining) {
+      _previousTime = oldWidget.timeRemaining;
+      _pulseController.forward().then((_) => _pulseController.reverse());
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLowTime = widget.timeRemaining <= 5;
+    final bgColor = isLowTime ? Colors.red.shade400 : Colors.white;
+    final textColor = isLowTime ? Colors.white : AppColor.primary;
+    final borderColor = isLowTime ? Colors.red.shade200 : Colors.white30;
+
+    return ScaleTransition(
+      scale: _pulseAnimation,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: 72,
+        height: 72,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bgColor,
+          shape: BoxShape.circle,
+          border: Border.all(color: borderColor, width: 2),
+          boxShadow: isLowTime
+              ? [
+                  BoxShadow(
+                    color: Colors.red.withValues(alpha: 0.4),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : null,
+        ),
+        child: TweenAnimationBuilder<int>(
+          tween: IntTween(begin: _previousTime, end: widget.timeRemaining),
+          duration: const Duration(milliseconds: 150),
+          builder: (context, value, child) {
+            return Text(
+              '$value',
+              style: TextStyle(
+                color: textColor,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            );
+          },
         ),
       ),
     );

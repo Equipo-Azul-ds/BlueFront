@@ -1,13 +1,60 @@
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
+import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
 
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../controllers/multiplayer_session_controller.dart';
+import '../widgets/shared_podium.dart';
 
 /// Podio final para el anfitrión al terminar la partida.
-class HostResultsScreen extends StatelessWidget {
+class HostResultsScreen extends StatefulWidget {
   const HostResultsScreen({super.key});
+
+  @override
+  State<HostResultsScreen> createState() => _HostResultsScreenState();
+}
+
+class _HostResultsScreenState extends State<HostResultsScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<double> _scaleAnimation;
+  late final ConfettiController _confettiController;
+  bool _confettiPlayed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
+    _fadeAnimation = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
+    );
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  void _triggerConfetti() {
+    if (_confettiPlayed) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _confettiPlayed) return;
+      setState(() => _confettiPlayed = true);
+      _confettiController.play();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,115 +90,158 @@ class HostResultsScreen extends StatelessWidget {
     final top3 = standings.take(3).toList();
     final rest = standings.skip(3).toList();
 
+    // Trigger confetti on first build with standings
+    if (standings.isNotEmpty) {
+      _triggerConfetti();
+    }
+
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColor.primary, AppColor.secundary],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 960),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppColor.primary, AppColor.secundary],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 960),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Podio final',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                              ),
+                        FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '🏆 Podio final',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    quizTitle,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    playersLabel,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    ),
+                                    Text(
+                                      totalQuestions > 0
+                                          ? '$totalQuestions preguntas'
+                                          : 'Total de preguntas no disponible',
+                                      style: const TextStyle(color: Colors.white60),
+                                    ),
+                                  ],
+                                ),
+                                FilledButton.tonal(
+                                  onPressed: () => Navigator.of(context)
+                                      .popUntil((route) => route.isFirst),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: AppColor.primary,
+                                  ),
+                                  child: const Text('Salir'),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              quizTitle,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              playersLabel,
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              totalQuestions > 0
-                                  ? '$totalQuestions preguntas'
-                                  : 'Total de preguntas no disponible',
-                              style: const TextStyle(color: Colors.white60),
-                            ),
-                          ],
-                        ),
-                        FilledButton.tonal(
-                          onPressed: () => Navigator.of(context)
-                              .popUntil((route) => route.isFirst),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: AppColor.primary,
                           ),
-                          child: const Text('Salir'),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: standings.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'Aún no hay datos del podio.',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                )
+                              : Column(
+                                  children: [
+                                    FadeTransition(
+                                      opacity: _fadeAnimation,
+                                      child: ScaleTransition(
+                                        scale: _scaleAnimation,
+                                        child: SharedPodium(top3: top3),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Expanded(
+                                      child: FadeTransition(
+                                        opacity: _fadeAnimation,
+                                        child: Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(18),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(alpha: 0.08),
+                                                blurRadius: 18,
+                                                offset: const Offset(0, 12),
+                                              ),
+                                            ],
+                                          ),
+                                          child: RestOfLeaderboard(entries: rest),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
-                              blurRadius: 20,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
-                        ),
-                        child: standings.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'Aún no hay datos del podio.',
-                                  style: TextStyle(color: AppColor.primary),
-                                ),
-                              )
-                            : Column(
-                                children: [
-                                  _Podium(top3: top3),
-                                  const SizedBox(height: 20),
-                                  Expanded(
-                                    child: _RestOfBoard(entries: rest),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+          IgnorePointer(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                emissionFrequency: 0.03,
+                numberOfParticles: 30,
+                gravity: 0.08,
+                colors: const [
+                  Colors.white,
+                  AppColor.primary,
+                  AppColor.secundary,
+                  AppColor.accent,
+                  Color(0xFFFFCC00), // Gold
+                  Color(0xFFC0C0C0), // Silver
+                  Color(0xFFCD7F32), // Bronze
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -167,203 +257,4 @@ class HostResultsScreen extends StatelessWidget {
   }
 }
 
-/// Bloque visual del podio (top 3).
-class _Podium extends StatelessWidget {
-  const _Podium({required this.top3});
 
-  final List<LeaderboardEntry> top3;
-
-  @override
-  Widget build(BuildContext context) {
-    final padded = List<LeaderboardEntry>.from(top3);
-    padded.sort((a, b) => a.rank.compareTo(b.rank));
-    final children = <Widget>[];
-    if (padded.length > 1) {
-      children.add(_PodiumColumn(entry: padded[1], heightFactor: 0.8));
-    }
-    if (padded.isNotEmpty) {
-      children.add(_PodiumColumn(entry: padded[0], heightFactor: 1.0));
-    }
-    if (padded.length > 2) {
-      children.add(_PodiumColumn(entry: padded[2], heightFactor: 0.65));
-    }
-    return SizedBox(
-      height: 260,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: children,
-        ),
-      ),
-    );
-  }
-}
-
-/// Columna individual del podio con rank, puntos y nombre.
-class _PodiumColumn extends StatelessWidget {
-  const _PodiumColumn({required this.entry, required this.heightFactor});
-
-  final LeaderboardEntry entry;
-  final double heightFactor;
-
-  @override
-  Widget build(BuildContext context) {
-    final rank = entry.rank <= 0 ? 1 : entry.rank;
-    final Color rankColor = rank == 1
-        ? const Color(0xFFFFCC00)
-        : rank == 2
-            ? const Color(0xFFC0C0C0)
-            : const Color(0xFFCD7F32);
-    final IconData rankIcon = rank == 1
-        ? Icons.looks_one_rounded
-        : rank == 2
-            ? Icons.looks_two_rounded
-            : Icons.looks_3_rounded;
-    final int columnHeight = (240 * heightFactor).round();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColor.accent,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              entry.nickname,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: 96,
-            height: columnHeight.toDouble(),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.06),
-                  blurRadius: 12,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: rankColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(rankIcon, color: Colors.white, size: 28),
-                ),
-                Column(
-                  children: [
-                    Text(
-                      '${entry.score}',
-                      style: TextStyle(
-                        color: AppColor.primary,
-                        fontSize: rank == 1 ? 22 : 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Posición $rank',
-                      style: const TextStyle(color: Colors.black54),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Lista del resto del tablero más allá del top 3.
-class _RestOfBoard extends StatelessWidget {
-  const _RestOfBoard({required this.entries});
-
-  final List<LeaderboardEntry> entries;
-
-  @override
-  Widget build(BuildContext context) {
-    if (entries.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return ListView.separated(
-      itemCount: entries.length,
-      separatorBuilder: (_, __) => const Divider(height: 20),
-      itemBuilder: (context, index) {
-        final standing = entries[index];
-        final rank = standing.rank <= 0 ? index + 4 : standing.rank;
-        return Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: AppColor.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                '$rank',
-                style: const TextStyle(
-                  color: AppColor.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    standing.nickname,
-                    style: const TextStyle(
-                      color: AppColor.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Puntuación final',
-                    style: TextStyle(color: Colors.black54, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            Text(
-              '${standing.score} pts',
-              style: const TextStyle(
-                color: AppColor.primary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}

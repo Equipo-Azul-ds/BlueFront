@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import 'core/constants/colors.dart';
+import 'local/secure_storage.dart';
 
 import 'features/Administrador/Aplication/DataSource/IUserDataSource.dart';
 import 'features/Administrador/Aplication/UseCases/DeleteUserUseCase.dart';
@@ -54,6 +55,10 @@ import 'features/media/application/upload_media_usecase.dart';
 import 'features/media/application/get_media_usecase.dart';
 import 'features/media/application/delete_media_usecase.dart';
 import 'features/kahoot/domain/entities/Quiz.dart';
+import 'features/report/domain/repositories/reports_repository.dart';
+import 'features/report/infrastructure/repositories/reports_repository_impl.dart';
+import 'features/report/application/use_cases/report_usecases.dart';
+import 'features/report/presentation/blocs/reports_list_bloc.dart';
 import 'features/gameSession/domain/repositories/multiplayer_session_repository.dart';
 import 'features/gameSession/domain/repositories/multiplayer_session_realtime.dart';
 import 'features/gameSession/application/use_cases/multiplayer_session_usecases.dart';
@@ -91,29 +96,29 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
 
-  defaultValue: 'https://backcomun-gc5j.onrender.com',
+  defaultValue: 'https://quizzy-backend-0wh2.onrender.com/api',
 
 );
 
 // Token (UUID) usado mientras el backend mockea la verificación real.
 const String apiAuthToken = String.fromEnvironment('API_AUTH_TOKEN', defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333');
+// Feature flag to allow running without Firebase; enable with --dart-define=ENABLE_FIREBASE=true
+const bool firebaseEnabled = bool.fromEnvironment('ENABLE_FIREBASE', defaultValue: false);
 
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (!firebaseEnabled) return;
   await Firebase.initializeApp();
   print("Mensaje recibido en segundo plano: ${message.messageId}");
 }
 
 Future<void> main() async {
-  // Mostrar en consola la URL base que la app está usando (útil para depuración)
-  if (kDebugMode) {
-    debugPrint('API_BASE_URL = $apiBaseUrl');
-  }
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-
-  // Configurar el handler de segundo plano
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  if (firebaseEnabled) {
+    await Firebase.initializeApp();
+    // Configurar el handler de segundo plano solo cuando Firebase está habilitado
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
   runApp(MyApp());
 }
 
@@ -126,6 +131,47 @@ class MyApp extends StatelessWidget {
       providers: [
         Provider<http.Client>(
           create: (_) => http.Client(),
+        ),
+
+        // Reportes: repo + casos de uso + BLoC (ChangeNotifier)
+        Provider<ReportsRepository>(
+          create: (context) => ReportsRepositoryImpl(
+            baseUrl: apiBaseUrl,
+            client: context.read<http.Client>(),
+            headersProvider: () async {
+              final token = await SecureStorage.instance.read('userId');
+              return {
+                'Content-Type': 'application/json',
+                if (token != null && token.isNotEmpty)
+                  'Authorization': 'Bearer $token',
+              };
+            },
+          ),
+        ),
+        Provider<GetMyResultsUseCase>(
+          create: (context) => GetMyResultsUseCase(
+            context.read<ReportsRepository>(),
+          ),
+        ),
+        Provider<GetSessionReportUseCase>(
+          create: (context) => GetSessionReportUseCase(
+            context.read<ReportsRepository>(),
+          ),
+        ),
+        Provider<GetMultiplayerResultUseCase>(
+          create: (context) => GetMultiplayerResultUseCase(
+            context.read<ReportsRepository>(),
+          ),
+        ),
+        Provider<GetSingleplayerResultUseCase>(
+          create: (context) => GetSingleplayerResultUseCase(
+            context.read<ReportsRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider<ReportsListBloc>(
+          create: (context) => ReportsListBloc(
+            getMyResultsUseCase: context.read<GetMyResultsUseCase>(),
+          ),
         ),
 
         Provider<IUserDataSource>(
@@ -154,7 +200,6 @@ class MyApp extends StatelessWidget {
             context.read<IUserRepository>(),
           ),
         ),
-
         ChangeNotifierProvider(
           create: (context) => UserManagementProvider(
             getUserListUseCase: context.read<GetUserListUseCase>(),
@@ -199,6 +244,7 @@ class MyApp extends StatelessWidget {
                 client: context.read<http.Client>(),
               ),
             ),
+            firebaseEnabled: firebaseEnabled,
           )..initNotifications(),
         ),
         Provider<SinglePlayerGameRepositoryImpl>(
@@ -236,7 +282,6 @@ class MyApp extends StatelessWidget {
             repository: context.read<SinglePlayerGameRepository>(),
           ),
         ),
-
         ChangeNotifierProxyProvider4<IDiscoverRepository, ThemeRepository, NotificationProvider, IUserRepository, DashboardProvider>(
           create: (context) => DashboardProvider(
             quizRepository: context.read<IDiscoverRepository>(),
@@ -251,8 +296,6 @@ class MyApp extends StatelessWidget {
             userRepository: user,
           )..loadDashboardData(),
         ),
-
-
         ChangeNotifierProvider<SinglePlayerChallengeBloc>(
           create: (context) => SinglePlayerChallengeBloc(
             startAttemptUseCase: context.read<StartAttemptUseCase>(),
@@ -261,7 +304,6 @@ class MyApp extends StatelessWidget {
             attemptTracker: context.read<SinglePlayerAttemptTracker>(),
           ),
         ),
-
         ChangeNotifierProvider<SinglePlayerResultsBloc>(
           create: (context) => SinglePlayerResultsBloc(
             getSummaryUseCase: context.read<GetSummaryUseCase>(),
@@ -439,8 +481,6 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ],
-
-
       child: UserProviders(
         baseUrl: apiBaseUrl,
         child: Builder(
@@ -497,7 +537,6 @@ class MyApp extends StatelessWidget {
                   bool explicitClear = false;
                   if (args is Quiz) template = args;
                   if (args is Map && args['clear'] == true) explicitClear = true;
-
                   final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
                   final shouldClear = template == null &&
                       (explicitClear ||

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
 import 'package:Trivvy/core/constants/answer_option_palette.dart';
 import 'package:Trivvy/core/widgets/answer_option_card.dart';
+import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
 
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../controllers/multiplayer_session_controller.dart';
@@ -113,7 +114,8 @@ class _HostGameScreenState extends State<HostGameScreen> {
     final quizTitle = controller.quizTitle ?? 'Trivvy!';
     final headerSubtitle = _buildHeaderSubtitle(slide, hostResults);
     final options = _buildOptionsFromDto(slide, hostResults);
-    final topPlayers = _extractTopPlayersFromDto(hostResults);
+    final leaderboardEntries = hostResults?.leaderboard ??
+      const <LeaderboardEntry>[];
 
     final primaryCta = _buildPrimaryCta(controller, slide != null);
 
@@ -236,12 +238,22 @@ class _HostGameScreenState extends State<HostGameScreen> {
                                     text: slide.questionText,
                                   ),
                                   const SizedBox(height: 14),
-                                  showingResults
-                                      ? _StatsCard(options: options)
-                                      : _MediaAndTimerBlock(
-                                          time: _timeRemaining,
-                                          imageUrl: slide.imageUrl,
-                                        ),
+                                  if (showingResults) ...[
+                                    StaggeredFadeSlide(
+                                      index: 0,
+                                      child: _StatsCard(options: options),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    StaggeredFadeSlide(
+                                      index: 1,
+                                      child: _ResultsLeaderboard(entries: leaderboardEntries),
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ] else
+                                    _MediaAndTimerBlock(
+                                      time: _timeRemaining,
+                                      imageUrl: slide.imageUrl,
+                                    ),
                                   const SizedBox(height: 16),
                                   GridView.builder(
                                     shrinkWrap: true,
@@ -255,16 +267,21 @@ class _HostGameScreenState extends State<HostGameScreen> {
                                           childAspectRatio: childAspectRatio,
                                         ),
                                     itemCount: options.length,
-                                    itemBuilder: (_, index) => _AnswerTile(
-                                      option: options[index],
-                                      showResults: showingResults,
-                                    ),
+                                    itemBuilder: (_, index) {
+                                      final tile = _AnswerTile(
+                                        option: options[index],
+                                        showResults: showingResults,
+                                      );
+                                      // When showing results, animate each tile
+                                      if (showingResults) {
+                                        return StaggeredFadeSlide(
+                                          index: 2 + index, // offset by stats + leaderboard
+                                          child: tile,
+                                        );
+                                      }
+                                      return tile;
+                                    },
                                   ),
-                                  if (showingResults &&
-                                      topPlayers.isNotEmpty) ...[
-                                    const SizedBox(height: 12),
-                                    _TopPlayersStrip(players: topPlayers),
-                                  ],
                                 ],
                               ),
                             );
@@ -460,29 +477,47 @@ class _StatsCard extends StatelessWidget {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: options.map((option) {
+        children: options.asMap().entries.map((entry) {
+          final index = entry.key;
+          final option = entry.value;
           final heightFactor = maxVotes == 0
               ? 0.15
               : (option.responses / maxVotes).clamp(0.15, 1.0);
           return Column(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (option.isCorrect)
-                const Icon(Icons.check_circle, color: AppColor.success)
-              else
-                const SizedBox(height: 24),
+              TweenAnimationBuilder<double>(
+                duration: Duration(milliseconds: 400 + index * 100),
+                curve: Curves.easeOutBack,
+                tween: Tween(begin: 0.0, end: option.isCorrect ? 1.0 : 0.0),
+                builder: (context, value, child) => Opacity(
+                  opacity: value,
+                  child: Transform.scale(
+                    scale: 0.5 + 0.5 * value,
+                    child: child,
+                  ),
+                ),
+                child: option.isCorrect
+                    ? const Icon(Icons.check_circle, color: AppColor.success)
+                    : const SizedBox(height: 24),
+              ),
               const SizedBox(height: 6),
-              Container(
-                width: 50,
-                height: 160 * heightFactor,
-                decoration: BoxDecoration(
-                  color: option.color,
-                  borderRadius: BorderRadius.circular(12),
+              TweenAnimationBuilder<double>(
+                duration: Duration(milliseconds: 600 + index * 100),
+                curve: Curves.easeOutCubic,
+                tween: Tween(begin: 0.0, end: heightFactor),
+                builder: (context, animatedHeight, _) => Container(
+                  width: 50,
+                  height: 160 * animatedHeight,
+                  decoration: BoxDecoration(
+                    color: option.color,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                '${option.responses}',
+              AnimatedCounter(
+                value: option.responses,
                 style: const TextStyle(
                   color: AppColor.primary,
                   fontWeight: FontWeight.bold,
@@ -535,14 +570,28 @@ class _AnswerTile extends StatelessWidget {
   }
 }
 
-/// Lista rápida de los mejores puntajes tras cada pregunta.
-class _TopPlayersStrip extends StatelessWidget {
-  const _TopPlayersStrip({required this.players});
+/// Lista ordenada de jugadores (por puntuación) bajo el gráfico de distribución.
+class _ResultsLeaderboard extends StatelessWidget {
+  const _ResultsLeaderboard({required this.entries});
 
-  final List<_TopPlayer> players;
+  final List<LeaderboardEntry> entries;
 
   @override
   Widget build(BuildContext context) {
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    final sorted = List<LeaderboardEntry>.from(entries)
+      ..sort((a, b) {
+        final scoreDiff = b.score.compareTo(a.score);
+        if (scoreDiff != 0) return scoreDiff;
+        // Tie-breaker: lower rank first when present.
+        if (a.rank != 0 && b.rank != 0) {
+          final rankDiff = a.rank.compareTo(b.rank);
+          if (rankDiff != 0) return rankDiff;
+        }
+        return a.nickname.compareTo(b.nickname);
+      });
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -555,23 +604,66 @@ class _TopPlayersStrip extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Mejores jugadores',
+            'Jugadores en orden',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: players.map((player) {
-              return Chip(
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                label: Text(
-                  '${player.name} • ${player.score} pts',
-                  style: const TextStyle(color: Colors.white),
+          for (int i = 0; i < sorted.length; i++)
+            StaggeredFadeSlide(
+              index: i,
+              staggerDelay: const Duration(milliseconds: 80),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      duration: Duration(milliseconds: 400 + i * 50),
+                      curve: Curves.easeOutBack,
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      builder: (context, value, child) => Transform.scale(
+                        scale: value,
+                        child: child,
+                      ),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${sorted[i].rank == 0 ? i + 1 : sorted[i].rank}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        sorted[i].nickname,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    AnimatedCounter(
+                      value: sorted[i].score,
+                      suffix: ' pts',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-              );
-            }).toList(),
-          ),
+              ),
+            ),
         ],
       ),
     );
@@ -601,14 +693,6 @@ class _HostOption {
   final IconData icon;
   final bool isCorrect;
   final int responses;
-}
-
-/// Representa un jugador destacado en el strip de resultados parciales.
-class _TopPlayer {
-  const _TopPlayer({required this.name, required this.score});
-
-  final String name;
-  final int score;
 }
 
 /// Construye subtítulo de cabecera con posición de pregunta.
@@ -666,14 +750,4 @@ Set<String> _extractCorrectAnswerIdsFromDto(HostResultsEvent? hostResults) {
 Map<String, int> _extractResponseCountsFromDto(HostResultsEvent? hostResults) {
   if (hostResults == null) return const <String, int>{};
   return Map<String, int>.from(hostResults.stats.distribution);
-}
-
-/// Obtiene leaderboard parcial para mostrar en la cinta de mejores jugadores.
-List<_TopPlayer> _extractTopPlayersFromDto(HostResultsEvent? hostResults) {
-  if (hostResults == null) return const <_TopPlayer>[];
-  final sorted = List<LeaderboardEntry>.from(hostResults.leaderboard)
-    ..sort((a, b) => b.score.compareTo(a.score));
-  return sorted
-      .map((entry) => _TopPlayer(name: entry.nickname, score: entry.score))
-      .toList(growable: false);
 }

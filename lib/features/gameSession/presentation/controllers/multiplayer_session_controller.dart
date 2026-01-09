@@ -5,31 +5,14 @@ import 'package:flutter/foundation.dart';
 import '../../application/dtos/multiplayer_session_dtos.dart';
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../../application/use_cases/multiplayer_session_usecases.dart';
+import '../../domain/constants/multiplayer_constants.dart';
+import '../../domain/constants/multiplayer_events.dart';
 import '../../domain/repositories/multiplayer_session_realtime.dart';
+import '../state/multiplayer_session_state.dart';
 
-/// Fases de la sesión para renderizado/navegación en UI.
-enum SessionPhase { lobby, question, results, end }
-
-/// Jugador en lobby o leaderboard básico (sin métricas de juego).
-class SessionPlayer {
-  const SessionPlayer({required this.playerId, required this.nickname, this.isDisconnected = false});
-
-  final String playerId;
-  final String nickname;
-  final bool isDisconnected;
-
-  factory SessionPlayer.fromJson(Map<String, dynamic> json) {
-    final idValue = json['playerId']?.toString() ?? '';
-    final nicknameValue = json['nickname']?.toString() ?? 'Jugador';
-    return SessionPlayer(playerId: idValue, nickname: nicknameValue);
-  }
-
-  SessionPlayer markDisconnected() => SessionPlayer(
-        playerId: playerId,
-        nickname: nickname,
-        isDisconnected: true,
-      );
-}
+// Re-export commonly used types from state file for backwards compatibility.
+export '../state/multiplayer_session_state.dart' 
+    show SessionPhase, SessionPlayer, LobbyState, GameplayState, SessionLifecycleState;
 
 /// Orquesta la sesión multijugador: listeners de socket, estado tipado para UI
 /// y comandos del host/jugador mediante casos de uso.
@@ -91,23 +74,21 @@ class MultiplayerSessionController extends ChangeNotifier {
   MultiplayerSocketStatus _socketStatus = MultiplayerSocketStatus.idle;
   MultiplayerRole? _currentRole;
   List<SessionPlayer> _players = const [];
-  Map<String, dynamic>? _latestGameState;
-  Map<String, dynamic>? _currentQuestionEvent;
+  HostLobbyUpdateEvent? _latestGameStateDto;
   QuestionStartedEvent? _currentQuestionDto;
-  Map<String, dynamic>? _hostResultsEvent;
   HostResultsEvent? _hostResultsDto;
-  Map<String, dynamic>? _hostGameEndEvent;
   HostGameEndEvent? _hostGameEndDto;
-  Map<String, dynamic>? _playerGameEndEvent;
   PlayerGameEndEvent? _playerGameEndDto;
-  Map<String, dynamic>? _sessionClosedEvent;
-  Map<String, dynamic>? _playerResultsEvent;
+  SessionClosedEvent? _sessionClosedDto;
   PlayerResultsEvent? _playerResultsDto;
-  Map<String, dynamic>? _playerLeftEvent;
-  Map<String, dynamic>? _hostLeftEvent;
-  Map<String, dynamic>? _hostReturnedEvent;
-  Map<String, dynamic>? _syncErrorEvent;
-  Map<String, dynamic>? _connectionErrorEvent;
+  PlayerLeftSessionEvent? _playerLeftDto;
+  HostLeftSessionEvent? _hostLeftDto;
+  HostReturnedSessionEvent? _hostReturnedDto;
+  SyncErrorEvent? _syncErrorDto;
+  ConnectionErrorEvent? _connectionErrorDto;
+  HostConnectedSuccessEvent? _hostConnectedSuccessDto;
+  PlayerAnswerConfirmationEvent? _playerAnswerConfirmationDto;
+  GameErrorEvent? _gameErrorDto;
   DateTime? _questionStartedAt;
   SessionPhase _phase = SessionPhase.lobby;
   int _questionSequence = 0;
@@ -133,6 +114,9 @@ class MultiplayerSessionController extends ChangeNotifier {
   StreamSubscription<dynamic>? _hostReturnedSubscription;
   StreamSubscription<dynamic>? _syncErrorSubscription;
   StreamSubscription<dynamic>? _connectionErrorSubscription;
+  StreamSubscription<dynamic>? _hostConnectedSuccessSubscription;
+  StreamSubscription<dynamic>? _playerAnswerConfirmationSubscription;
+  StreamSubscription<dynamic>? _gameErrorSubscription;
 
   /// Estado de creación de sala (host).
   bool get isCreatingSession => _isCreatingSession;
@@ -142,57 +126,74 @@ class MultiplayerSessionController extends ChangeNotifier {
   String? get sessionPin => _currentPin ?? _hostSession?.sessionPin;
   String? get qrToken => _hostSession?.qrToken;
   String? get currentNickname => _currentNickname;
-  String? get quizTitle =>
-      _latestGameState?['quizTitle']?.toString() ?? _hostSession?.quizTitle;
+  String? get quizTitle => _hostSession?.quizTitle;
   MultiplayerSocketStatus get socketStatus => _socketStatus;
   MultiplayerRole? get currentRole => _currentRole;
   List<SessionPlayer> get lobbyPlayers => List.unmodifiable(_players);
-  Map<String, dynamic>? get latestGameState =>
-      _latestGameState == null ? null : Map<String, dynamic>.from(_latestGameState!);
-    Map<String, dynamic>? get currentQuestion => _currentQuestionEvent == null
-      ? null
-      : Map<String, dynamic>.from(_currentQuestionEvent!);
-    QuestionStartedEvent? get currentQuestionDto => _currentQuestionDto;
-    Map<String, dynamic>? get hostResults => _hostResultsEvent == null
-      ? null
-      : Map<String, dynamic>.from(_hostResultsEvent!);
-    HostResultsEvent? get hostResultsDto => _hostResultsDto;
-    Map<String, dynamic>? get playerResults => _playerResultsEvent == null
-      ? null
-      : Map<String, dynamic>.from(_playerResultsEvent!);
-    PlayerResultsEvent? get playerResultsDto => _playerResultsDto;
-    Map<String, dynamic>? get hostGameEnd => _hostGameEndEvent == null
-      ? null
-      : Map<String, dynamic>.from(_hostGameEndEvent!);
-    HostGameEndEvent? get hostGameEndDto => _hostGameEndDto;
-    Map<String, dynamic>? get playerGameEnd => _playerGameEndEvent == null
-      ? null
-      : Map<String, dynamic>.from(_playerGameEndEvent!);
-    PlayerGameEndEvent? get playerGameEndDto => _playerGameEndDto;
-    Map<String, dynamic>? get sessionClosedPayload => _sessionClosedEvent == null
-      ? null
-      : Map<String, dynamic>.from(_sessionClosedEvent!);
-    Map<String, dynamic>? get playerLeftPayload => _playerLeftEvent == null
-      ? null
-      : Map<String, dynamic>.from(_playerLeftEvent!);
-    Map<String, dynamic>? get hostLeftPayload => _hostLeftEvent == null
-      ? null
-      : Map<String, dynamic>.from(_hostLeftEvent!);
-    Map<String, dynamic>? get hostReturnedPayload => _hostReturnedEvent == null
-      ? null
-      : Map<String, dynamic>.from(_hostReturnedEvent!);
-    Map<String, dynamic>? get syncErrorPayload => _syncErrorEvent == null
-      ? null
-      : Map<String, dynamic>.from(_syncErrorEvent!);
-    Map<String, dynamic>? get connectionErrorPayload => _connectionErrorEvent == null
-      ? null
-      : Map<String, dynamic>.from(_connectionErrorEvent!);
-    DateTime? get questionStartedAt => _questionStartedAt;
-    SessionPhase get phase => _phase;
-    int get questionSequence => _questionSequence;
-    int get hostGameEndSequence => _hostGameEndSequence;
-    int get playerGameEndSequence => _playerGameEndSequence;
-    int? get hostAnswerSubmissions => _hostAnswerSubmissions;
+  HostLobbyUpdateEvent? get latestGameStateDto => _latestGameStateDto;
+  QuestionStartedEvent? get currentQuestionDto => _currentQuestionDto;
+  HostResultsEvent? get hostResultsDto => _hostResultsDto;
+  PlayerResultsEvent? get playerResultsDto => _playerResultsDto;
+  HostGameEndEvent? get hostGameEndDto => _hostGameEndDto;
+  PlayerGameEndEvent? get playerGameEndDto => _playerGameEndDto;
+  SessionClosedEvent? get sessionClosedDto => _sessionClosedDto;
+  PlayerLeftSessionEvent? get playerLeftDto => _playerLeftDto;
+  HostLeftSessionEvent? get hostLeftDto => _hostLeftDto;
+  HostReturnedSessionEvent? get hostReturnedDto => _hostReturnedDto;
+  SyncErrorEvent? get syncErrorDto => _syncErrorDto;
+  ConnectionErrorEvent? get connectionErrorDto => _connectionErrorDto;
+  HostConnectedSuccessEvent? get hostConnectedSuccessDto => _hostConnectedSuccessDto;
+  PlayerAnswerConfirmationEvent? get playerAnswerConfirmationDto => _playerAnswerConfirmationDto;
+  GameErrorEvent? get gameErrorDto => _gameErrorDto;
+  DateTime? get questionStartedAt => _questionStartedAt;
+  SessionPhase get phase => _phase;
+  int get questionSequence => _questionSequence;
+  int get hostGameEndSequence => _hostGameEndSequence;
+  int get playerGameEndSequence => _playerGameEndSequence;
+  int? get hostAnswerSubmissions => _hostAnswerSubmissions;
+
+  /// Returns an immutable snapshot of the current session state.
+  /// Useful for consumers that prefer working with immutable state objects.
+  MultiplayerSessionSnapshot get snapshot => MultiplayerSessionSnapshot(
+    lobby: LobbyState(
+      hostSession: _hostSession,
+      currentPin: _currentPin,
+      currentNickname: _currentNickname,
+      currentRole: _currentRole,
+      players: _players,
+      latestGameStateDto: _latestGameStateDto,
+      isCreatingSession: _isCreatingSession,
+      isJoiningSession: _isJoiningSession,
+      isResolvingQr: _isResolvingQr,
+    ),
+    gameplay: GameplayState(
+      phase: _phase,
+      currentQuestionDto: _currentQuestionDto,
+      questionStartedAt: _questionStartedAt,
+      questionSequence: _questionSequence,
+      hostAnswerSubmissions: _hostAnswerSubmissions,
+      hostResultsDto: _hostResultsDto,
+      playerResultsDto: _playerResultsDto,
+      hostGameEndDto: _hostGameEndDto,
+      hostGameEndSequence: _hostGameEndSequence,
+      playerGameEndDto: _playerGameEndDto,
+      playerGameEndSequence: _playerGameEndSequence,
+    ),
+    lifecycle: SessionLifecycleState(
+      socketStatus: _socketStatus,
+      lastError: _lastError,
+      sessionClosedDto: _sessionClosedDto,
+      playerLeftDto: _playerLeftDto,
+      hostLeftDto: _hostLeftDto,
+      hostReturnedDto: _hostReturnedDto,
+      syncErrorDto: _syncErrorDto,
+      connectionErrorDto: _connectionErrorDto,
+      hostConnectedSuccessDto: _hostConnectedSuccessDto,
+      playerAnswerConfirmationDto: _playerAnswerConfirmationDto,
+      gameErrorDto: _gameErrorDto,
+      shouldEmitClientReady: _shouldEmitClientReady,
+    ),
+  );
 
   @override
   void dispose() {
@@ -213,6 +214,9 @@ class MultiplayerSessionController extends ChangeNotifier {
     _hostReturnedSubscription?.cancel();
     _syncErrorSubscription?.cancel();
     _connectionErrorSubscription?.cancel();
+    _hostConnectedSuccessSubscription?.cancel();
+    _playerAnswerConfirmationSubscription?.cancel();
+    _gameErrorSubscription?.cancel();
     _realtime.disconnect();
     super.dispose();
   }
@@ -349,31 +353,31 @@ class MultiplayerSessionController extends ChangeNotifier {
       
   /// Limpia resultados parciales del host.
   void clearHostResults() {
-    _hostResultsEvent = null;
+    _hostResultsDto = null;
     notifyListeners();
   }
 
   /// Limpia caché de cierre de juego (host).
   void clearHostGameEnd() {
-    _hostGameEndEvent = null;
+    _hostGameEndDto = null;
     notifyListeners();
   }
 
   /// Limpia caché de cierre de juego (jugador).
   void clearPlayerGameEnd() {
-    _playerGameEndEvent = null;
+    _playerGameEndDto = null;
     notifyListeners();
   }
 
   /// Limpia cache de resultados de pregunta (jugador).
   void clearPlayerResults() {
-    _playerResultsEvent = null;
+    _playerResultsDto = null;
     notifyListeners();
   }
 
   /// Limpia evento de sesión cerrada.
   void clearSessionClosed() {
-    _sessionClosedEvent = null;
+    _sessionClosedDto = null;
     notifyListeners();
   }
 
@@ -386,24 +390,19 @@ class MultiplayerSessionController extends ChangeNotifier {
       _currentRole = null;
     }
     _players = const [];
-    _latestGameState = null;
+    _latestGameStateDto = null;
     _lastError = null;
-    _currentQuestionEvent = null;
     _currentQuestionDto = null;
-    _hostResultsEvent = null;
     _hostResultsDto = null;
-    _playerResultsEvent = null;
     _playerResultsDto = null;
-    _hostGameEndEvent = null;
     _hostGameEndDto = null;
-    _playerGameEndEvent = null;
     _playerGameEndDto = null;
-    _sessionClosedEvent = null;
-    _playerLeftEvent = null;
-    _hostLeftEvent = null;
-    _hostReturnedEvent = null;
-    _syncErrorEvent = null;
-    _connectionErrorEvent = null;
+    _sessionClosedDto = null;
+    _playerLeftDto = null;
+    _hostLeftDto = null;
+    _hostReturnedDto = null;
+    _syncErrorDto = null;
+    _connectionErrorDto = null;
     _questionStartedAt = null;
     _phase = SessionPhase.lobby;
     _questionSequence = 0;
@@ -423,7 +422,7 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _registerGameStateListener() {
     _gameStateSubscription?.cancel();
     _gameStateSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('game_state_update')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.gameStateUpdate)
         .listen(_handleGameStateSync, onError: _handleEventError);
   }
 
@@ -431,75 +430,90 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _registerLobbyListeners() {
     _hostLobbySubscription?.cancel();
     _hostLobbySubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('host_lobby_update')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostLobbyUpdate)
         .listen(_handleHostLobbyUpdate, onError: _handleEventError);
 
     _playerConnectedSubscription?.cancel();
     _playerConnectedSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>('player_connected_to_session')
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerConnectedToSession)
         .listen(_handlePlayerConnectedToSession, onError: _handleEventError);
 
     _hostAnswerUpdateSubscription?.cancel();
     _hostAnswerUpdateSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('host_answer_update')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostAnswerUpdate)
         .listen(_handleHostAnswerUpdate, onError: _handleEventError);
 
     _playerLeftSubscription?.cancel();
     _playerLeftSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>('player_left_session')
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerLeftSession)
       .listen(_handlePlayerLeftSession, onError: _handleEventError);
 
     _hostLeftSubscription?.cancel();
     _hostLeftSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>('host_left_session')
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostLeftSession)
       .listen(_handleHostLeftSession, onError: _handleEventError);
 
     _hostReturnedSubscription?.cancel();
     _hostReturnedSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>('host_returned_to_session')
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostReturnedToSession)
       .listen(_handleHostReturnedSession, onError: _handleEventError);
 
     _syncErrorSubscription?.cancel();
     _syncErrorSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>('sync_error')
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.syncError)
       .listen(_handleSyncError, onError: _handleEventError);
 
     _connectionErrorSubscription?.cancel();
     _connectionErrorSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>('connection_error')
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.connectionError)
       .listen(_handleConnectionError, onError: _handleEventError);
+
+    _hostConnectedSuccessSubscription?.cancel();
+    _hostConnectedSuccessSubscription = _realtime
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostConnectedSuccess)
+      .listen(_handleHostConnectedSuccess, onError: _handleEventError);
+
+    _playerAnswerConfirmationSubscription?.cancel();
+    _playerAnswerConfirmationSubscription = _realtime
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerAnswerConfirmation)
+      .listen(_handlePlayerAnswerConfirmation, onError: _handleEventError);
+
+    _gameErrorSubscription?.cancel();
+    _gameErrorSubscription = _realtime
+      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.gameError)
+      .listen(_handleGameError, onError: _handleEventError);
   }
 
   /// Eventos de juego en vivo (preguntas, resultados, fin de juego).
   void _registerRealtimeListeners() {
     _questionStartedSubscription?.cancel();
     _questionStartedSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('question_started')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.questionStarted)
         .listen(_handleQuestionStarted, onError: _handleEventError);
 
     _hostResultsSubscription?.cancel();
     _hostResultsSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('host_results')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostResults)
         .listen(_handleHostResults, onError: _handleEventError);
 
     _hostGameEndSubscription?.cancel();
     _hostGameEndSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('host_game_end')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostGameEnd)
         .listen(_handleHostGameEnd, onError: _handleEventError);
 
     _playerGameEndSubscription?.cancel();
     _playerGameEndSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('player_game_end')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerGameEnd)
         .listen(_handlePlayerGameEnd, onError: _handleEventError);
 
     _sessionClosedSubscription?.cancel();
     _sessionClosedSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('session_closed')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.sessionClosed)
         .listen(_handleSessionClosed, onError: _handleEventError);
 
     _playerResultsSubscription?.cancel();
     _playerResultsSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>('player_results')
+        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerResults)
         .listen(_handlePlayerResults, onError: _handleEventError);
   }
 
@@ -527,7 +541,7 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _handleGameStateSync(Map<String, dynamic> payload) {
     try {
       final event = HostLobbyUpdateEvent.fromJson(payload);
-      _latestGameState = Map<String, dynamic>.from(payload);
+      _latestGameStateDto = event;
       _applyPlayersFromPayload(event.players);
       _phase = _parsePhase(event.state);
       notifyListeners();
@@ -540,7 +554,7 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _handleHostLobbyUpdate(Map<String, dynamic> payload) {
     try {
       final event = HostLobbyUpdateEvent.fromJson(payload);
-      _latestGameState = Map<String, dynamic>.from(payload);
+      _latestGameStateDto = event;
       _applyPlayersFromPayload(event.players);
       _phase = _parsePhase(event.state);
       notifyListeners();
@@ -553,7 +567,6 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _handlePlayerConnectedToSession(Map<String, dynamic> payload) {
     try {
       final event = PlayerConnectedEvent.fromJson(payload);
-      _latestGameState = Map<String, dynamic>.from(payload);
       if (event.nickname.isNotEmpty) {
         _currentNickname = event.nickname;
       }
@@ -579,7 +592,7 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _handlePlayerLeftSession(Map<String, dynamic> payload) {
     try {
       final event = PlayerLeftSessionEvent.fromJson(payload);
-      _playerLeftEvent = Map<String, dynamic>.from(payload);
+      _playerLeftDto = event;
       final leavingId = event.userId;
       final leavingNick = event.nickname;
       if (_players.isNotEmpty && (leavingId != null || leavingNick != null)) {
@@ -600,8 +613,8 @@ class MultiplayerSessionController extends ChangeNotifier {
   /// Recibe aviso de que el host abandonó.
   void _handleHostLeftSession(Map<String, dynamic> payload) {
     try {
-      HostLeftSessionEvent.fromJson(payload);
-      _hostLeftEvent = Map<String, dynamic>.from(payload);
+      final event = HostLeftSessionEvent.fromJson(payload);
+      _hostLeftDto = event;
       notifyListeners();
     } catch (error) {
       _handleEventError(error);
@@ -611,8 +624,8 @@ class MultiplayerSessionController extends ChangeNotifier {
   /// Notifica que el host volvió a la sesión.
   void _handleHostReturnedSession(Map<String, dynamic> payload) {
     try {
-      HostReturnedSessionEvent.fromJson(payload);
-      _hostReturnedEvent = Map<String, dynamic>.from(payload);
+      final event = HostReturnedSessionEvent.fromJson(payload);
+      _hostReturnedDto = event;
       notifyListeners();
     } catch (error) {
       _handleEventError(error);
@@ -623,8 +636,8 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _handleSyncError(Map<String, dynamic> payload) {
     try {
       final event = SyncErrorEvent.fromJson(payload);
-      _syncErrorEvent = Map<String, dynamic>.from(payload);
-      _lastError = event.message ?? 'Sync error';
+      _syncErrorDto = event;
+      _lastError = event.message ?? MultiplayerConstants.errorSyncDefault;
       _phase = SessionPhase.end;
       _realtime.disconnect();
       notifyListeners();
@@ -637,8 +650,43 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _handleConnectionError(Map<String, dynamic> payload) {
     try {
       final event = ConnectionErrorEvent.fromJson(payload);
-      _connectionErrorEvent = Map<String, dynamic>.from(payload);
-      _lastError = event.message ?? 'Connection error';
+      _connectionErrorDto = event;
+      _lastError = event.message ?? MultiplayerConstants.errorConnectionDefault;
+      notifyListeners();
+    } catch (error) {
+      _handleEventError(error);
+    }
+  }
+
+  /// Maneja confirmación de conexión exitosa del host.
+  void _handleHostConnectedSuccess(Map<String, dynamic> payload) {
+    try {
+      final event = HostConnectedSuccessEvent.fromJson(payload);
+      _hostConnectedSuccessDto = event;
+      _lastError = null;
+      notifyListeners();
+    } catch (error) {
+      _handleEventError(error);
+    }
+  }
+
+  /// Maneja confirmación de respuesta del jugador recibida por el servidor.
+  void _handlePlayerAnswerConfirmation(Map<String, dynamic> payload) {
+    try {
+      final event = PlayerAnswerConfirmationEvent.fromJson(payload);
+      _playerAnswerConfirmationDto = event;
+      notifyListeners();
+    } catch (error) {
+      _handleEventError(error);
+    }
+  }
+
+  /// Maneja errores de juego enviados por el servidor.
+  void _handleGameError(Map<String, dynamic> payload) {
+    try {
+      final event = GameErrorEvent.fromJson(payload);
+      _gameErrorDto = event;
+      _lastError = event.message;
       notifyListeners();
     } catch (error) {
       _handleEventError(error);
@@ -669,22 +717,25 @@ class MultiplayerSessionController extends ChangeNotifier {
   }
 
   /// Deduce timestamp de emisión de la pregunta a partir de tiempo restante.
-  DateTime _resolveQuestionIssuedAt(Map<String, dynamic> payload, int? timeRemainingMs, int timeLimitSeconds) {
-    final remainingMs = timeRemainingMs ?? payload['timeRemainingMs'];
-    if (remainingMs is num && timeLimitSeconds > 0) {
+  DateTime _resolveQuestionIssuedAt(int? timeRemainingMs, int timeLimitSeconds) {
+    if (timeRemainingMs != null && timeLimitSeconds > 0) {
       final totalMs = timeLimitSeconds * 1000;
-      final elapsedMs = totalMs - remainingMs.toInt();
+      final elapsedMs = totalMs - timeRemainingMs;
       final clampedElapsed = elapsedMs.clamp(0, totalMs);
       return DateTime.now().subtract(Duration(milliseconds: clampedElapsed));
     }
     return DateTime.now();
   }
 
-  /// Valida nickname (6-20 chars) y devuelve versión sanitizada; falla si no cumple.
+  /// Valida nickname y devuelve versión sanitizada; falla si no cumple.
   String _validateNickname(String nickname) {
     final trimmed = nickname.trim();
-    if (trimmed.length < 6 || trimmed.length > 20) {
-      throw StateError('El nickname debe tener entre 6 y 20 caracteres.');
+    if (trimmed.length < MultiplayerConstants.nicknameMinLength || 
+        trimmed.length > MultiplayerConstants.nicknameMaxLength) {
+      throw StateError(MultiplayerConstants.errorInvalidNickname(
+        MultiplayerConstants.nicknameMinLength,
+        MultiplayerConstants.nicknameMaxLength,
+      ));
     }
     return trimmed;
   }
@@ -696,16 +747,11 @@ class MultiplayerSessionController extends ChangeNotifier {
       _questionSequence++;
       _phase = SessionPhase.question;
       _currentQuestionDto = event;
-      _currentQuestionEvent = Map<String, dynamic>.from(payload);
-      _questionStartedAt = _resolveQuestionIssuedAt(payload, event.timeRemainingMs, event.slide.timeLimitSeconds);
+      _questionStartedAt = _resolveQuestionIssuedAt(event.timeRemainingMs, event.slide.timeLimitSeconds);
       // Limpiar cachés de otras fases para evitar renders obsoletos.
-      _hostResultsEvent = null;
       _hostResultsDto = null;
-      _playerResultsEvent = null;
       _playerResultsDto = null;
-      _hostGameEndEvent = null;
       _hostGameEndDto = null;
-      _playerGameEndEvent = null;
       _playerGameEndDto = null;
       _hostAnswerSubmissions = null;
       notifyListeners();
@@ -719,7 +765,6 @@ class MultiplayerSessionController extends ChangeNotifier {
     try {
       _hostResultsDto = HostResultsEvent.fromJson(payload);
       _phase = SessionPhase.results;
-      _hostResultsEvent = Map<String, dynamic>.from(payload);
       notifyListeners();
     } catch (error) {
       _handleEventError(error);
@@ -731,7 +776,6 @@ class MultiplayerSessionController extends ChangeNotifier {
     try {
       _playerResultsDto = PlayerResultsEvent.fromJson(payload);
       _phase = SessionPhase.results;
-      _playerResultsEvent = Map<String, dynamic>.from(payload);
       notifyListeners();
     } catch (error) {
       _handleEventError(error);
@@ -744,7 +788,6 @@ class MultiplayerSessionController extends ChangeNotifier {
       _hostGameEndDto = HostGameEndEvent.fromJson(payload);
       _hostGameEndSequence++;
       _phase = SessionPhase.end;
-      _hostGameEndEvent = Map<String, dynamic>.from(payload);
       notifyListeners();
     } catch (error) {
       _handleEventError(error);
@@ -757,7 +800,6 @@ class MultiplayerSessionController extends ChangeNotifier {
       _playerGameEndDto = PlayerGameEndEvent.fromJson(payload);
       _playerGameEndSequence++;
       _phase = SessionPhase.end;
-      _playerGameEndEvent = Map<String, dynamic>.from(payload);
       notifyListeners();
     } catch (error) {
       _handleEventError(error);
@@ -767,8 +809,8 @@ class MultiplayerSessionController extends ChangeNotifier {
   /// Maneja evento de sesión cerrada por backend.
   void _handleSessionClosed(Map<String, dynamic> payload) {
     try {
-      SessionClosedEvent.fromJson(payload);
-      _sessionClosedEvent = Map<String, dynamic>.from(payload);
+      final event = SessionClosedEvent.fromJson(payload);
+      _sessionClosedDto = event;
       _phase = SessionPhase.end;
       notifyListeners();
     } catch (error) {

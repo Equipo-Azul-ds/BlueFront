@@ -5,20 +5,28 @@ import 'package:http/http.dart' as http;
 import '../../domain/entities/report_model.dart';
 import '../../domain/repositories/reports_repository.dart';
 
-/// Implementación básica usando http.Client.
+/// Provides HTTP headers (Authorization, etc.) at call time.
+typedef HeadersProvider = Future<Map<String, String>> Function();
+
+/// Implementación con soporte para auth headers.
 class ReportsRepositoryImpl implements ReportsRepository {
-  ReportsRepositoryImpl({required this.baseUrl, http.Client? client})
-      : _client = client ?? http.Client();
+  ReportsRepositoryImpl({
+    required this.baseUrl,
+    required this.headersProvider,
+    http.Client? client,
+  }) : _client = client ?? http.Client();
 
   final String baseUrl;
   final http.Client _client;
+  final HeadersProvider headersProvider;
 
   Uri _buildUri(String path, [Map<String, dynamic>? query]) {
     return Uri.parse('$baseUrl$path').replace(queryParameters: query);
   }
 
   Future<Map<String, dynamic>> _getJson(Uri uri) async {
-    final resp = await _client.get(uri);
+    final headers = await headersProvider();
+    final resp = await _client.get(uri, headers: headers);
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final decoded = jsonDecode(resp.body);
       if (decoded is Map<String, dynamic>) return decoded;

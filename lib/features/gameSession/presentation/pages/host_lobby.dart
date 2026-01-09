@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
+import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
 
 import '../controllers/multiplayer_session_controller.dart';
 import 'package:Trivvy/core/widgets/game_ui_kit.dart';
@@ -154,8 +156,9 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                               ),
                             )
                           else
-                            Text(
-                              pinCode,
+                            AnimatedPinDisplay(
+                              pin: pinCode,
+                              spacing: 4,
                               style: const TextStyle(
                                 color: AppColor.primary,
                                 fontSize: 36,
@@ -234,7 +237,10 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                                     ),
                                 itemCount: players.length,
                                     itemBuilder: (_, index) =>
-                                      _LobbyPlayerCard(player: players[index]),
+                                      StaggeredFadeSlide(
+                                        index: index,
+                                        child: _LobbyPlayerCard(player: players[index]),
+                                      ),
                               );
                             },
                           );
@@ -247,6 +253,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                       icon: Icons.play_arrow_rounded,
                       onPressed: sessionController.canHostStartGame
                           ? () {
+                              HapticFeedback.heavyImpact();
                               sessionController.emitHostStartGame();
                               Navigator.of(context).push(
                                 MaterialPageRoute(

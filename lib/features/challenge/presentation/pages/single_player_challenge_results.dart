@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Trivvy/core/constants/colors.dart';
+import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
 import 'package:Trivvy/core/widgets/game_ui_kit.dart';
 import '../../application/use_cases/single_player_usecases.dart';
 import '../../domain/entities/single_player_game.dart';
@@ -257,8 +258,10 @@ class _SinglePlayerChallengeResultsScreenState
                                       ),
                                     ),
                                     const SizedBox(height: 16),
-                                    Text(
-                                      "$finalScore puntos",
+                                    AnimatedCounter(
+                                      value: finalScore,
+                                      duration: const Duration(milliseconds: 800),
+                                      suffix: ' puntos',
                                       style: const TextStyle(
                                         color: Colors.black54,
                                         fontSize: 18,

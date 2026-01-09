@@ -5,11 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
-import 'package:Trivvy/main.dart' show apiBaseUrl;
 
 import '../controllers/multiplayer_session_controller.dart';
 import 'player_lobby_screen.dart';
-import '../../../report/presentation/pages/reports_list_page.dart';
 
 const _defaultNickname = 'Jugador';
 
@@ -259,26 +257,6 @@ class JoinGameScreenState extends State<JoinGameScreen> {
                       color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 14,
                     ),
-                  ),
-
-                  const SizedBox(height: 12),
-                  // Botón temporal para navegar a la lista de reportes (solo para QA/preview).
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColor.onPrimary,
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.5)),
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => ReportsListPage(
-                            baseUrl: apiBaseUrl,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.assessment_outlined),
-                    label: const Text('Ver reportes (temporal)'),
                   ),
 
                   SizedBox(height: actionGap),

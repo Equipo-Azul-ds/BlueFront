@@ -1,48 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:provider/provider.dart';
 
-import '../../../../core/constants/colors.dart';
-import '../../application/dtos/report_dtos.dart';
-import '../../application/use_cases/report_usecases.dart';
+import '../../../../../core/constants/colors.dart';
 import '../../domain/entities/report_model.dart';
-import '../../infrastructure/repositories/reports_repository_impl.dart';
+import '../blocs/reports_list_bloc.dart';
+import '../widgets/ranking_badge.dart';
+import '../widgets/shimmer_loading.dart';
+import 'report_detail_page.dart';
 
 /// Pantalla estilizada para listar los reportes personales (endpoint my-results).
 class ReportsListPage extends StatefulWidget {
-  const ReportsListPage({super.key, required this.baseUrl, this.httpClient});
-
-  final String baseUrl;
-  final http.Client? httpClient;
+  const ReportsListPage({super.key});
 
   @override
   State<ReportsListPage> createState() => _ReportsListPageState();
 }
 
 class _ReportsListPageState extends State<ReportsListPage> {
-  late final ReportsRepositoryImpl _repository;
-  late final GetMyResultsUseCase _getMyResults;
-  late Future<MyResultsResponse> _future;
+  bool _mountedLoad = false;
 
   @override
-  void initState() {
-    super.initState();
-    _repository = ReportsRepositoryImpl(
-      baseUrl: widget.baseUrl,
-      client: widget.httpClient,
-    );
-    _getMyResults = GetMyResultsUseCase(_repository);
-    _future = _load();
-  }
-
-  Future<MyResultsResponse> _load({int page = 1}) {
-    return _getMyResults(MyResultsQueryDto(limit: 20, page: page));
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_mountedLoad) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final bloc = context.read<ReportsListBloc>();
+      if (!bloc.hasLoaded) {
+        bloc.loadInitial();
+      }
+    });
+    _mountedLoad = true;
   }
 
   Future<void> _refresh() async {
-    setState(() {
-      _future = _load();
-    });
-    await _future; // Espera a completar para cerrar el indicador
+    await context.read<ReportsListBloc>().refresh();
   }
 
   @override
@@ -55,29 +47,40 @@ class _ReportsListPageState extends State<ReportsListPage> {
             const _HeroHeader(),
             RefreshIndicator(
               onRefresh: _refresh,
-              child: FutureBuilder<MyResultsResponse>(
-                future: _future,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const _CenteredLoader();
+              child: Consumer<ReportsListBloc>(
+                builder: (context, bloc, _) {
+                  if (bloc.isLoading && !bloc.hasData) {
+                    return _SkeletonList();
                   }
-                  if (snapshot.hasError) {
+
+                  if (bloc.error != null && !bloc.hasData) {
                     return _ErrorState(
                       message: 'No se pudieron cargar los reportes',
-                      detail: snapshot.error.toString(),
+                      detail: bloc.error!,
                       onRetry: _refresh,
                     );
                   }
-                  final data = snapshot.data;
-                  if (data == null || data.results.isEmpty) {
+
+                  if (!bloc.isLoading && bloc.items.isEmpty) {
                     return const _EmptyState();
                   }
+
                   return ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 180, 16, 24),
-                    itemCount: data.results.length,
+                    itemCount: bloc.items.length + (bloc.canLoadMore ? 1 : 0),
                     itemBuilder: (context, index) {
-                      final item = data.results[index];
-                      return _ReportCard(item: item);
+                      if (index >= bloc.items.length) {
+                        bloc.loadNextPage();
+                        return const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      final item = bloc.items[index];
+                      return _ReportCard(
+                        item: item,
+                        onTap: () => _openDetail(item),
+                      );
                     },
                   );
                 },
@@ -85,6 +88,14 @@ class _ReportsListPageState extends State<ReportsListPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _openDetail(ReportSummary summary) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ReportDetailPage(summary: summary),
       ),
     );
   }
@@ -146,17 +157,15 @@ class _HeroHeader extends StatelessWidget {
 }
 
 class _ReportCard extends StatelessWidget {
-  const _ReportCard({required this.item});
+  const _ReportCard({required this.item, this.onTap});
 
   final ReportSummary item;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final isSingle = item.gameType == GameType.singleplayer;
     final chipColor = isSingle ? AppColor.success : AppColor.accent;
-    final rankText = item.rankingPosition != null
-        ? 'Puesto ${item.rankingPosition}'
-        : 'Sin ranking';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -173,9 +182,7 @@ class _ReportCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () {
-          // Aquí se puede navegar a detalle: usar item.gameId + item.gameType.
-        },
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -188,7 +195,10 @@ class _ReportCard extends StatelessWidget {
                   _TagChip(label: 'Puntaje ${item.finalScore}', color: AppColor.primary),
                   if (item.rankingPosition != null) ...[
                     const SizedBox(width: 8),
-                    _TagChip(label: rankText, color: Colors.orange),
+                    RankingBadge(
+                      position: item.rankingPosition!,
+                      size: RankingBadgeSize.small,
+                    ),
                   ],
                 ],
               ),
@@ -311,6 +321,17 @@ class _ErrorState extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SkeletonList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 180, 16, 24),
+      itemCount: 6,
+      itemBuilder: (_, __) => const ReportCardSkeleton(),
     );
   }
 }

@@ -30,7 +30,7 @@ class PhaseNavigator {
     required MultiplayerSessionController controller,
     required int lastSequence,
   }) {
-    final summary = controller.playerGameEnd;
+    final summary = controller.playerGameEndDto;
     if (summary == null) return lastSequence;
     if (controller.playerGameEndSequence == lastSequence) return lastSequence;
     final nextSeq = controller.playerGameEndSequence;
@@ -69,12 +69,10 @@ class PhaseNavigator {
     required bool alreadyTerminated,
   }) {
     if (alreadyTerminated) return true;
-    final closed = controller.sessionClosedPayload;
-    final hostLeft = controller.hostLeftPayload;
+    final closed = controller.sessionClosedDto;
+    final hostLeft = controller.hostLeftDto;
     if (closed == null && hostLeft == null) return false;
-    final message = closed?['message']?.toString() ??
-        hostLeft?['message']?.toString() ??
-        'La sesión ha sido cerrada.';
+    final message = closed?.message ?? hostLeft?.message ?? 'La sesión ha sido cerrada.';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

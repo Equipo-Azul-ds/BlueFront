@@ -10,8 +10,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 class NotificationProvider extends ChangeNotifier {
 
   final INotificationRepository repository;
+  final bool firebaseEnabled;
 
-  NotificationProvider({required this.repository});
+  NotificationProvider({required this.repository, this.firebaseEnabled = true});
   // Historial con la estructura de la entidad
   List<NotificationEntity> _history = [];
   bool _isLoading = false;
@@ -25,6 +26,7 @@ class NotificationProvider extends ChangeNotifier {
   final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey<ScaffoldMessengerState>();
 
   Future<void> initNotifications() async {
+    if (!firebaseEnabled) return;
     try {
       FirebaseMessaging messaging = FirebaseMessaging.instance;
 
@@ -145,6 +147,7 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> enableNotifications() async {
+    if (!firebaseEnabled) return;
     String? token = await FirebaseMessaging.instance.getToken();
     if (token != null) {
       await registerDeviceToken(token); // Llama al POST /notifications/register-device
@@ -153,6 +156,7 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> disableNotifications() async {
+    if (!firebaseEnabled) return;
     String? token = await FirebaseMessaging.instance.getToken();
     if (token != null) {
       await logoutDevice(token); // Llama al DELETE /notifications/unregister-device
@@ -229,6 +233,7 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> printCurrentToken() async {
+    if (!firebaseEnabled) return;
     try {
       String? token = await FirebaseMessaging.instance.getToken();
       if (token != null) {

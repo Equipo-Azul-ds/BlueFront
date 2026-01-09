@@ -1,4 +1,5 @@
 import '../../application/dtos/multiplayer_session_dtos.dart';
+import '../../domain/constants/multiplayer_events.dart';
 import '../../domain/repositories/multiplayer_session_realtime.dart';
 import '../socket/multiplayer_socket_client.dart';
 
@@ -41,36 +42,36 @@ class MultiplayerSessionRealtimeImpl implements MultiplayerSessionRealtime {
   @override
   /// Anuncia que el cliente está listo para recibir eventos tras unirse.
   void emitClientReady() {
-    _socketClient.emit('client_ready');
+    _socketClient.emit(MultiplayerEvents.clientReady);
   }
 
   @override
   /// Notifica al servidor que un jugador quiere unirse al lobby.
   void emitPlayerJoin(PlayerJoinPayload payload) {
-    _socketClient.emit('player_join', payload.toJson());
+    _socketClient.emit(MultiplayerEvents.playerJoin, payload.toJson());
   }
 
   @override
   /// Señal del host para iniciar la partida.
   void emitHostStartGame() {
-    _socketClient.emit('host_start_game');
+    _socketClient.emit(MultiplayerEvents.hostStartGame);
   }
 
   @override
   /// Envía las respuestas del jugador más el tiempo empleado.
   void emitPlayerSubmitAnswer(PlayerSubmitAnswerPayload payload) {
-    _socketClient.emit('player_submit_answer', payload.toJson());
+    _socketClient.emit(MultiplayerEvents.playerSubmitAnswer, payload.toJson());
   }
 
   @override
   /// Señal del host para avanzar a la siguiente fase.
   void emitHostNextPhase() {
-    _socketClient.emit('host_next_phase');
+    _socketClient.emit(MultiplayerEvents.hostNextPhase);
   }
 
   @override
   /// Señal del host para finalizar la sesión y desconectar jugadores.
   void emitHostEndSession() {
-    _socketClient.emit('host_end_session');
+    _socketClient.emit(MultiplayerEvents.hostEndSession);
   }
 }
