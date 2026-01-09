@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../../core/errors/exception.dart';
-import '../../Aplication/DataSource/IUserDataSource.dart';
 import '../../Aplication/dtos/userDTO.dart';
 import '../../Aplication/dtos/user_query_params.dart';
+import '../../Dominio/DataSource/IUserDataSource.dart';
 import '../../Dominio/entidad/User.dart';
 
 
@@ -39,10 +39,7 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
 
   @override
   Future<PaginatedResponse> fetchUsers(UserQueryParams params) async {
-    final uri = _buildUri(
-      '/users',
-      params.toMap(),
-    );
+    final uri = _buildUri('/backoffice/users', params.toMap());
 
     try {
       print('UserRemoteDataSource.fetchUsers -> GET $uri');
@@ -73,37 +70,75 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
 
   @override
   Future<UserEntity> toggleUserStatus(String userId, String status) async {
-    final uri = Uri.parse('$baseUrl/users/$userId');
+
+    final String action = (status.toLowerCase() == 'active') ? 'blockUser' : 'unblockUser';
+    final uri = Uri.parse('$baseUrl/backoffice/$action/$userId');
 
     final response = await cliente.patch(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer admin_token', // Ajustar según tu auth
+        'Authorization': 'Bearer admin_token',
       },
-      body: json.encode({'status': status}),
     );
 
     if (response.statusCode == 200) {
       return UserDto.fromJson(json.decode(response.body)).toEntity();
+    } else if (response.statusCode == 400) {
+      throw ServerException(message: 'El usuario no existe');
     } else {
-      throw ServerException(message: 'Error al cambiar estado del usuario');
+      throw ServerException(message: 'Error de servidor al cambiar estado');
     }
   }
 
   @override
   Future<void> deleteUser(String userId) async {
-    final uri = Uri.parse('$baseUrl/users/$userId');
+    // Ajuste del path según la nueva especificación
+    final uri = Uri.parse('$baseUrl/backoffice/user/$userId');
 
     final response = await cliente.delete(
       uri,
       headers: {
+        'Content-Type': 'application/json',
         'Authorization': 'Bearer admin_token',
       },
     );
 
-    if (response.statusCode != 204 && response.statusCode != 200) {
-      throw ServerException(message: 'Error al eliminar usuario');
+    if (response.statusCode == 204) {
+
+      return;
+    } else if (response.statusCode == 400) {
+      throw ServerException(message: 'El usuario con el id dado no existe');
+    } else if (response.statusCode == 401) {
+      throw ServerException(message: 'No autorizado: requiere rol de administrador');
+    } else {
+      throw ServerException(message: 'Error al eliminar usuario: ${response.statusCode}');
+    }
+  }
+
+  @override
+  Future<UserEntity> toggleAdminStatus(String userId, bool currentlyIsAdmin) async {
+    final String action = currentlyIsAdmin ? 'removeAdmin' : 'giveAdmin';
+    final uri = Uri.parse('$baseUrl/backoffice/$action/$userId');
+
+    print('UserRemoteDataSource.toggleAdminStatus -> PATCH $uri');
+
+    final response = await cliente.patch(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer admin_token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return UserDto.fromJson(json.decode(response.body)).toEntity();
+    } else if (response.statusCode == 400) {
+      throw ServerException(message: 'El usuario con el id dado no existe');
+    } else if (response.statusCode == 401) {
+      throw ServerException(message: 'No autorizado: se requiere rol de administrador');
+    } else {
+      throw ServerException(message: 'Error interno del servidor');
     }
   }
 

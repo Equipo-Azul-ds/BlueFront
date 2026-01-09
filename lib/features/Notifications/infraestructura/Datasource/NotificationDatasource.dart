@@ -2,7 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../Application/DTO/NotificationListResponseDTO.dart';
-import '../../Application/DataSource/INotificationDatasource.dart';
+import '../../Dominio/DataSource/INotificationDatasource.dart';
+
 
 
 
@@ -105,6 +106,71 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
     if (response.statusCode != 201) {
       throw Exception('Error al enviar notificación: ${response.body}');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> sendMassNotification({
+    required String title,
+    required String message,
+    required bool toAdmins,
+    required bool toRegularUsers,
+  }) async {
+    final uri = Uri.parse('$baseUrl/backoffice/massNotification');
+
+    final response = await client.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer YOUR_ADMIN_TOKEN',
+      },
+      body: jsonEncode({
+        "title": title,
+        "message": message,
+        "filters": {
+          "toAdmins": toAdmins,
+          "toRegularUsers": toRegularUsers,
+        }
+      }),
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Error al enviar notificación masiva: ${response.statusCode}');
+    }
+  }
+
+  @override
+  Future<NotificationListResponseDto> getAdminNotificationHistory({
+    int limit = 20,
+    int page = 1,
+    String? userId,
+  }) async {
+    // Construcción de URI con parámetros de paginación
+    final Map<String, String> queryParams = {
+      'limit': limit.toString(),
+      'page': page.toString(),
+      'orderBy': 'createdAt',
+      'order': 'desc',
+    };
+    if (userId != null) queryParams['userId'] = userId;
+
+    final uri = Uri.parse('$baseUrl/backoffice/massNotifications')
+        .replace(queryParameters: queryParams);
+
+    final response = await client.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer YOUR_ADMIN_TOKEN',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      return NotificationListResponseDto.fromDynamicJson(jsonDecode(response.body));
+    } else {
+      throw Exception('Error al obtener historial de admin: ${response.statusCode}');
     }
   }
 }

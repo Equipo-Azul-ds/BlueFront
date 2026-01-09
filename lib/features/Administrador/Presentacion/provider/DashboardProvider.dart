@@ -44,20 +44,19 @@ class DashboardProvider extends ChangeNotifier {
     try {
       final now = DateTime.now();
       final weekAgo = now.subtract(const Duration(days: 7));
+      // Obtener usuarios
+      final usersResult = await userRepository.getUsers(const UserQueryParams(limit: 100));
 
-      // 1. Obtener Usuarios (usamos un límite alto para estadísticas o ajusta según tu API)
-      final usersResult = await userRepository.getUsers(UserQueryParams(page: 1, limit: 100));
       usersResult.fold(
-            (failure) => print("Error al obtener usuarios: $failure"),
+            (failure) => print("Error en dashboard usuarios: $failure"),
             (paginatedList) {
           _totalUsers = paginatedList.totalCount;
-          _newUsersCount = paginatedList.users
-              .where((u) => u.createdAt.isAfter(weekAgo))
-              .length;
+          _newUsersCount = paginatedList.users.where((u) =>
+          now.difference(u.createdAt).inDays <= 7).length;
         },
       );
 
-      // 2. Obtener Categorías
+      // Obtener Categorías
       final themesResult = await themeRepository.getThemes();
       List<ThemeVO> themes = [];
       themesResult.fold(
@@ -68,7 +67,7 @@ class DashboardProvider extends ChangeNotifier {
         },
       );
 
-      // 3. Obtener Kahoots y procesar métricas
+      //  Obtener Kahoots y procesar métricas
       final quizzesResult = await quizRepository.getKahoots(
         query: null,
         themes: [],
@@ -80,12 +79,10 @@ class DashboardProvider extends ChangeNotifier {
             (failure) => print("Error al obtener kahoots: $failure"),
             (quizList) {
           _totalQuizzes = quizList.length;
-          // Contar kahoots nuevos (últimos 7 días)
           _newKahootsCount = quizList
               .where((k) => k.createdAt.isAfter(weekAgo))
               .length;
 
-          // Calcular popularidad cruzando temas con kahoots
           _calculatePopularity(themes, quizList);
         },
       );

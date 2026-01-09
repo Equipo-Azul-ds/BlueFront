@@ -8,8 +8,8 @@ import '../entidad/User.dart';
 abstract class IUserRepository {
 
   Future<Either<Failure, PaginatedUserList>> getUsers(UserQueryParams params);
-
   Future<Either<Failure, UserEntity>> toggleUserStatus(String userId, String status);
+  Future<Either<Failure, UserEntity>> toggleAdminStatus(String userId, bool currentlyIsAdmin);
   Future<Either<Failure, void>> deleteUser(String userId);
 }
 
