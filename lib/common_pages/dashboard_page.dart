@@ -206,7 +206,7 @@ class _HomePageContentState extends State<HomePageContent> {
         }
 
         print('[dashboard] requesting delete for quizId=${q.quizId}');
-        await quizBloc.deleteQuiz(q.quizId);
+        await quizBloc.deleteQuiz(q);
         if (quizBloc.errorMessage != null) {
           print('[dashboard] delete returned error: ${quizBloc.errorMessage}');
           ScaffoldMessenger.of(context).showSnackBar(

@@ -32,6 +32,16 @@ class QuizRepositoryImpl implements QuizRepository {
     return re.hasMatch(s.trim());
   }
 
+  // Limpia prefijos locales (q_/a_) para que el backend reciba solo UUIDs.
+  String _sanitizeId(String? raw) {
+    if (raw == null) return '';
+    final trimmed = raw.trim();
+    if (trimmed.startsWith('q_') || trimmed.startsWith('a_')) {
+      return trimmed.substring(2);
+    }
+    return trimmed;
+  }
+
   // Construye headers según contrato: Content-Type y x-debug-user-id.
   Map<String, String> _headers({required String userId, bool json = false}) {
     final id = userId.trim();
@@ -208,10 +218,15 @@ class QuizRepositoryImpl implements QuizRepository {
         ? 'Public'
         : (visRaw.toLowerCase() == 'private' ? 'Private' : visRaw));
 
-    // Status: para updates se prefiere "Draft" si no viene; para create mantenemos Publish por compatibilidad previa.
-    final statusValue = allowEmptyAnswers
-      ? _safeString(quiz.status ?? 'Draft')
-      : _safeString(quiz.status ?? 'Publish');
+    // Normaliza status al formato esperado: Draft/Publish
+    String _normalizeStatus(String? raw, {required bool isUpdate}) {
+      final v = (raw ?? '').trim().toLowerCase();
+      if (v == 'publish' || v == 'published') return 'Publish';
+      if (v == 'draft') return 'Draft';
+      return isUpdate ? 'Draft' : 'Publish';
+    }
+
+    final statusValue = _normalizeStatus(quiz.status, isUpdate: allowEmptyAnswers);
 
     void _assertQuestionValid(String text, List<Map<String, dynamic>> answers) {
       final qText = text.trim();
@@ -240,7 +255,6 @@ class QuizRepositoryImpl implements QuizRepository {
         : fallbackAuthorId; // backend exige themeId
 
     final payload = <String, dynamic>{
-      'authorId': authorId,
       'title': _safeString(quiz.title),
       'description': _safeString(quiz.description),
       // El backend espera 'coverImageId' (id de recurso). Si no existe, enviar null.
@@ -263,7 +277,7 @@ class QuizRepositoryImpl implements QuizRepository {
             'mediaId': mediaId,
             'isCorrect': a.isCorrect,
           };
-          if (includeIds) answerMap['id'] = a.answerId;
+          if (includeIds) answerMap['id'] = _sanitizeId(a.answerId);
           return answerMap;
         }).toList();
 
@@ -284,15 +298,19 @@ class QuizRepositoryImpl implements QuizRepository {
         };
 
         if (includeIds) {
-          questionMap['id'] = q.questionId;
+          questionMap['id'] = _sanitizeId(q.questionId);
         }
 
         return questionMap;
       }).toList(),
     };
 
+    payload['authorId'] = authorId;
+
     if (includeIds) {
-      payload['id'] = quiz.quizId;
+      // Algunos backends solo esperan id en la ruta; se omite aquí para evitar 400.
+      // Si llegara a ser requerido, se puede reactivar.
+      // payload['id'] = quiz.quizId;
     }
 
     return payload;
@@ -318,10 +336,15 @@ class QuizRepositoryImpl implements QuizRepository {
   }
 
   @override
-  Future<void> delete(String id) async {
+  Future<void> delete(String id, String userId) async {
     if (id.trim().isEmpty) {
       print('QuizRepositoryImpl.delete -> Ignoring delete request with empty id');
       return;
+    }
+
+    _currentUserId = userId.trim();
+    if ((_currentUserId ?? '').isEmpty) {
+      throw Exception('delete requiere userId para enviar x-debug-user-id');
     }
 
     final url = '$baseUrl/kahoots/$id';
