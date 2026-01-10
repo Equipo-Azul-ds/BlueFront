@@ -160,6 +160,74 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
   bool _themesLoading = false;
   String? _themesError;
   String? _selectedThemeId;
+  bool _mediaPreloaded = false;
+
+  // Resuelve un posible id de media a una URL usando el MediaEditorBloc.
+  Future<String?> _resolveMediaUrlIfNeeded(String? idOrUrl) async {
+    final s = (idOrUrl ?? '').trim();
+    if (s.isEmpty) return null;
+    if (s.startsWith('http')) return s;
+    try {
+      final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
+      final res = await mediaBloc.getMedia(s);
+      final url = res.media.path;
+      return (url.isNotEmpty) ? url : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Precarga las imágenes del quiz en edición: portada, preguntas y respuestas.
+  Future<void> _preloadQuizMedia() async {
+    final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+    final quiz = quizBloc.currentQuiz;
+    if (quiz == null) return;
+
+    // Resolver portada
+    final resolvedCover = await _resolveMediaUrlIfNeeded(quiz.coverImageUrl);
+    if (resolvedCover != null && resolvedCover.startsWith('http')) {
+      setState(() {
+        _coverImagePath = resolvedCover;
+        _coverImageBytes = null;
+      });
+      quiz.coverImageUrl = resolvedCover;
+    }
+
+    // Resolver media de preguntas y respuestas
+    if (quiz.questions.isNotEmpty) {
+      for (var i = 0; i < quiz.questions.length; i++) {
+        final q = quiz.questions[i];
+        final qUrl = await _resolveMediaUrlIfNeeded(q.mediaUrl);
+        // Reconstruir respuestas resolviendo mediaUrl si es id
+        final newAnswers = <A.Answer>[];
+        for (final a in q.answers) {
+          final aUrl = await _resolveMediaUrlIfNeeded(a.mediaUrl);
+          newAnswers.add(
+            A.Answer(
+              answerId: a.answerId,
+              questionId: a.questionId,
+              isCorrect: a.isCorrect,
+              text: a.text,
+              mediaUrl: aUrl ?? a.mediaUrl,
+            ),
+          );
+        }
+        final updatedQ = Q.Question(
+          questionId: q.questionId,
+          quizId: q.quizId,
+          text: q.text,
+          mediaUrl: qUrl ?? q.mediaUrl,
+          type: q.type,
+          timeLimit: q.timeLimit,
+          points: q.points,
+          answers: newAnswers,
+        );
+        quizBloc.updateQuestionAt(i, updatedQ);
+      }
+    }
+
+    quizBloc.setCurrentQuiz(quiz);
+  }
 
   // Devuelve el color asociado a un themeId; si no hay match devuelve null
   Color? _colorForTheme(String? idOrUrl) {
@@ -183,17 +251,36 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
     }
   }
 
+  // Devuelve la URL del tema a partir de id/assetId/url/path
+  String? _resolveThemeUrl(String? idOrUrl) {
+    if (idOrUrl == null || idOrUrl.isEmpty) return null;
+    if (idOrUrl.startsWith('http')) return idOrUrl;
+    final match = _availableThemes.firstWhere(
+      (e) =>
+          e['id'] == idOrUrl ||
+          e['assetId'] == idOrUrl ||
+          e['url'] == idOrUrl ||
+          e['path'] == idOrUrl,
+      orElse: () => <String, dynamic>{},
+    );
+    if (match.isEmpty) return null;
+    final url = (match['url'] ?? match['path'] ?? '').toString();
+    return url.isNotEmpty ? url : null;
+  }
+
   /// Envuelve el contenido con el fondo del tema seleccionado (imagen si es URL, color como respaldo)
   Widget _withThemeBackground(Widget child) {
     final themeUrl = (_selectedThemeId ?? '').trim();
+    final resolvedUrl = _resolveThemeUrl(themeUrl) ??
+      (themeUrl.startsWith('http') ? themeUrl : '');
     final fallbackColor = _colorForTheme(themeUrl) ?? AppColor.background;
 
     return Container(
       decoration: BoxDecoration(
         color: fallbackColor,
-        image: themeUrl.startsWith('http')
+        image: resolvedUrl.isNotEmpty
             ? DecorationImage(
-                image: NetworkImage(themeUrl),
+          image: NetworkImage(resolvedUrl),
                 fit: BoxFit.cover,
                 onError: (_, __) {},
               )
@@ -222,9 +309,11 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
         if ((_selectedThemeId == null || _selectedThemeId!.isEmpty) &&
             _availableThemes.isNotEmpty) {
           final first = _availableThemes.first;
+          final firstId = (first['assetId'] ?? first['id'] ?? '').toString();
           final firstUrl = (first['url'] ?? first['path'] ?? '').toString();
-          if (firstUrl.isNotEmpty) {
-            _selectedThemeId = firstUrl;
+          final chosen = firstId.isNotEmpty ? firstId : firstUrl;
+          if (chosen.isNotEmpty) {
+            _selectedThemeId = chosen;
             final quizBloc = Provider.of<QuizEditorBloc>(
               context,
               listen: false,
@@ -574,6 +663,13 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
       _questionController.text = '';
     }
 
+    // Al construir por primera vez, intentar precargar las imágenes del quiz en edición
+    if (!_mediaPreloaded && quizBloc.currentQuiz != null) {
+      _mediaPreloaded = true;
+      // Ejecutar asincrónicamente para no bloquear build
+      Future.microtask(_preloadQuizMedia);
+    }
+
     if (_step == 1) {
       return _withThemeBackground(
         Scaffold(
@@ -603,6 +699,8 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                           context,
                           listen: false,
                         );
+                        final auth = Provider.of<AuthBloc>(context, listen: false);
+                        final bearer = auth.currentUser?.id ?? '';
                         try {
                           final bytes = await file.readAsBytes();
                           setState(() {
@@ -612,6 +710,7 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
 
                           final uploaded = await mediaBloc.uploadFromXFile(
                             file,
+                            bearerToken: bearer,
                           );
                           // 'uploaded' puede contener 'id' y/o 'path/url'. Se prefiere 'path' si es una URL.
                           final uploadedMap = uploaded as dynamic;
@@ -638,12 +737,15 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                             }
                           } else if (returnedId != null &&
                               returnedId.isNotEmpty) {
-                            // el backend devolvió solo un id — lo guardamos y mantenemos la previsualización local
-                            setState(() => _coverImagePath = returnedId);
-                            if (quizBloc.currentQuiz != null) {
-                              quizBloc.currentQuiz!.coverImageUrl = returnedId;
-                              quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
-                            }
+                            // El backend no devolvió URL. No guardamos el id como coverImage
+                            // para cumplir con el requisito de usar URL renderizable.
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'La subida no devolvió URL pública. Intenta de nuevo.',
+                                ),
+                              ),
+                            );
                           }
 
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -713,10 +815,13 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                             spacing: 12,
                             runSpacing: 12,
                             children: _availableThemes.map((t) {
+                              final assetId =
+                                  (t['assetId'] ?? t['id'] ?? '').toString();
                               final url = (t['url'] ?? t['path'] ?? '')
                                   .toString();
                               final name = (t['name'] ?? '').toString();
-                              final selected = _selectedThemeId == url;
+                              final selected = _selectedThemeId == assetId ||
+                                  _selectedThemeId == url;
                               return GestureDetector(
                                 onTap: () async {
                                   final picked = await showDialog<bool>(
@@ -732,12 +837,13 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                     ),
                                   );
                                   if (picked == true) {
+                                    final chosen =
+                                        assetId.isNotEmpty ? assetId : url;
                                     setState(() {
-                                      _selectedThemeId =
-                                          url; // guardar la URL seleccionada como themeId
+                                      _selectedThemeId = chosen;
                                     });
                                     if (quizBloc.currentQuiz != null) {
-                                      quizBloc.currentQuiz!.themeId = url;
+                                      quizBloc.currentQuiz!.themeId = chosen;
                                       quizBloc.setCurrentQuiz(
                                         quizBloc.currentQuiz!,
                                       );
@@ -1278,6 +1384,9 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
 
                                 // Subir imagen para la pregunta
                                 media.MediaUpload(
+                                  previewUrl: (selectedQuestion.mediaUrl != null && selectedQuestion.mediaUrl!.startsWith('http'))
+                                      ? selectedQuestion.mediaUrl
+                                      : null,
                                   onMediaSelected: (file) async {
                                     // Si hay texto, no permitir subir imagen hasta que se borre
                                     if (_questionController.text
@@ -1301,18 +1410,22 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                           listen: false,
                                         );
                                     try {
+                                      final auth = Provider.of<AuthBloc>(
+                                        context,
+                                        listen: false,
+                                      );
+                                      final bearer = auth.currentUser?.id ?? '';
                                       final uploaded = await mediaBloc
-                                          .uploadFromXFile(file);
-                                      final mediaId =
-                                          (uploaded as dynamic).id ??
-                                          (uploaded as dynamic).mediaId ??
-                                          file.path;
+                                          .uploadFromXFile(file, bearerToken: bearer);
+                                      // Preferir URL absoluta (path puede contener la URL según el repositorio)
+                                      final url = ((uploaded as dynamic).path ?? (uploaded as dynamic).url ?? '')
+                                          .toString();
                                       final updated = Q.Question(
                                         questionId: q.questionId,
                                         quizId: q.quizId,
                                         text: q.text,
-                                        // Guardamos el mediaId devuelto por el backend en la propiedad mediaUrl
-                                        mediaUrl: mediaId,
+                                        // Guardar la URL para que se pueda renderizar directamente
+                                        mediaUrl: url,
                                         type: q.type,
                                         timeLimit: q.timeLimit,
                                         points: q.points,
@@ -1326,9 +1439,7 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                         context,
                                       ).showSnackBar(
                                         const SnackBar(
-                                          content: Text(
-                                            'Media subida para la pregunta',
-                                          ),
+                                          content: Text('Imagen subida para la pregunta'),
                                         ),
                                       );
                                     } catch (e) {

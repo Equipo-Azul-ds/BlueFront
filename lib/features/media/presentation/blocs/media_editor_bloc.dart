@@ -33,10 +33,10 @@ class MediaEditorBloc extends ChangeNotifier {
   });
 
   // Sube un archivo dado como UploadMediaDTO
-  Future<dynamic> upload(UploadMediaDTO dto) async {
+  Future<dynamic> upload(UploadMediaDTO dto, {String? bearerToken}) async {
     _startLoading();
     try {
-      final media = await uploadUseCase.run(dto);
+      final media = await uploadUseCase.run(dto, bearerToken: bearerToken);
       lastMedia = media;
       errorMessage = null;
       return media;
@@ -49,7 +49,7 @@ class MediaEditorBloc extends ChangeNotifier {
   }
 
   // Helper: subir directamente desde un XFile (image_picker)
-  Future<dynamic> uploadFromXFile(XFile xfile) async {
+  Future<dynamic> uploadFromXFile(XFile xfile, {String? bearerToken}) async {
     final bytes = await xfile.readAsBytes();
     final dto = UploadMediaDTO(
       fileBytes: bytes,
@@ -57,7 +57,7 @@ class MediaEditorBloc extends ChangeNotifier {
       mimeType: _detectMimeType(xfile.path),
       sizeInBytes: bytes.length,
     );
-    return await upload(dto);
+    return await upload(dto, bearerToken: bearerToken);
   }
 
   // Obtener metadatos + bytes

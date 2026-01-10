@@ -201,13 +201,12 @@ class QuizRepositoryImpl implements QuizRepository {
       return v.toString();
     }
 
-    // Solo acepta mediaId con formato UUID v4; cualquier otro valor (incluyendo URLs) se envía como null.
-    String? _maybeMediaId(String? v) {
+    // Acepta UUID o URL; el backend usa 'mediaId' pero almacenaremos el URL cuando sea disponible.
+    String? _mediaIdAllowingUrl(String? v) {
       if (v == null) return null;
       final s = v.trim();
       if (s.isEmpty) return null;
-      final uuidV4 = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$');
-      return uuidV4.hasMatch(s) ? s : null;
+      return s; // no restringir a UUID, permitir URL
     }
 
     // Normaliza a los valores que el backend muestra en el contrato: "Public" / "Private".
@@ -250,15 +249,17 @@ class QuizRepositoryImpl implements QuizRepository {
       }
     }
 
-    final safeThemeId = _safeString(quiz.themeId).isNotEmpty
-        ? _safeString(quiz.themeId)
-        : fallbackAuthorId; // backend exige themeId
+    // themeId no puede ir vacío; enviamos siempre el valor seleccionado (UUID o URL) como string.
+    final rawTheme = _safeString(quiz.themeId);
+    final safeThemeId = rawTheme.isNotEmpty ? rawTheme : null;
 
     final payload = <String, dynamic>{
       'title': _safeString(quiz.title),
       'description': _safeString(quiz.description),
-      // El backend espera 'coverImageId' (id de recurso). Si no existe, enviar null.
-      'coverImageId': _maybeMediaId(quiz.coverImageUrl),
+        // Enviar URL en coverImageId según contrato
+        'coverImageId': _safeString(quiz.coverImageUrl).trim().isNotEmpty
+          ? _safeString(quiz.coverImageUrl).trim()
+          : null,
       'visibility': vis,
       // Usar los valores del quiz si existen, de lo contrario dejar valores por defecto
       'status': statusValue,
@@ -268,13 +269,16 @@ class QuizRepositoryImpl implements QuizRepository {
         final idx = entry.key;
         final q = entry.value;
         final answersList = q.answers.map((a) {
-          final mediaId = _maybeMediaId(a.mediaUrl);
+          final mediaId = _mediaIdAllowingUrl(a.mediaUrl);
           final textRaw = _safeString(a.text).trim();
           final text = textRaw.isEmpty ? null : textRaw;
           _assertAnswerValid(text ?? '', mediaId);
           final answerMap = <String, dynamic>{
             'text': text,
-            'mediaId': mediaId,
+            // Guardar URL en mediaId según contrato
+            'mediaId': _safeString(a.mediaUrl).trim().isNotEmpty
+                ? _safeString(a.mediaUrl).trim()
+                : null,
             'isCorrect': a.isCorrect,
           };
           if (includeIds) answerMap['id'] = _sanitizeId(a.answerId);
@@ -288,8 +292,10 @@ class QuizRepositoryImpl implements QuizRepository {
 
         final questionMap = <String, dynamic>{
           'text': qText.trim(),
-          // backend espera mediaId (id de media). Si no existe, enviar null.
-          'mediaId': _maybeMediaId(q.mediaUrl),
+          // Guardar URL en mediaId según contrato
+          'mediaId': _safeString(q.mediaUrl).trim().isNotEmpty
+              ? _safeString(q.mediaUrl).trim()
+              : null,
           'type': _mapQuestionType(_safeString(q.type)),
           'timeLimit': q.timeLimit,
           'points': q.points,

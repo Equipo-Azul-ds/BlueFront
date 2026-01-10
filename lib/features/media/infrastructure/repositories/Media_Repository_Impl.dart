@@ -18,8 +18,9 @@ class MediaRepositoryImpl implements MediaRepository {
   Future<Media> uploadFromBytes(
     Uint8List fileBytes,
     String fileName,
-    String mimeType,
-  ) async {
+    String mimeType, {
+    String? bearerToken,
+  }) async {
     final url = Uri.parse('$baseUrl/media/upload');
 
     final request = http.MultipartRequest('POST', url);
@@ -35,6 +36,11 @@ class MediaRepositoryImpl implements MediaRepository {
         contentType: MediaType.parse(safeMime),
       ),
     );
+
+    // Headers: Authorization Bearer userId (backend espera userId como token)
+    if ((bearerToken ?? '').trim().isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer ${bearerToken!.trim()}';
+    }
 
     // Información de depuración: cabeceras y metadatos del archivo (se imprimen justo antes del envío)
     try {
@@ -67,51 +73,39 @@ class MediaRepositoryImpl implements MediaRepository {
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       try {
-        final jsonMap = jsonDecode(response.body);
-        // Solo necesitamos el id (el registro de media) para poder asociarlo a quizzes/preguntas/respuestas.
-        // Construimos un objeto Media mínimo con ese id y usamos `baseUrl/media/:id` como ruta para obtener el recurso.
-        if (jsonMap is Map<String, dynamic> &&
-            jsonMap.containsKey('id') &&
-            jsonMap.containsKey('data')) {
-          final id = (jsonMap['id'] ?? '').toString();
+        final raw = jsonDecode(response.body);
+        Map<String, dynamic> mediaJson;
+        if (raw is Map<String, dynamic>) {
+          // Algunas implementaciones devuelven { data: { ... } }
+          if (raw['data'] is Map<String, dynamic>) {
+            mediaJson = raw['data'] as Map<String, dynamic>;
+          } else {
+            mediaJson = raw;
+          }
+        } else {
+          throw Exception('Formato inesperado en respuesta de upload');
+        }
+
+        final media = Media.fromJson(mediaJson);
+        // Preferimos URL absoluta si está disponible para que el frontend pueda renderizar directamente
+        if ((media.path).isEmpty && (mediaJson['url'] is String)) {
+          final url = (mediaJson['url'] as String);
           return Media(
-            id: id,
-            path:
-                id, // almacenar el id aquí; la UI/otros repos deben tratar esto como mediaId
-            mimeType: safeMime,
-            size: fileBytes.length,
-            originalName: fileName,
-            createdAt: DateTime.now(),
-            previewPath: null,
-            ownerId: null,
+            id: media.id,
+            path: url,
+            mimeType: media.mimeType,
+            size: media.size,
+            originalName: media.originalName,
+            createdAt: media.createdAt,
+            previewPath: media.previewPath,
+            ownerId: media.ownerId,
           );
         }
 
-        // De lo contrario, intenta mapear la respuesta completa de metadatos a Media
-        return Media.fromJson(jsonMap as Map<String, dynamic>);
+        return media;
       } catch (e, st) {
         print('Failed to parse Media JSON after successful upload: $e');
         print('Stacktrace: $st');
-        // Si falla el parseo, aún así devuelve un objeto Media mínimo usando safeMime y la información del archivo
-        try {
-          // Intentar extraer el id si es posible
-          final fallbackJson = jsonDecode(response.body);
-          final maybeId =
-              (fallbackJson is Map && fallbackJson.containsKey('id'))
-              ? fallbackJson['id'].toString()
-              : '';
-          if (maybeId.isNotEmpty) {
-            return Media(
-              id: maybeId,
-              path: maybeId,
-              mimeType: safeMime,
-              size: fileBytes.length,
-              originalName: fileName,
-              createdAt: DateTime.now(),
-            );
-          }
-        } catch (_) {}
-
         throw Exception(
           'Upload succeeded but failed to parse Media JSON: $e - body: ${response.body}',
         );
