@@ -86,6 +86,7 @@ import 'features/user/presentation/pages/profile_page.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'config/use_firebase.dart';
 
 import 'features/subscriptions/domain/repositories/subscription_repository.dart';
 import 'features/subscriptions/application/usecases/subscribe_user_usecase.dart';
@@ -113,6 +114,7 @@ const String apiBaseUrl = String.fromEnvironment(
 const String apiAuthToken = String.fromEnvironment('API_AUTH_TOKEN', defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333');
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  if (!kUseFirebase) return;
   await Firebase.initializeApp();
   print("Mensaje recibido en segundo plano: ${message.messageId}");
 }
@@ -121,10 +123,12 @@ Future<void> main() async {
   // Mostrar en consola la URL base que la app está usando (útil para depuración)
   print('API_BASE_URL = $apiBaseUrl');
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  if (kUseFirebase) {
+    await Firebase.initializeApp();
 
-  // Configurar el handler de segundo plano
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // Configurar el handler de segundo plano
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
   runApp(MyApp());
 }
 
@@ -249,14 +253,20 @@ class MyApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (context) => NotificationProvider(
-            repository: NotificationRepository(
-              dataSource: NotificationRemoteDataSource(
-                baseUrl: apiBaseUrl,
-                client: context.read<http.Client>(),
+          create: (context) {
+            final provider = NotificationProvider(
+              repository: NotificationRepository(
+                dataSource: NotificationRemoteDataSource(
+                  baseUrl: apiBaseUrl,
+                  client: context.read<http.Client>(),
+                ),
               ),
-            ),
-          )..initNotifications(),
+            );
+            if (kUseFirebase) {
+              provider.initNotifications();
+            }
+            return provider;
+          },
         ),
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
