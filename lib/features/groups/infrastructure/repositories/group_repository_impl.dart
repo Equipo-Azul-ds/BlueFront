@@ -42,9 +42,44 @@ class GroupRepositoryImpl implements GroupRepository {
     final uri = Uri.parse('$_base/groups');
     final res = await _get(uri);
     _ensureSuccess(res, {200});
-    final data = jsonDecode(res.body);
-    if (data is List) {
-      return data.whereType<Map<String, dynamic>>().map(Group.fromJson).toList();
+    final decoded = jsonDecode(res.body);
+    // Aceptar múltiples formas: List<Map>, {groups: List}, {data: List}, etc.
+    List<Map<String, dynamic>>? list;
+    if (decoded is List) {
+      list = decoded.whereType<Map<String, dynamic>>().toList();
+    } else if (decoded is Map<String, dynamic>) {
+      final candidates = [
+        decoded['groups'], decoded['data'], decoded['items'], decoded['content'], decoded['result']
+      ];
+      list = candidates.firstWhere(
+        (v) => v is List && (v as List).isNotEmpty && (v as List).first is Map,
+        orElse: () => null,
+      )?.whereType<Map<String, dynamic>>().toList();
+      // Si no encontramos clave directa, intenta buscar la primera lista de mapas dentro del objeto.
+      list ??= decoded.values
+          .whereType<List>()
+          .firstWhere(
+            (v) => v.isNotEmpty && v.first is Map,
+            orElse: () => <dynamic>[],
+          )
+          .whereType<Map<String, dynamic>>()
+          .toList();
+      if (list.isEmpty) {
+        // Último recurso: si el backend devuelve un objeto único de grupo
+        if (decoded.containsKey('id') && decoded['id'] is String) {
+          return [Group.fromJson(decoded)];
+        }
+      }
+    }
+    if (list != null) {
+      // lista vacía es válida: sin grupos creados.
+      return list.map(Group.fromJson).toList();
+    }
+    // Si no hay lista pero la respuesta es un objeto con clave groups vacía, devolver []
+    if (decoded is Map<String, dynamic> && decoded.containsKey('groups')) {
+      final g = decoded['groups'];
+      if (g is List) return g.whereType<Map<String, dynamic>>().map(Group.fromJson).toList();
+      return <Group>[];
     }
     throw Exception('Unexpected response for groups list');
   }
@@ -65,8 +100,16 @@ class GroupRepositoryImpl implements GroupRepository {
 
   Future<Group> createGroup({required String name}) async {
     final uri = Uri.parse('$_base/groups');
+    try {
+      // ignore: avoid_print
+      print('[groups] createGroup POST ${uri.toString()} name="$name"');
+    } catch (_) {}
     final res = await _post(uri, {'name': name});
     _ensureSuccess(res, {201});
+    try {
+      // ignore: avoid_print
+      print('[groups] createGroup status=${res.statusCode} body=${res.body}');
+    } catch (_) {}
     return Group.fromJson(_asMap(res.body));
   }
 
@@ -100,10 +143,13 @@ class GroupRepositoryImpl implements GroupRepository {
   Future<GroupInvitationToken> generateInvitation(String groupId) async {
     final uri = Uri.parse('$_base/groups/$groupId/invitation');
     final res = await _post(uri, {});
-    _ensureSuccess(res, {200});
+    _ensureSuccess(res, {200, 201});
     final data = _asMap(res.body);
+    final rawLink = data['link'] ?? data['Link'] ?? '';
+    final parsedLink = rawLink is String ? rawLink : rawLink.toString();
     return GroupInvitationToken(
-      token: data['link']?.toString().split('/').last ?? '',
+      token: parsedLink.isNotEmpty ? parsedLink.split('/').last : (data['token']?.toString() ?? ''),
+      link: parsedLink,
       expiresAt: DateTime.parse(data['expiresAt'] as String),
     );
   }
@@ -163,11 +209,19 @@ class GroupRepositoryImpl implements GroupRepository {
 
   Future<http.Response> _get(Uri uri) async {
     final headers = await headersProvider();
+    try {
+      // ignore: avoid_print
+      print('[groups] GET ${uri.toString()} headers=$headers');
+    } catch (_) {}
     return client.get(uri, headers: headers);
   }
 
   Future<http.Response> _post(Uri uri, Map<String, dynamic> body) async {
     final headers = await headersProvider();
+    try {
+      // ignore: avoid_print
+      print('[groups] POST ${uri.toString()} headers=$headers body=$body');
+    } catch (_) {}
     return client.post(uri,
         headers: {
           'Content-Type': 'application/json',
@@ -178,6 +232,10 @@ class GroupRepositoryImpl implements GroupRepository {
 
   Future<http.Response> _patch(Uri uri, Map<String, dynamic> body) async {
     final headers = await headersProvider();
+    try {
+      // ignore: avoid_print
+      print('[groups] PATCH ${uri.toString()} headers=$headers body=$body');
+    } catch (_) {}
     return client.patch(uri,
         headers: {
           'Content-Type': 'application/json',
@@ -188,6 +246,10 @@ class GroupRepositoryImpl implements GroupRepository {
 
   Future<http.Response> _delete(Uri uri) async {
     final headers = await headersProvider();
+    try {
+      // ignore: avoid_print
+      print('[groups] DELETE ${uri.toString()} headers=$headers');
+    } catch (_) {}
     return client.delete(uri, headers: headers);
   }
 

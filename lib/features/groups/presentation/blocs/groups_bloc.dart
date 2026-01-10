@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domain/entities/Group.dart';
 import '../../domain/entities/GroupMember.dart';
+import '../../domain/entities/GroupInvitationToken.dart';
 import '../../domain/repositories/GroupRepository.dart';
 import '../../../user/presentation/blocs/auth_bloc.dart';
 
@@ -34,6 +35,9 @@ class GroupsBloc extends ChangeNotifier {
     notifyListeners();
     try {
       _groups = await repository.findByMember(userId);
+      if (_groups.isEmpty) {
+        _error = null; // lista vacía es válida
+      }
     } catch (e) {
       _error = 'No se pudieron cargar tus grupos. Intenta nuevamente.';
       if (kDebugMode) {
@@ -80,7 +84,13 @@ class GroupsBloc extends ChangeNotifier {
   }
 
   Future<void> joinByToken(String token) async {
+    if (kDebugMode) {
+      debugPrint('[groups] joinByToken token="$token"');
+    }
     final groupId = await repository.joinByInvitation(token);
+    if (kDebugMode) {
+      debugPrint('[groups] joinByToken success groupId="$groupId"');
+    }
     await refreshGroup(groupId);
     await loadMyGroups();
   }
@@ -94,6 +104,11 @@ class GroupsBloc extends ChangeNotifier {
   Future<void> removeMember(String groupId, String memberId) async {
     await repository.removeMember(groupId: groupId, memberId: memberId);
     await refreshGroup(groupId);
+  }
+
+  Future<GroupInvitationToken> generateInvitation(String groupId) async {
+    final token = await repository.generateInvitation(groupId);
+    return token;
   }
 
   Future<List<GroupMember>?> getMembers(String groupId) async {
