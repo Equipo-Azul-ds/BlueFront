@@ -2,16 +2,15 @@ import 'package:Trivvy/features/Administrador/Presentacion/pages/NotificationAdm
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-
 import 'core/constants/colors.dart';
-
-import 'features/Administrador/Aplication/DataSource/IUserDataSource.dart';
 import 'features/Administrador/Aplication/UseCases/DeleteUserUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/GetUserListUseCase.dart';
+import 'features/Administrador/Aplication/UseCases/ToggleAdminUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/ToggleUserStatusUseCase.dart';
+import 'features/Administrador/Dominio/DataSource/IUserDataSource.dart';
 import 'features/Administrador/Dominio/Repositorio/IUserManagementRepository.dart';
 import 'features/Administrador/Infraestructure/Datasource/UserDataSource.dart';
-import 'features/Administrador/Infraestructure/repositories/UserRepositorie.dart';
+import 'features/Administrador/Infraestructure/repositories/UserRepository.dart';
 import 'features/Administrador/Presentacion/pages/Admin_Page.dart';
 import 'features/Administrador/Presentacion/pages/DashboardPage.dart';
 import 'features/Administrador/Presentacion/pages/UserManagementPage.dart';
@@ -147,11 +146,18 @@ class MyApp extends StatelessWidget {
               DeleteUserUseCase(context.read<IUserRepository>()),
         ),
 
+        Provider<ToggleAdminRoleUseCase>(
+          create: (context) => ToggleAdminRoleUseCase(
+            context.read<IUserRepository>(),
+          ),
+        ),
+
         ChangeNotifierProvider(
           create: (context) => UserManagementProvider(
             getUserListUseCase: context.read<GetUserListUseCase>(),
             toggleUserStatusUseCase: context.read<ToggleUserStatusUseCase>(),
             deleteUserUseCase: context.read<DeleteUserUseCase>(),
+            toggleAdminRoleUseCase: context.read<ToggleAdminRoleUseCase>(),
           ),
         ),
 

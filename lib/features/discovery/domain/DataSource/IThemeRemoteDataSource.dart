@@ -1,5 +1,6 @@
 
-import '../dto/ThemeListResponseDto.dart';
+
+import '../../application/dto/ThemeListResponseDto.dart';
 
 abstract class IThemeRemoteDataSource {
 

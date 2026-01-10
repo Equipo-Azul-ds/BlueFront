@@ -14,6 +14,8 @@ class DiscoverRepository implements IDiscoverRepository{
     try { print('DiscoverRepository initialized'); } catch (_) {}
   }
 
+
+
   @override
   Future<Either<Failure, List<Kahoot>>> getKahoots({
     required String? query,
@@ -26,8 +28,8 @@ class DiscoverRepository implements IDiscoverRepository{
 
     try {
       final responseDto = await remoteDataSource.fetchKahoots(
-        query: query,
-        themes: themes,
+        query: query?.isEmpty == true ? null : query,
+        themes: themes, // Si themes es [], el _buildUri nuevo lo ignorará
         orderBy: orderBy,
         order: order,
       );
@@ -41,7 +43,7 @@ class DiscoverRepository implements IDiscoverRepository{
       print('DiscoverRepository.getKahoots -> ServerException: ${e.message}');
       print('Stacktrace: $st');
       return Left(NetworkFailure());
-    } catch (e, st) { // Captura genérica con StackTrace
+    } catch (e, st) {
       // Log de error genérico
       print('DiscoverRepository.getKahoots -> Unexpected Exception: $e');
       print('Stacktrace: $st');

@@ -31,11 +31,25 @@ class _KahootCategorySectionState extends State<KahootCategorySection> {
   }
 
   Future<void> _fetchCategoryKahoots() async {
-    print('[dashboard] _fetchCategoryKahoots -> category=${widget.categoryTitle}');
+    // 1. Verificación inicial de seguridad
+    if (!mounted) return;
+    if (widget.categoryTitle.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _error = "Categoría no válida";
+      });
+      return;
+    }
 
-    final repository = Provider.of<IDiscoverRepository>(context, listen: false);
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
+      final repository = Provider.of<IDiscoverRepository>(context, listen: false);
+
+      // 2. Llamada al repositorio
       final result = await repository.getKahoots(
         query: null,
         themes: [widget.categoryTitle],
@@ -43,42 +57,30 @@ class _KahootCategorySectionState extends State<KahootCategorySection> {
         order: 'desc',
       );
 
+      // 3. Verificación de montado tras la espera (Await)
+      if (!mounted) return;
+
       result.fold(
             (failure) {
-          print(
-            '[dashboard] fetchCategoryKahoots FAILED for ${widget.categoryTitle} -> Failure: ${failure.runtimeType}',
-          );
-          if (mounted) {
-            setState(() {
-              _error =
-              'Error al cargar kahoots de ${widget.categoryTitle}: ${failure.runtimeType}';
-              _isLoading = false;
-            });
-          }
+          setState(() {
+            _isLoading = false;
+            // Mensaje más descriptivo según el tipo de fallo
+            _error = "No se pudieron cargar los kahoots de ${widget.categoryTitle}";
+          });
         },
-            (kahoots) {
-          print(
-            '[dashboard] fetchCategoryKahoots SUCCESS for ${widget.categoryTitle} -> count: ${kahoots.length}',
-          );
-          if (mounted) {
-            setState(() {
-              _kahoots = kahoots;
-              _isLoading = false;
-            });
-          }
+            (quizList) {
+          setState(() {
+            _kahoots = quizList;
+            _isLoading = false;
+          });
         },
       );
-    } catch (e, st) {
-      print(
-        '[dashboard] Exception fetching Kahoots for ${widget.categoryTitle} -> $e',
-      );
-      print(st);
-      if (mounted) {
-        setState(() {
-          _error = 'Ocurrió un error inesperado: $e';
-          _isLoading = false;
-        });
-      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = "Error inesperado";
+      });
     }
   }
 

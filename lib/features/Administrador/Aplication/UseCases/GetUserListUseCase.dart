@@ -1,3 +1,4 @@
+import 'package:Trivvy/features/Administrador/Aplication/dtos/userDTO.dart';
 import 'package:dartz/dartz.dart';
 import '../../../../core/errors/failures.dart';
 import '../../Dominio/Repositorio/IUserManagementRepository.dart';
@@ -8,12 +9,9 @@ class GetUserListUseCase {
 
   GetUserListUseCase(this.repository);
 
-
   Future<Either<Failure, PaginatedUserList>> execute({
     required UserQueryParams params,
   }) async {
-
-
-    return repository.getUsers(params);
+    return await repository.getUsers(params);
   }
 }
