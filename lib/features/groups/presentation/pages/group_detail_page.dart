@@ -32,7 +32,7 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -120,7 +120,6 @@ class _GroupDetailPageState extends State<GroupDetailPage>
           labelColor: Colors.black87,
           tabs: const [
             Tab(text: 'Actividad'),
-            Tab(text: 'Compartido'),
             Tab(text: 'Asignaciones'),
           ],
         ),
@@ -149,7 +148,6 @@ class _GroupDetailPageState extends State<GroupDetailPage>
       controller: _tabController,
       children: [
         _activityTab(group, adminLabel),
-        _sharedTab(),
         _assignmentsTab(bloc),
       ],
     );
@@ -384,16 +382,6 @@ class _GroupDetailPageState extends State<GroupDetailPage>
     }
   }
 
-  Widget _sharedTab() {
-    return Center(
-      child: _placeholderCard(
-        title: 'Comparte Kahoots',
-        message: 'Aquí verás los kahoots compartidos dentro del grupo.',
-        icon: Icons.folder_shared_outlined,
-      ),
-    );
-  }
-
   Widget _assignmentsTab(GroupsBloc bloc) {
     _assignmentsFuture ??= _ensureAssignmentsLoaded(bloc);
 
@@ -443,8 +431,9 @@ class _GroupDetailPageState extends State<GroupDetailPage>
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (ctx, i) {
             final a = assignments[i];
-            final availableUntilStr = a.availableUntil.toLocal().toString();
-            final availableFromStr = a.availableFrom.toLocal().toString();
+            final availableUntilStr = _fmt(a.availableUntil.toLocal());
+            final availableFromStr = _fmt(a.availableFrom.toLocal());
+            final title = a.quizTitle.isNotEmpty ? a.quizTitle : a.quizId;
             return Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
@@ -460,7 +449,7 @@ class _GroupDetailPageState extends State<GroupDetailPage>
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text('QuizId: ${a.quizId}', style: const TextStyle(color: Colors.black87)),
+                    Text('Quiz: $title', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 4),
                     Text('Disponible desde: $availableFromStr', style: const TextStyle(color: Colors.black54, fontSize: 12)),
                     Text('Disponible hasta: $availableUntilStr', style: const TextStyle(color: Colors.black54, fontSize: 12)),
@@ -673,12 +662,31 @@ class _GroupDetailPageState extends State<GroupDetailPage>
     if (_assignmentsFetched || _group == null) return;
     try {
       final refreshed = await bloc.refreshGroup(_group!.id);
+      // Además de refrescar el grupo completo, intenta obtener asignaciones del endpoint dedicado.
+      try {
+        await bloc.loadGroupAssignments(_group!.id);
+      } catch (_) {
+        // si falla, al menos mantenemos el detalle cargado
+      }
       setState(() {
-        _group = refreshed ?? _group;
+        final latest = bloc.groups.firstWhere(
+          (g) => g.id == _group!.id,
+          orElse: () => refreshed ?? _group!,
+        );
+        _group = latest;
         _assignmentsFetched = true;
       });
     } catch (_) {
       // Silently ignore; UI will show placeholder error card.
     }
+  }
+
+  String _fmt(DateTime dt) {
+    final y = dt.year.toString().padLeft(4, '0');
+    final m = dt.month.toString().padLeft(2, '0');
+    final d = dt.day.toString().padLeft(2, '0');
+    final hh = dt.hour.toString().padLeft(2, '0');
+    final mm = dt.minute.toString().padLeft(2, '0');
+    return '$y-$m-$d $hh:$mm';
   }
 }

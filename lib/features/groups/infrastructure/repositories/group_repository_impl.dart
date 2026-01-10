@@ -165,6 +165,10 @@ class GroupRepositoryImpl implements GroupRepository {
   Future<void> leaveGroup(String groupId) async {
     final uri = Uri.parse('$_base/groups/$groupId/leave');
     final res = await _post(uri, {});
+    try {
+      // ignore: avoid_print
+      print('[groups] leaveGroup <- status=${res.statusCode} body=${res.body}');
+    } catch (_) {}
     _ensureSuccess(res, {200});
   }
 
@@ -201,8 +205,42 @@ class GroupRepositoryImpl implements GroupRepository {
       'quizId': quizId,
       'availableUntil': availableUntil.toIso8601String(),
     });
+    try {
+      // ignore: avoid_print
+      print('[groups] assignQuizToGroup <- status=${res.statusCode} body=${res.body}');
+    } catch (_) {}
     _ensureSuccess(res, {201});
     return GroupQuizAssignment.fromJson(_asMap(res.body));
+  }
+
+  Future<List<GroupQuizAssignment>> getGroupAssignments(String groupId) async {
+    final uri = Uri.parse('$_base/groups/$groupId/quizzes');
+    final res = await _get(uri);
+    try {
+      // ignore: avoid_print
+      print('[groups] getGroupAssignments <- status=${res.statusCode}');
+      print('[groups] getGroupAssignments <- body=${res.body}');
+    } catch (_) {}
+    _ensureSuccess(res, {200});
+    final decoded = jsonDecode(res.body);
+    List<dynamic> list;
+    if (decoded is List) {
+      list = decoded;
+    } else if (decoded is Map<String, dynamic>) {
+      // soportar {items: []}, {data: []}, {quizzes: []}, etc.
+      list = (decoded['items'] ?? decoded['data'] ?? decoded['quizzes'] ?? decoded['assignments'] ?? decoded['quizAssignments'] ?? decoded['groupQuizzes']) as List? ?? [];
+    } else {
+      list = [];
+    }
+    final parsed = list
+        .whereType<Map<String, dynamic>>()
+        .map(GroupQuizAssignment.fromJson)
+        .toList();
+    try {
+      // ignore: avoid_print
+      print('[groups] getGroupAssignments -> parsed ${parsed.length} assignments');
+    } catch (_) {}
+    return parsed;
   }
 
   // --- HTTP helpers ---------------------------------------------------
@@ -218,15 +256,16 @@ class GroupRepositoryImpl implements GroupRepository {
 
   Future<http.Response> _post(Uri uri, Map<String, dynamic> body) async {
     final headers = await headersProvider();
+    final mergedHeaders = {
+      'Content-Type': 'application/json',
+      ...headers,
+    };
     try {
       // ignore: avoid_print
-      print('[groups] POST ${uri.toString()} headers=$headers body=$body');
+      print('[groups] POST ${uri.toString()} headers=$mergedHeaders body=$body');
     } catch (_) {}
     return client.post(uri,
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
+        headers: mergedHeaders,
         body: jsonEncode(body));
   }
 
@@ -255,6 +294,10 @@ class GroupRepositoryImpl implements GroupRepository {
 
   void _ensureSuccess(http.Response res, Set<int> allowed) {
     if (!allowed.contains(res.statusCode)) {
+      try {
+        // ignore: avoid_print
+        print('[groups] ERROR status=${res.statusCode} body=${res.body}');
+      } catch (_) {}
       throw Exception('Request failed: ${res.statusCode} ${res.body}');
     }
   }

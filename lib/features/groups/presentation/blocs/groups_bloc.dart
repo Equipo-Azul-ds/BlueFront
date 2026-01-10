@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../domain/entities/Group.dart';
 import '../../domain/entities/GroupMember.dart';
 import '../../domain/entities/GroupInvitationToken.dart';
+import '../../domain/entities/GroupQuizAssignment.dart';
 import '../../domain/repositories/GroupRepository.dart';
 import '../../../user/presentation/blocs/auth_bloc.dart';
 
@@ -99,6 +100,18 @@ class GroupsBloc extends ChangeNotifier {
     await repository.leaveGroup(groupId);
     _groups = _groups.where((g) => g.id != groupId).toList();
     notifyListeners();
+  }
+
+  Future<List<GroupQuizAssignment>> loadGroupAssignments(String groupId) async {
+    final list = await repository.getGroupAssignments(groupId);
+    if (kDebugMode) {
+      debugPrint('[groups] loadGroupAssignments groupId=$groupId count=${list.length}');
+    }
+    _groups = _groups
+        .map((g) => g.id == groupId ? g.copyWith(quizAssignments: list) : g)
+        .toList();
+    notifyListeners();
+    return list;
   }
 
   Future<void> removeMember(String groupId, String memberId) async {
