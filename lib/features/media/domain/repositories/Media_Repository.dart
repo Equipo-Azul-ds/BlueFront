@@ -11,4 +11,7 @@ abstract class MediaRepository {
 
   Future<Media?> findById(String id);
   Future<void> delete(String id);
+
+  /// Obtiene la lista de assets de tema (categoría 'theme') desde el backend.
+  Future<List<Map<String, dynamic>>> fetchThemes();
 }

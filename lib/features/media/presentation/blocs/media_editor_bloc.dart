@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../domain/repositories/Media_Repository.dart';
 import '../../application/dtos/upload_media_dto.dart';
 import '../../application/upload_media_usecase.dart';
 import '../../application/get_media_usecase.dart';
@@ -12,6 +13,7 @@ import '../../application/delete_media_usecase.dart';
 /// Bloc responsable de operaciones de media (upload / get / delete).
 /// Inyecta las implementaciones de repositorios (o sus interfaces).
 class MediaEditorBloc extends ChangeNotifier {
+  final MediaRepository mediaRepository;
   final UploadMediaUseCase uploadUseCase;
   final GetMediaUseCase getUseCase;
   final DeleteMediaUseCase deleteUseCase;
@@ -24,6 +26,7 @@ class MediaEditorBloc extends ChangeNotifier {
   Uint8List? lastFileBytes;
 
   MediaEditorBloc({
+    required this.mediaRepository,
     required this.uploadUseCase,
     required this.getUseCase,
     required this.deleteUseCase,
@@ -93,6 +96,18 @@ class MediaEditorBloc extends ChangeNotifier {
       rethrow;
     } finally {
       _stopLoading();
+    }
+  }
+
+  /// Obtiene los themes disponibles desde el backend (categoría 'theme').
+  Future<List<Map<String, dynamic>>> fetchThemes() async {
+    try {
+      final themes = await mediaRepository.fetchThemes();
+      errorMessage = null;
+      return themes;
+    } catch (e) {
+      errorMessage = 'Error al obtener themes: $e';
+      rethrow;
     }
   }
 

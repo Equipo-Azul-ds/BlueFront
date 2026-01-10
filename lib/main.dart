@@ -287,6 +287,7 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (context) => MediaEditorBloc(
+            mediaRepository: context.read<MediaRepository>(),
             uploadUseCase: UploadMediaUseCase(
               mediaRepository: context.read<MediaRepository>(),
             ),
