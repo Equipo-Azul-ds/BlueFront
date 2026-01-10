@@ -71,15 +71,17 @@ class _GroupMembersPageState extends State<GroupMembersPage> {
       itemBuilder: (context, index) {
         final member = _members[index];
         final isAdmin = member.role == GroupRole.admin;
+        final display = (member.userName.isNotEmpty) ? member.userName : member.userId;
+        final initial = display.isNotEmpty ? display.substring(0, 1).toUpperCase() : '?';
         return ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           tileColor: const Color(0xFFF6F6F6),
           leading: CircleAvatar(
             backgroundColor: Colors.blueGrey[100],
-            child: Text(member.userId.substring(0, 1).toUpperCase()),
+            child: Text(initial),
           ),
-          title: Text(member.userId),
+          title: Text(display),
           subtitle: Text('Rol: ${member.role.value}', style: const TextStyle(color: Colors.black54)),
           trailing: isAdmin
               ? Container(

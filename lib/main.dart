@@ -1,17 +1,20 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:Trivvy/features/Administrador/Presentacion/pages/NotificationAdminPage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-
 import 'core/constants/colors.dart';
-
-import 'features/Administrador/Aplication/DataSource/IUserDataSource.dart';
+import 'local/secure_storage.dart';
 import 'features/Administrador/Aplication/UseCases/DeleteUserUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/GetUserListUseCase.dart';
+import 'features/Administrador/Aplication/UseCases/ToggleAdminUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/ToggleUserStatusUseCase.dart';
+import 'features/Administrador/Dominio/DataSource/IUserDataSource.dart';
 import 'features/Administrador/Dominio/Repositorio/IUserManagementRepository.dart';
 import 'features/Administrador/Infraestructure/Datasource/UserDataSource.dart';
-import 'features/Administrador/Infraestructure/repositories/UserRepositorie.dart';
+import 'features/Administrador/Infraestructure/repositories/UserRepository.dart';
 import 'features/Administrador/Presentacion/pages/Admin_Page.dart';
 import 'features/Administrador/Presentacion/pages/DashboardPage.dart';
 import 'features/Administrador/Presentacion/pages/UserManagementPage.dart';
@@ -32,11 +35,10 @@ import 'features/discovery/presentation/pages/discover_page.dart';
 import 'common_pages/dashboard_page.dart';
 import 'features/challenge/domain/repositories/single_player_game_repository.dart';
 import 'features/challenge/infrastructure/repositories/single_player_game_repository_impl.dart';
-import 'features/challenge/infrastructure/ports/slide_provider_impl.dart';
 import 'features/challenge/application/use_cases/single_player_usecases.dart';
-import 'features/challenge/application/ports/slide_provider.dart';
 import 'features/challenge/presentation/blocs/single_player_challenge_bloc.dart';
 import 'features/challenge/presentation/blocs/single_player_results_bloc.dart';
+import 'features/challenge/infrastructure/storage/single_player_attempt_tracker.dart';
 import 'features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import 'features/media/presentation/blocs/media_editor_bloc.dart';
 import 'features/kahoot/presentation/pages/quiz_editor_page.dart';
@@ -52,6 +54,18 @@ import 'features/media/application/upload_media_usecase.dart';
 import 'features/media/application/get_media_usecase.dart';
 import 'features/media/application/delete_media_usecase.dart';
 import 'features/kahoot/domain/entities/Quiz.dart';
+import 'features/report/domain/repositories/reports_repository.dart';
+import 'features/report/infrastructure/repositories/reports_repository_impl.dart';
+import 'features/report/application/use_cases/report_usecases.dart';
+import 'features/report/presentation/blocs/reports_list_bloc.dart';
+import 'features/gameSession/domain/repositories/multiplayer_session_repository.dart';
+import 'features/gameSession/domain/repositories/multiplayer_session_realtime.dart';
+import 'features/gameSession/application/use_cases/multiplayer_session_usecases.dart';
+import 'features/gameSession/infrastructure/datasources/multiplayer_session_remote_data_source.dart';
+import 'features/gameSession/infrastructure/realtime/multiplayer_session_realtime_impl.dart';
+import 'features/gameSession/infrastructure/repositories/multiplayer_session_repository_impl.dart';
+import 'features/gameSession/infrastructure/socket/multiplayer_socket_client.dart';
+import 'features/gameSession/presentation/controllers/multiplayer_session_controller.dart';
 
 import 'features/library/domain/repositories/library_repository.dart';
 import 'features/library/infrastructure/repositories/library_repository_impl.dart';
@@ -90,7 +104,11 @@ const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
 
   defaultValue: 'https://backcomun-gc5j.onrender.com',
+
 );
+
+// Token (UUID) usado mientras el backend mockea la verificación real.
+const String apiAuthToken = String.fromEnvironment('API_AUTH_TOKEN', defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333');
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -116,6 +134,47 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<http.Client>(create: (_) => http.Client()),
+
+        // Reportes: repo + casos de uso + BLoC (ChangeNotifier)
+        Provider<ReportsRepository>(
+          create: (context) => ReportsRepositoryImpl(
+            baseUrl: apiBaseUrl,
+            client: context.read<http.Client>(),
+            headersProvider: () async {
+              final token = await SecureStorage.instance.read('userId');
+              return {
+                'Content-Type': 'application/json',
+                if (token != null && token.isNotEmpty)
+                  'Authorization': 'Bearer $token',
+              };
+            },
+          ),
+        ),
+        Provider<GetMyResultsUseCase>(
+          create: (context) => GetMyResultsUseCase(
+            context.read<ReportsRepository>(),
+          ),
+        ),
+        Provider<GetSessionReportUseCase>(
+          create: (context) => GetSessionReportUseCase(
+            context.read<ReportsRepository>(),
+          ),
+        ),
+        Provider<GetMultiplayerResultUseCase>(
+          create: (context) => GetMultiplayerResultUseCase(
+            context.read<ReportsRepository>(),
+          ),
+        ),
+        Provider<GetSingleplayerResultUseCase>(
+          create: (context) => GetSingleplayerResultUseCase(
+            context.read<ReportsRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider<ReportsListBloc>(
+          create: (context) => ReportsListBloc(
+            getMyResultsUseCase: context.read<GetMyResultsUseCase>(),
+          ),
+        ),
 
         Provider<IUserDataSource>(
           create: (context) => UserRemoteDataSourceImpl(
@@ -145,11 +204,17 @@ class MyApp extends StatelessWidget {
               DeleteUserUseCase(context.read<IUserRepository>()),
         ),
 
+        Provider<ToggleAdminRoleUseCase>(
+          create: (context) => ToggleAdminRoleUseCase(
+            context.read<IUserRepository>(),
+          ),
+        ),
         ChangeNotifierProvider(
           create: (context) => UserManagementProvider(
             getUserListUseCase: context.read<GetUserListUseCase>(),
             toggleUserStatusUseCase: context.read<ToggleUserStatusUseCase>(),
             deleteUserUseCase: context.read<DeleteUserUseCase>(),
+            toggleAdminRoleUseCase: context.read<ToggleAdminRoleUseCase>(),
           ),
         ),
 
@@ -191,38 +256,41 @@ class MyApp extends StatelessWidget {
             ),
           )..initNotifications(),
         ),
-        Provider<SlideProvider>(create: (_) => SlideProviderImpl()),
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
-            slideProvider: context.read<SlideProvider>(),
+            baseUrl: apiBaseUrl,
+            mockAuthToken: apiAuthToken,
           ),
         ),
         Provider<SinglePlayerGameRepository>(
           create: (context) => context.read<SinglePlayerGameRepositoryImpl>(),
         ),
-        Provider<GetAttemptStateUseCase>(
-          create: (context) => GetAttemptStateUseCase(
-            repository: context.read<SinglePlayerGameRepository>(),
-          ),
+        Provider<FlutterSecureStorage>(
+          create: (_) => const FlutterSecureStorage(),
+        ),
+        Provider<SinglePlayerAttemptTracker>(
+          create: (context) =>
+              SinglePlayerAttemptTracker(context.read<FlutterSecureStorage>()),
         ),
         Provider<StartAttemptUseCase>(
           create: (context) => StartAttemptUseCase(
             repository: context.read<SinglePlayerGameRepository>(),
-            slideProvider: context.read<SlideProvider>(),
-            getAttemptStateUseCase: context.read<GetAttemptStateUseCase>(),
           ),
         ),
         Provider<SubmitAnswerUseCase>(
           create: (context) => SubmitAnswerUseCase(
             repository: context.read<SinglePlayerGameRepository>(),
-            slideProvider: context.read<SlideProvider>(),
           ),
         ),
         Provider<GetSummaryUseCase>(
           create: (context) =>
               GetSummaryUseCase(context.read<SinglePlayerGameRepository>()),
         ),
-
+        Provider<GetAttemptStateUseCase>(
+          create: (context) => GetAttemptStateUseCase(
+            repository: context.read<SinglePlayerGameRepository>(),
+          ),
+        ),
         ChangeNotifierProxyProvider4<
           IDiscoverRepository,
           ThemeRepository,
@@ -250,16 +318,24 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<SinglePlayerChallengeBloc>(
           create: (context) => SinglePlayerChallengeBloc(
             startAttemptUseCase: context.read<StartAttemptUseCase>(),
-            getAttemptStateUseCase: context.read<GetAttemptStateUseCase>(),
             submitAnswerUseCase: context.read<SubmitAnswerUseCase>(),
+            getSummaryUseCase: context.read<GetSummaryUseCase>(),
+            attemptTracker: context.read<SinglePlayerAttemptTracker>(),
+          ),
+        ),
+        ChangeNotifierProvider<SinglePlayerResultsBloc>(
+          create: (context) => SinglePlayerResultsBloc(
             getSummaryUseCase: context.read<GetSummaryUseCase>(),
           ),
         ),
-
-        ChangeNotifierProvider<SinglePlayerResultsBloc>(
-          create: (context) => SinglePlayerResultsBloc(
-            repository: context.read<SinglePlayerGameRepository>(),
-            getSummaryUseCase: context.read<GetSummaryUseCase>(),
+        Provider<Dio>(
+          create: (_) => Dio(
+            BaseOptions(
+              baseUrl: apiBaseUrl,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 10),
+              sendTimeout: const Duration(seconds: 10),
+            ),
           ),
         ),
         //Estos son los proveedores para los repositorios (inyeccion de dependencias)
@@ -273,12 +349,90 @@ class MyApp extends StatelessWidget {
         Provider<StorageProviderRepository>(
           create: (_) => StorageProviderRepositoryImpl(baseUrl: apiBaseUrl),
         ),
+        Provider<MultiplayerSessionRemoteDataSource>(
+          create: (context) => MultiplayerSessionRemoteDataSourceImpl(
+            dio: context.read<Dio>(),
+            tokenProvider: () async => apiAuthToken,
+          ),
+        ),
+        Provider<MultiplayerSocketClient>(
+          create: (_) => MultiplayerSocketClient(
+            baseUrl: apiBaseUrl,
+            defaultTokenProvider: () async => apiAuthToken,
+          ),
+        ),
+        Provider<MultiplayerSessionRepository>(
+          create: (context) => MultiplayerSessionRepositoryImpl(
+            remoteDataSource: context.read<MultiplayerSessionRemoteDataSource>(),
+          ),
+        ),
+        Provider<MultiplayerSessionRealtime>(
+          create: (context) => MultiplayerSessionRealtimeImpl(
+            socketClient: context.read<MultiplayerSocketClient>(),
+          ),
+        ),
+        Provider<InitializeHostLobbyUseCase>(
+          create: (context) => InitializeHostLobbyUseCase(
+            repository: context.read<MultiplayerSessionRepository>(),
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<ResolvePinFromQrTokenUseCase>(
+          create: (context) => ResolvePinFromQrTokenUseCase(
+            repository: context.read<MultiplayerSessionRepository>(),
+          ),
+        ),
+        Provider<JoinLobbyUseCase>(
+          create: (context) => JoinLobbyUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<LeaveSessionUseCase>(
+          create: (context) => LeaveSessionUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<EmitHostStartGameUseCase>(
+          create: (context) => EmitHostStartGameUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<EmitHostNextPhaseUseCase>(
+          create: (context) => EmitHostNextPhaseUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<EmitHostEndSessionUseCase>(
+          create: (context) => EmitHostEndSessionUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        Provider<SubmitPlayerAnswerUseCase>(
+          create: (context) => SubmitPlayerAnswerUseCase(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => MultiplayerSessionController(
+            realtime: context.read<MultiplayerSessionRealtime>(),
+            initializeHostLobbyUseCase: context.read<InitializeHostLobbyUseCase>(),
+            resolvePinFromQrTokenUseCase:
+                context.read<ResolvePinFromQrTokenUseCase>(),
+            joinLobbyUseCase: context.read<JoinLobbyUseCase>(),
+            leaveSessionUseCase: context.read<LeaveSessionUseCase>(),
+            emitHostStartGameUseCase: context.read<EmitHostStartGameUseCase>(),
+            emitHostNextPhaseUseCase: context.read<EmitHostNextPhaseUseCase>(),
+            emitHostEndSessionUseCase: context.read<EmitHostEndSessionUseCase>(),
+            submitPlayerAnswerUseCase: context.read<SubmitPlayerAnswerUseCase>(),
+          ),
+        ),
         // Blocs / ChangeNotifiers
         ChangeNotifierProvider(
           create: (context) => QuizEditorBloc(context.read<QuizRepository>()),
         ),
         ChangeNotifierProvider(
           create: (context) => MediaEditorBloc(
+            mediaRepository: context.read<MediaRepository>(),
             uploadUseCase: UploadMediaUseCase(
               mediaRepository: context.read<MediaRepository>(),
             ),
@@ -426,7 +580,6 @@ class MyApp extends StatelessWidget {
                   if (args is Quiz) template = args;
                   if (args is Map && args['clear'] == true)
                     explicitClear = true;
-
                   final quizBloc = Provider.of<QuizEditorBloc>(
                     context,
                     listen: false,

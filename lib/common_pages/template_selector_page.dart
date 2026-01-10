@@ -7,9 +7,9 @@ import 'package:uuid/uuid.dart';
 /// Página que muestra plantillas visuales para que el usuario elija
 /// Al seleccionar "Usar plantilla" devuelve por `Navigator.pop(context, Quiz)`
 class TemplateSelectorPage extends StatelessWidget {
-  TemplateSelectorPage({Key? key}) : super(key: key);
+  const TemplateSelectorPage({super.key});
 
-  final List<Map<String, String>> _templates = [
+  static const List<Map<String, String>> _templates = [
     {
       'id': 'tpl_001',
       'title': 'Estudia con preguntas de verdadero o falso',

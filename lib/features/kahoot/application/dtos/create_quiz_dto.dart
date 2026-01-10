@@ -10,8 +10,10 @@ class CreateAnswerDto {
       // El backend puede esperar 'answerText' o 'text'
       'answerText': answerText,
       'text': answerText,
-      'answerImage': answerImage,
-      'mediaUrl': answerImage,
+      // Mantener nombres del contrato: 'media' y 'mediaId'. Guardar URL en mediaId según requisito.
+      'answerImage': answerImage, // compat
+      'media': answerImage,
+      'mediaId': answerImage,
         'isCorrect': isCorrect,
       };
 }
@@ -37,7 +39,9 @@ class CreateQuestionDto {
       // Proporciona ambas formas: 'questionText' (ejemplos del backend) y 'text' (entidades internas)
       'questionText': questionText,
       'text': questionText,
-      'mediaUrl': mediaUrl,
+      // Mantener nombres del contrato: 'media' y 'mediaId'. Guardar URL en mediaId según requisito.
+      'media': mediaUrl,
+      'mediaId': mediaUrl,
       'questionType': questionType,
       'type': questionType,
       'timeLimit': timeLimit,
@@ -73,7 +77,8 @@ class CreateQuizDto {
         'authorId': authorId,
         'title': title,
         'description': description,
-        'coverImage': coverImage,
+      'coverImage': coverImage,
+      'coverImageId': coverImage,
         'visibility': visibility,
         'status': status,
         'category': category,

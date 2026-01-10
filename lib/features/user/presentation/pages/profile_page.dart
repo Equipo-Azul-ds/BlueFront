@@ -10,6 +10,7 @@ import 'package:Trivvy/features/subscriptions/presentation/screens/plans_screen.
 import 'package:Trivvy/features/subscriptions/presentation/widgets/plan_badge.dart';
 import 'package:Trivvy/features/subscriptions/presentation/screens/subscription_management_screen.dart';
 import '../pages/access_gate_page.dart';
+import '../../../report/presentation/pages/reports_list_page.dart';
 
 class ProfilePage extends StatefulWidget {
   final User user;
@@ -306,6 +307,27 @@ class _ProfilePageState extends State<ProfilePage> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ReportsListPage(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.assessment),
+                label: const Text('Informes y Estadísticas'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  textStyle: const TextStyle(fontSize: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
 

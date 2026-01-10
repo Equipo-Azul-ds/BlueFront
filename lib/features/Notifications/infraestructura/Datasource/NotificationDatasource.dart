@@ -1,14 +1,18 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../../../../local/secure_storage.dart';
+import '../../Application/DTO/AdminNotificacationDTO.dart';
 import '../../Application/DTO/NotificationListResponseDTO.dart';
-import '../../Application/DataSource/INotificationDatasource.dart';
+import '../../Dominio/DataSource/INotificationDatasource.dart';
+
 
 
 
 class NotificationRemoteDataSource implements INotificationDataSource {
   final String baseUrl;
   final http.Client client;
+  final storage = SecureStorage.instance;
 
   NotificationRemoteDataSource({required this.baseUrl, required this.client});
 
@@ -36,7 +40,7 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
     if (response.statusCode != 204) {
       throw Exception(
-        'Error al anular registro'); // [cite: 4]
+        'Error al anular registro');
     }
   }
 
@@ -45,7 +49,6 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     int limit = 20,
     int page = 1,
   }) async {
-    // Construimos la URI con los parámetros de búsqueda
     final uri = Uri.parse('$baseUrl/notifications').replace(
       queryParameters: {
         'limit': limit.toString(),
@@ -60,7 +63,6 @@ class NotificationRemoteDataSource implements INotificationDataSource {
         uri,
         headers: {
           'Content-Type': 'application/json',
-          // 'Authorization': 'Bearer $token', // Agregar el token aquí
         },
       );
 
@@ -85,7 +87,6 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     );
 
     if (response.statusCode == 200) {
-      // Retornamos el JSON para que el Repositorio lo convierta a Entidad
       return jsonDecode(response.body) as Map<String, dynamic>; //
     } else {
       throw Exception('Error al marcar como leída: ${response.statusCode}'); //
@@ -95,7 +96,7 @@ class NotificationRemoteDataSource implements INotificationDataSource {
   @override
   Future<void> sendAdminNotification(String message) async {
     final response = await client.post(
-      Uri.parse('$baseUrl/admin/notifications'), // Endpoint real
+      Uri.parse('$baseUrl/admin/notifications'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer YOUR_TOKEN',
@@ -105,6 +106,83 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
     if (response.statusCode != 201) {
       throw Exception('Error al enviar notificación: ${response.body}');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> sendMassNotification({
+    required String title,
+    required String message,
+    required bool toAdmins,
+    required bool toRegularUsers,
+  }) async {
+    final uri = Uri.parse('$baseUrl/backoffice/massNotification');
+    final token = await storage.read('token');
+    //final adminId = await storage.read('userId');
+    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
+
+    final response = await client.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'user': adminId ?? '',
+      },
+      body: jsonEncode({
+        "title": title,
+        "message": message,
+        "filters": {
+          "toAdmins": toAdmins,
+          "toRegularUsers": toRegularUsers,
+        }
+      }),
+    );
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception('Error al enviar notificación masiva: ${response.statusCode}');
+    }
+  }
+
+  @override
+  Future<AdminNotificationListResponseDto> getAdminNotificationHistory({
+    int limit = 20,
+    int page = 1,
+    String? userId,
+  }) async {
+    final Map<String, String> queryParams = {
+      'limit': limit.toString(),
+      'page': page.toString(),
+      'orderBy': 'createdAt',
+      'order': 'desc',
+    };
+    if (userId != null) queryParams['userId'] = userId;
+
+    final uri = Uri.parse('$baseUrl/backoffice/massNotifications')
+        .replace(queryParameters: queryParams);
+    final token = await storage.read('token');
+    //final adminId = await storage.read('userId');
+    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
+
+    final response = await client.get(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'user': adminId ?? '',
+      },
+    );
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final dynamic jsonBody = json.decode(utf8.decode(response.bodyBytes));
+      return AdminNotificationListResponseDto.fromDynamicJson(jsonBody);
+    } else {
+      throw Exception('Error al cargar historial: ${response.statusCode}');
     }
   }
 }

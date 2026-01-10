@@ -1,20 +1,26 @@
 // lib/features/kahoot/presentation/pages/question_editor_page.dart
 import 'dart:io';
- 
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../application/dtos/create_quiz_dto.dart';
-import '../../application/dtos/create_quiz_dto.dart' show CreateQuestionDto, CreateAnswerDto;
+import '../../application/dtos/create_quiz_dto.dart'
+    show CreateQuestionDto, CreateAnswerDto;
 import '../blocs/quiz_editor_bloc.dart';
 import '../../../media/presentation/blocs/media_editor_bloc.dart';
-import '../../../media/application/dtos/upload_media_dto.dart' show UploadMediaDTO;
+import '../../../media/application/dtos/upload_media_dto.dart'
+    show UploadMediaDTO;
 
 class QuestionEditorPage extends StatefulWidget {
   final String quizId;
   final String questionId;
 
-  const QuestionEditorPage({required this.quizId, required this.questionId, Key? key}) : super(key: key);
+  const QuestionEditorPage({
+    required this.quizId,
+    required this.questionId,
+    Key? key,
+  }) : super(key: key);
 
   @override
   _QuestionEditorPageState createState() => _QuestionEditorPageState();
@@ -24,6 +30,23 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
   late TextEditingController _textController;
   String? _mediaPath;
   bool _busy = false;
+
+  Widget _withThemeBackground(String? themeUrl, Widget child) {
+    final url = (themeUrl ?? '').trim();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        image: url.startsWith('http')
+            ? DecorationImage(
+                image: NetworkImage(url),
+                fit: BoxFit.cover,
+                onError: (_, __) {},
+              )
+            : null,
+      ),
+      child: Container(color: Colors.black.withOpacity(0.08), child: child),
+    );
+  }
 
   @override
   void initState() {
@@ -37,7 +60,9 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
     final quiz = quizBloc.currentQuiz;
     if (quiz != null) {
-      final idx = quiz.questions.indexWhere((qq) => qq.questionId == widget.questionId);
+      final idx = quiz.questions.indexWhere(
+        (qq) => qq.questionId == widget.questionId,
+      );
       if (idx != -1) {
         final q = quiz.questions[idx];
         _textController.text = q.text;
@@ -76,9 +101,13 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
       if (path != null) {
         setState(() => _mediaPath = path);
       }
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Archivo subido')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Archivo subido')));
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al subir: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al subir: $e')));
     } finally {
       setState(() => _busy = false);
     }
@@ -150,7 +179,9 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
     final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
     final quiz = quizBloc.currentQuiz;
     if (quiz == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz no cargado')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Quiz no cargado')));
       return;
     }
 
@@ -159,10 +190,14 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
     setState(() => _busy = true);
     try {
       await quizBloc.updateQuiz(widget.quizId, dto);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pregunta guardada')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Pregunta guardada')));
       Navigator.of(context).pop();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
     } finally {
       setState(() => _busy = false);
     }
@@ -179,7 +214,9 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
       );
     }
 
-    final idx = quiz.questions.indexWhere((qq) => qq.questionId == widget.questionId);
+    final idx = quiz.questions.indexWhere(
+      (qq) => qq.questionId == widget.questionId,
+    );
     if (idx == -1) {
       return Scaffold(
         appBar: AppBar(title: const Text('Editor de Pregunta')),
@@ -187,36 +224,49 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
       );
     }
 
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Editor de Pregunta')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
-              controller: _textController,
-              decoration: const InputDecoration(labelText: 'Texto de la pregunta'),
-              maxLines: null,
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _busy ? null : _pickAndUploadMedia,
-                  icon: const Icon(Icons.upload_file),
-                  label: const Text('Subir media'),
+    return _withThemeBackground(
+      quiz.themeId,
+      Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(title: const Text('Editor de Pregunta')),
+        body: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              TextField(
+                controller: _textController,
+                decoration: const InputDecoration(
+                  labelText: 'Texto de la pregunta',
                 ),
-                const SizedBox(width: 12),
-                if (_mediaPath != null) Flexible(child: Text('Media: $_mediaPath', overflow: TextOverflow.ellipsis)),
-              ],
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _busy ? null : _save,
-              child: _busy ? const CircularProgressIndicator() : const Text('Guardar pregunta'),
-            ),
-          ],
+                maxLines: null,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _busy ? null : _pickAndUploadMedia,
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Subir media'),
+                  ),
+                  const SizedBox(width: 12),
+                  if (_mediaPath != null)
+                    Flexible(
+                      child: Text(
+                        'Media: $_mediaPath',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _busy ? null : _save,
+                child: _busy
+                    ? const CircularProgressIndicator()
+                    : const Text('Guardar pregunta'),
+              ),
+            ],
+          ),
         ),
       ),
     );

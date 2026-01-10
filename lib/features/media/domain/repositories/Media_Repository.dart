@@ -4,11 +4,19 @@ import '../entities/Media.dart';
 
 abstract class MediaRepository {
   /// Sube un archivo (multipart) al backend y devuelve los metadatos del objeto Media creado.
-  Future<Media> uploadFromBytes(Uint8List fileBytes, String fileName, String mimeType);
+  Future<Media> uploadFromBytes(
+    Uint8List fileBytes,
+    String fileName,
+    String mimeType, {
+    String? bearerToken,
+  });
 
   /// Persiste un objeto solo con metadatos si es necesario (mantenido por compatibilidad).
   Future<Media> save(Media media);
 
   Future<Media?> findById(String id);
   Future<void> delete(String id);
+
+  /// Obtiene la lista de assets de tema (categoría 'theme') desde el backend.
+  Future<List<Map<String, dynamic>>> fetchThemes();
 }

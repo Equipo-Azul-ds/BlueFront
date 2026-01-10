@@ -1,9 +1,29 @@
+import '../Entidades/AdminNotificacation.dart';
 import '../Entidades/NotificationEntiry.dart';
 
 abstract class INotificationRepository {
+  // --- Gestión de Dispositivo ---
   Future<void> registerToken(String token, String deviceType);
   Future<void> unregisterToken(String token);
+
+  // --- Notificaciones Personales (Usuario) ---
   Future<List<NotificationEntity>> getHistory();
   Future<NotificationEntity> markAsRead(String id);
-  Future<void> sendAdminNotification(String message);
+
+  // --- Notificaciones Administrativas (Backoffice) ---
+
+
+  Future<void> sendMassNotification({
+    required String title,
+    required String message,
+    required bool toAdmins,
+    required bool toRegularUsers,
+  });
+
+
+  Future<List<AdminNotificationEntity>> getAdminNotificationHistory({
+    int limit = 20,
+    int page = 1,
+    String? userId,
+  });
 }

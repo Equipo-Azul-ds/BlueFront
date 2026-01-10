@@ -60,9 +60,12 @@ class UserProviders extends StatelessWidget {
                 final storage = SecureStorage.instance;
                 final headersProvider = () async {
                   final token = await storage.read('token');
+                  final currentUserId = await storage.read('currentUserId');
                   return {
                     if (token != null) 'Authorization': 'Bearer $token',
                     'Accept': 'application/json',
+                    if (currentUserId != null && currentUserId.isNotEmpty)
+                      'x-debug-user-id': currentUserId,
                   };
                 };
                 return GroupRepositoryImpl(

@@ -1,17 +1,28 @@
 // ENUM
 enum GameStateType {
-  LOBBY,
-  QUESTIONS,
-  RESULTS,
-  END;
+  lobby,
+  questions,
+  results,
+  end;
 
-  String toJson() => name;
+  String toJson() {
+    return switch (this) {
+      GameStateType.lobby => 'LOBBY',
+      GameStateType.questions => 'QUESTIONS',
+      GameStateType.results => 'RESULTS',
+      GameStateType.end => 'END',
+    };
+  }
 
   static GameStateType fromJson(String json) {
-    return GameStateType.values.firstWhere(
-      (e) => e.name == json,
-      orElse: () => GameStateType.LOBBY,
-    );
+    final normalized = json.trim();
+    return switch (normalized) {
+      'LOBBY' || 'lobby' => GameStateType.lobby,
+      'QUESTIONS' || 'questions' => GameStateType.questions,
+      'RESULTS' || 'results' => GameStateType.results,
+      'END' || 'end' => GameStateType.end,
+      _ => GameStateType.lobby,
+    };
   }
 }
 

@@ -1,6 +1,7 @@
 import 'package:Trivvy/features/Notifications/Dominio/Entidades/NotificationEntiry.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/colors.dart';
+import '../../Dominio/Entidades/AdminNotificacation.dart';
 import '../../Dominio/Repositorios/INotificationRepository.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -12,14 +13,15 @@ class NotificationProvider extends ChangeNotifier {
   final INotificationRepository repository;
 
   NotificationProvider({required this.repository});
-  // Historial con la estructura de la entidad
   List<NotificationEntity> _history = [];
+  List<AdminNotificationEntity> _adminHistory = [];
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
   bool _isSending = false;
 
   List<NotificationEntity> get history => _history;
+  List<AdminNotificationEntity> get adminHistory => _adminHistory;
   bool get isSending => _isSending;
 
   final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -161,25 +163,7 @@ class NotificationProvider extends ChangeNotifier {
   }
 
 
-  Future<bool> sendAdminNotification(String messageText) async {
-    try {
-      _isSending = true;
-      notifyListeners();
 
-      await repository.sendAdminNotification(messageText);
-
-      await fetchHistory();
-
-      _isSending = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _isSending = false;
-      notifyListeners();
-      print("Error en envío: $e");
-      return false;
-    }
-  }
 
   void simulateIncomingNotification() {
     // 1. Creamos un objeto que simule la estructura de RemoteMessage de Firebase
@@ -246,5 +230,81 @@ class NotificationProvider extends ChangeNotifier {
     } catch (e) {
       print("Error al obtener el token: $e");
     }
+  }
+
+  Future<void> sendMassiveNotification({
+    required String title,
+    required String message,
+    required bool toAdmins,
+    required bool toRegularUsers,
+  }) async {
+    _isSending = true;
+    notifyListeners();
+
+    try {
+      await repository.sendMassNotification(
+        title: title,
+        message: message,
+        toAdmins: toAdmins,
+        toRegularUsers: toRegularUsers,
+      );
+
+      _showSnackBar('Notificación enviada con éxito', isError: false);
+      await loadAdminHistory();
+    } catch (e) {
+      _showSnackBar('Error al enviar: $e', isError: true);
+    } finally {
+      _isSending = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadAdminHistory({int page = 1}) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final newNotifications = await repository.getAdminNotificationHistory(
+        page: page,
+        limit: 20,
+      );
+
+      if (page == 1) {
+        _adminHistory = newNotifications;
+      } else {
+        _adminHistory.addAll(newNotifications);
+      }
+    } catch (e) {
+      print('Error en Provider: $e');
+      _showSnackBar('Error al cargar historial administrativo', isError: true);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+
+  Future<void> loadHistory() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      _history = await repository.getHistory();
+    } catch (e) {
+      _showSnackBar('Error al cargar tus notificaciones', isError: true);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Helper para notificaciones visuales
+  void _showSnackBar(String message, {bool isError = false}) {
+    messengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 }

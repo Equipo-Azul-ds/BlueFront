@@ -1,10 +1,17 @@
-import 'package:flutter/material.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:Trivvy/core/constants/colors.dart';
-import '../mocks/mock_session_data.dart';
-import 'player_lobby_screen.dart';
-import 'host_lobby.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:provider/provider.dart';
+import 'package:Trivvy/core/constants/colors.dart';
+
+import '../controllers/multiplayer_session_controller.dart';
+import 'player_lobby_screen.dart';
+
+const _defaultNickname = 'Jugador';
+
+/// Pantalla para que el jugador ingrese PIN/QR y se una a una partida.
 class JoinGameScreen extends StatefulWidget {
   final ScrollController? scrollController;
   const JoinGameScreen({super.key, this.scrollController});
@@ -15,23 +22,130 @@ class JoinGameScreen extends StatefulWidget {
 
 class JoinGameScreenState extends State<JoinGameScreen> {
   final TextEditingController _pinController = TextEditingController();
+  bool _isJoining = false;
+  bool _canSubmitPin = false;
 
-  void onEnterPinPressed() {
-    final pin = _pinController.text.trim().isEmpty
-        ? mockSessionPin
-        : _pinController.text.trim();
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PlayerLobbyScreen(
-          nickname: mockDefaultNickname,
-          pinCode: pin,
-        ),
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _pinController.addListener(_handlePinChanged);
   }
 
-  // Vista de cámara puramente visual por ahora
+  /// Habilita/deshabilita CTA cuando el PIN tiene formato válido.
+  void _handlePinChanged() {
+    final nextState = _isValidPin(_pinController.text);
+    if (nextState != _canSubmitPin) {
+      setState(() => _canSubmitPin = nextState);
+    }
+  }
+
+  /// Valida que el PIN sea numérico de 6-10 dígitos.
+  bool _isValidPin(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.length < 6 || trimmed.length > 10) {
+      return false;
+    }
+    for (var i = 0; i < trimmed.length; i++) {
+      final codeUnit = trimmed.codeUnitAt(i);
+      if (codeUnit < 48 || codeUnit > 57) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Normaliza nickname y aplica fallback si es muy corto.
+  String _resolveNickname(String? rawNickname) {
+    final trimmed = rawNickname?.trim() ?? '';
+    if (trimmed.length >= 6) {
+      return trimmed.length > 20 ? trimmed.substring(0, 20) : trimmed;
+    }
+    return _defaultNickname;
+  }
+
+  /// Intenta unirse a la sala con el PIN ingresado.
+  Future<void> onEnterPinPressed() async {
+    final pin = _pinController.text.trim();
+    if (!_isValidPin(pin)) {
+      _showSnack('Ingresa un PIN de 6 a 10 dígitos para continuar');
+      return;
+    }
+
+    setState(() => _isJoining = true);
+    final sessionController = context.read<MultiplayerSessionController>();
+
+    try {
+      final nickname = _resolveNickname(sessionController.currentNickname);
+      await sessionController
+          .joinLobby(pin: pin, nickname: nickname)
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException('La sala no respondió, verifica el PIN.');
+      });
+      
+      if (!mounted) return;
+      
+      // Verifica que no haya errores de conexión antes de navegar
+      if (sessionController.connectionErrorDto != null) {
+        final errorMsg = sessionController.connectionErrorDto?.message ?? 'Error de conexión desconocido';
+        await _showErrorDialog(
+          title: 'No se pudo unir',
+          message: errorMsg,
+        );
+        return;
+      }
+      
+      // Verifica que no haya errores del servidor antes de navegar
+      if (sessionController.gameErrorDto != null) {
+        final errorMsg = sessionController.gameErrorDto?.message ?? 'Error del juego desconocido';
+        await _showErrorDialog(
+          title: 'No se pudo unir',
+          message: errorMsg,
+        );
+        return;
+      }
+      
+      // Espera un frame para asegurar que todos los eventos socket se procesaron
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (!mounted) return;
+      
+      // Verifica de nuevo después del delay
+      if (sessionController.connectionErrorDto != null) {
+        final errorMsg = sessionController.connectionErrorDto?.message ?? 'Error de conexión desconocido';
+        await _showErrorDialog(
+          title: 'No se pudo unir',
+          message: errorMsg,
+        );
+        return;
+      }
+      
+      if (sessionController.gameErrorDto != null) {
+        final errorMsg = sessionController.gameErrorDto?.message ?? 'Error del juego desconocido';
+        await _showErrorDialog(
+          title: 'No se pudo unir',
+          message: errorMsg,
+        );
+        return;
+      }
+      
+      // Solo navega si la conexión es exitosa y sin errores
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const PlayerLobbyScreen()));
+    } catch (error) {
+      if (!mounted) return;
+      await _showErrorDialog(
+        title: 'No se pudo unir',
+        message: error.toString(),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isJoining = false);
+      }
+    }
+  }
+
+  /// Lanza hoja inferior con escáner de QR (resuelve PIN).
   void onScanQrPressed() {
     showModalBottomSheet(
       context: context,
@@ -41,19 +155,52 @@ class JoinGameScreenState extends State<JoinGameScreen> {
         height: MediaQuery.of(context).size.height * 0.9,
         child: _QrScannerSheet(
           onCloseRequested: () => Navigator.of(sheetContext).pop(),
+          onPinResolved: (pin) {
+            setState(() => _pinController.text = pin);
+            Navigator.of(sheetContext).pop();
+            _showSnack('PIN detectado automáticamente');
+          },
         ),
+      ),
+    );
+  }
+
+  /// Helper para mostrar mensajes en snackbar.
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _showErrorDialog({required String title, required String message}) async {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
       ),
     );
   }
 
   @override
   void dispose() {
+    _pinController.removeListener(_handlePinChanged);
     _pinController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final headerGap = (size.height * 0.06).clamp(24.0, 80.0);
+    final actionGap = (size.height * 0.08).clamp(24.0, 96.0);
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -71,167 +218,171 @@ class JoinGameScreenState extends State<JoinGameScreen> {
         top: false,
         child: SingleChildScrollView(
           controller: widget.scrollController,
-          child: Column(
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 12.0,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Boton Cerrar: close the modal/page
-                    IconButton(
-                      icon: const Icon(
-                        Icons.close,
-                        color: AppColor.onPrimary,
-                        size: 28,
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                      },
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                children: [
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16.0,
+                      vertical: 12.0,
                     ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Boton Cerrar: close the modal/page
+                        IconButton(
+                          icon: const Icon(
+                            Icons.close,
+                            color: AppColor.onPrimary,
+                            size: 28,
+                          ),
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                        ),
 
-                    // Titulo
-                    const Text(
-                      "Unirse a un juego",
-                      style: TextStyle(
+                        // Titulo
+                        const Text(
+                          "Unirse a un juego",
+                          style: TextStyle(
+                            color: AppColor.onPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(width: 32, height: 32),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: headerGap),
+
+                  // Contenido Principal
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: TextField(
+                      controller: _pinController,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
                         color: AppColor.onPrimary,
-                        fontSize: 18,
+                        fontSize: 56,
                         fontWeight: FontWeight.bold,
+                        letterSpacing: 2.0,
                       ),
-                    ),
-
-                    const SizedBox(width: 32, height: 32),
-                  ],
-                ),
-              ),
-
-              SizedBox(height: MediaQuery.of(context).size.height * 0.06),
-
-              // Contenido Principal
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: TextField(
-                  controller: _pinController,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColor.onPrimary,
-                    fontSize: 56,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2.0,
-                  ),
-                  // Cursor
-                  cursorColor: AppColor.accent,
-                  cursorHeight: 64,
-                  cursorWidth: 3,
-                  decoration: InputDecoration(
-                    hintText: 'PIN',
-                    hintStyle: TextStyle(
-                      color: AppColor.onPrimary.withValues(alpha: 0.35),
-                      fontSize: 56,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                  ),
-                  keyboardType: TextInputType.number,
-                  autofocus: false,
-                ),
-              ),
-
-              SizedBox(height: MediaQuery.of(context).size.height * 0.08),
-
-              // Botones Abajo
-              Padding(
-                padding: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
-                child: Row(
-                  children: [
-                    // Boton "Introduzca PIN"
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: onEnterPinPressed,
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 56),
-                          backgroundColor: AppColor.secundary,
-                          foregroundColor: AppColor.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                      // Cursor
+                      cursorColor: AppColor.accent,
+                      cursorHeight: 64,
+                      cursorWidth: 3,
+                      decoration: InputDecoration(
+                        hintText: 'PIN',
+                        hintStyle: TextStyle(
+                          color: AppColor.onPrimary.withValues(alpha: 0.35),
+                          fontSize: 56,
+                          fontWeight: FontWeight.bold,
                         ),
-                        icon: const Icon(
-                          Icons.grid_view_rounded,
-                          size: 22,
-                        ),
-                        label: const Text(
-                          "Introduzca PIN",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                       ),
-                    ),
-
-                    const SizedBox(width: 8),
-
-                    // Boton "Escanear codigo QR"
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: onScanQrPressed,
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 56),
-                          backgroundColor: AppColor.accent,
-                          foregroundColor: AppColor.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        icon: const Icon(Icons.qr_code_scanner, size: 22),
-                        label: const Text(
-                          "Escanear Codigo QR",
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.only(bottom: 32, left: 16, right: 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const HostLobbyScreen(),
-                        ),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white70),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Pantallas Host',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
+                      autofocus: false,
                     ),
                   ),
-                ),
+
+                  const SizedBox(height: 12),
+                  Text(
+                    'Ingresa el PIN que aparece en la pantalla del anfitrión (6-10 dígitos).',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+
+                  SizedBox(height: actionGap),
+
+                  // Botones Abajo
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      bottom: 24,
+                      left: 16,
+                      right: 16,
+                    ),
+                    child: Row(
+                      children: [
+                        // Boton "Introduzca PIN"
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _isJoining || !_canSubmitPin
+                                ? null
+                                : onEnterPinPressed,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 56),
+                              backgroundColor: AppColor.secundary,
+                              foregroundColor: AppColor.onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.grid_view_rounded, size: 22),
+                            label: _isJoining
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Text(
+                                    "Introduzca PIN",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        // Boton "Escanear codigo QR"
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: onScanQrPressed,
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 56),
+                              backgroundColor: AppColor.accent,
+                              foregroundColor: AppColor.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            icon: const Icon(Icons.qr_code_scanner, size: 22),
+                            label: const Text(
+                              "Escanear Codigo QR",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -241,8 +392,12 @@ class JoinGameScreenState extends State<JoinGameScreen> {
 
 class _QrScannerSheet extends StatefulWidget {
   final VoidCallback onCloseRequested;
+  final ValueChanged<String> onPinResolved;
 
-  const _QrScannerSheet({required this.onCloseRequested});
+  const _QrScannerSheet({
+    required this.onCloseRequested,
+    required this.onPinResolved,
+  });
 
   @override
   State<_QrScannerSheet> createState() => _QrScannerSheetState();
@@ -251,6 +406,8 @@ class _QrScannerSheet extends StatefulWidget {
 class _QrScannerSheetState extends State<_QrScannerSheet> {
   late final MobileScannerController _controller;
   bool _torchOn = false;
+  bool _isProcessingToken = false;
+  bool _hasResolvedPin = false;
 
   @override
   void initState() {
@@ -277,11 +434,9 @@ class _QrScannerSheetState extends State<_QrScannerSheet> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          MobileScanner(
-            controller: _controller,
-            onDetect: (_) {},
-          ),
+          MobileScanner(controller: _controller, onDetect: _handleDetection),
           Positioned(
             top: 16,
             left: 16,
@@ -347,5 +502,34 @@ class _QrScannerSheetState extends State<_QrScannerSheet> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleDetection(BarcodeCapture capture) async {
+    if (!mounted || _isProcessingToken || _hasResolvedPin) return;
+    final token = capture.barcodes
+        .map((barcode) => barcode.rawValue)
+        .firstWhere(
+          (value) => value != null && value.trim().isNotEmpty,
+          orElse: () => null,
+        );
+    if (token == null) return;
+
+    setState(() => _isProcessingToken = true);
+    try {
+      final controller = context.read<MultiplayerSessionController>();
+      final pin = await controller.resolvePinFromQrToken(token.trim());
+      if (!mounted) return;
+      _hasResolvedPin = true;
+      widget.onPinResolved(pin);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al obtener el PIN: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessingToken = false);
+      }
+    }
   }
 }

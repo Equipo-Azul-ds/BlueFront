@@ -15,17 +15,22 @@ class PaginationDto {
 
   factory PaginationDto.fromJson(Map<String, dynamic> json) {
     return PaginationDto(
-      page: json['page'] ?? 1,
-      limit: json['limit'] ?? 10,
-      totalCount: json['totalCount'] ?? 0,
-      totalPages: json['totalPages'] ?? 1,
+      page: _toInt(json['page']) ?? 1,
+      limit: _toInt(json['limit']) ?? 20,
+      totalCount: _toInt(json['totalCount']) ?? 0,
+      totalPages: _toInt(json['totalPages']) ?? 1,
     );
   }
 
-  // Constructor para cuando el backend no envía paginación (casos de lista simple)
+  static int? _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
   factory PaginationDto.empty() => PaginationDto(
     page: 1,
-    limit: 10,
+    limit: 20,
     totalCount: 0,
     totalPages: 1,
   );
@@ -40,32 +45,27 @@ class KahootSearchResponseDto {
     required this.pagination,
   });
 
-  /// Factory modificado para detectar si viene una Lista o un Mapa
   factory KahootSearchResponseDto.fromDynamicJson(dynamic json) {
-    // CASO NUEVO BACKEND: Es una lista directa []
+
     if (json is List) {
-      final List<KahootModel> kahoots = json
+      final kahoots = json
           .map((item) => KahootModel.fromJson(item as Map<String, dynamic>))
           .toList();
 
       return KahootSearchResponseDto(
         data: kahoots,
-        pagination: PaginationDto(
-          page: 1,
-          limit: kahoots.length,
-          totalCount: kahoots.length,
-          totalPages: 1,
-        ),
+        pagination: PaginationDto.empty(),
       );
     }
 
+
     if (json is Map<String, dynamic>) {
       final List<dynamic> dataList = json['data'] as List<dynamic>? ?? [];
-      final paginationJson = json['pagination'] as Map<String, dynamic>?;
-
       final List<KahootModel> kahoots = dataList
           .map((item) => KahootModel.fromJson(item as Map<String, dynamic>))
           .toList();
+
+      final paginationJson = json['pagination'] as Map<String, dynamic>?;
 
       return KahootSearchResponseDto(
         data: kahoots,
@@ -75,6 +75,6 @@ class KahootSearchResponseDto {
       );
     }
 
-    throw Exception("Formato de respuesta desconocido");
+    throw Exception("Formato de respuesta de Kahoot desconocido");
   }
 }
