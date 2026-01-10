@@ -27,4 +27,5 @@ abstract class GroupRepository {
   Future<Group> updateGroupInfo({required String groupId, String? name, String? description});
   Future<void> transferAdmin({required String groupId, required String newAdminUserId});
   Future<GroupQuizAssignment> assignQuizToGroup({required String groupId, required String quizId, required DateTime availableUntil});
+  Future<List<GroupQuizAssignment>> getGroupAssignments(String groupId);
 }

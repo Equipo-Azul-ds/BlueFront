@@ -26,6 +26,9 @@ import '../features/media/presentation/blocs/media_editor_bloc.dart';
 import '../features/library/presentation/pages/library_page.dart';
 import '../features/user/presentation/pages/profile_page.dart';
 import '../features/user/presentation/blocs/auth_bloc.dart';
+import '../features/library/presentation/providers/library_provider.dart';
+
+import 'package:Trivvy/features/subscriptions/presentation/utils/subscription_guard.dart';
 
 class HomePageContent extends StatefulWidget {
   const HomePageContent({super.key});
@@ -58,7 +61,8 @@ class _HomePageContentState extends State<HomePageContent> {
         // los quizzes creados durante el desarrollo o pruebas.
         final auth = Provider.of<AuthBloc>(context, listen: false);
         const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
-        var authorIdCandidate = auth.currentUser?.id ?? quizBloc.currentQuiz?.authorId ?? '';
+        var authorIdCandidate =
+            auth.currentUser?.id ?? quizBloc.currentQuiz?.authorId ?? '';
         if (authorIdCandidate.isEmpty) authorIdCandidate = defaultTestAuthorId;
 
         setState(() => _loadingUserQuizzes = true);
@@ -413,7 +417,9 @@ class _HomePageContentState extends State<HomePageContent> {
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[700],
-                                fontFeatures: const [FontFeature.tabularFigures()],
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
                               ),
                             ),
                             SizedBox(height: 8),
@@ -498,16 +504,19 @@ class _HomePageContentState extends State<HomePageContent> {
                             // Realizar una petición POST para crear la copia del quiz en el backend (se construye el DTO a continuación)
                             Navigator.of(ctx).pop();
 
-                            final auth = Provider.of<AuthBloc>(context, listen: false);
+                            final auth = Provider.of<AuthBloc>(
+                              context,
+                              listen: false,
+                            );
                             const defaultTestAuthorId =
-                              'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
+                                'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
                             final authorIdCandidate =
-                              (auth.currentUser?.id ?? '').isNotEmpty
+                                (auth.currentUser?.id ?? '').isNotEmpty
                                 ? auth.currentUser!.id
                                 : ((q.authorId.isEmpty ||
-                                  q.authorId.contains('placeholder'))
-                                ? defaultTestAuthorId
-                                : q.authorId);
+                                          q.authorId.contains('placeholder'))
+                                      ? defaultTestAuthorId
+                                      : q.authorId);
 
                             // Mapear preguntas y respuestas a los DTOs Create* para la petición de duplicado.
                             // NO se generan ni se reasignan IDs aquí: el backend debe asignar los nuevos identificadores.
@@ -1074,8 +1083,13 @@ class _HomePageContentState extends State<HomePageContent> {
                         }
                       }
 
-                      final auth = Provider.of<AuthBloc>(context, listen: false);
-                      final authorName = (auth.currentUser?.id == q.authorId && (auth.currentUser?.name.isNotEmpty ?? false))
+                      final auth = Provider.of<AuthBloc>(
+                        context,
+                        listen: false,
+                      );
+                      final authorName =
+                          (auth.currentUser?.id == q.authorId &&
+                              (auth.currentUser?.name.isNotEmpty ?? false))
                           ? auth.currentUser!.name
                           : q.authorId;
 
@@ -1221,7 +1235,9 @@ class _HomePageContentState extends State<HomePageContent> {
                 itemBuilder: (context, index) {
                   final kahoot = recommendedKahoots[index];
                   final auth = Provider.of<AuthBloc>(context, listen: false);
-                  final authorName = (auth.currentUser?.id == kahoot.authorId && (auth.currentUser?.name.isNotEmpty ?? false))
+                  final authorName =
+                      (auth.currentUser?.id == kahoot.authorId &&
+                          (auth.currentUser?.name.isNotEmpty ?? false))
                       ? auth.currentUser!.name
                       : kahoot.authorId;
                   return KahootCard(
@@ -1253,7 +1269,6 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
 
-
   List<Widget> _buildPages(BuildContext context) {
     final auth = Provider.of<AuthBloc>(context, listen: true);
     final currentUser = auth.currentUser;
@@ -1269,6 +1284,7 @@ class _DashboardPageState extends State<DashboardPage> {
           : ProfilePage(user: currentUser), // 4: Perfil
     ];
   }
+
   /*
 =======
   final List<Widget> _pages = const [
@@ -1298,8 +1314,10 @@ class _DashboardPageState extends State<DashboardPage> {
     if (auth.currentUser == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        Navigator.of(context, rootNavigator: true)
-            .pushNamedAndRemoveUntil('/welcome', (route) => false);
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pushNamedAndRemoveUntil('/welcome', (route) => false);
       });
       // Devuelve un contenedor vacío mientras se realiza la navegación
       return const SizedBox.shrink();
@@ -1309,6 +1327,24 @@ class _DashboardPageState extends State<DashboardPage> {
       body: IndexedStack(index: _currentIndex, children: _buildPages(context)),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
+          // Obtenemos el LibraryProvider (listen: false porque estamos en una función)
+          final libraryProvider = Provider.of<LibraryProvider>(
+            context,
+            listen: false,
+          );
+
+          // Obtenemos el total de Kahoots creados
+          final totalCreados = libraryProvider.createdKahoots.length;
+
+          // Aplicamos el Guard: Si devuelve 'false', el Guard ya mostró el diálogo y cortamos aquí.
+          if (!SubscriptionGuard.checkLimit(
+            context,
+            currentCount: totalCreados,
+            maxFree: 5,
+            itemName: 'Kahoots',
+          )) {
+            return; // Detenemos la ejecución
+          }
           // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo
           final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
           quizBloc.clear();

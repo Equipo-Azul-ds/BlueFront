@@ -5,6 +5,10 @@ import '../../domain/entities/User.dart';
 import '../blocs/auth_bloc.dart';
 import 'avatar_picker_page.dart';
 import '../../../library/presentation/providers/library_provider.dart';
+import 'package:Trivvy/features/subscriptions/presentation/provider/subscription_provider.dart';
+import 'package:Trivvy/features/subscriptions/presentation/screens/plans_screen.dart';
+import 'package:Trivvy/features/subscriptions/presentation/widgets/plan_badge.dart';
+import 'package:Trivvy/features/subscriptions/presentation/screens/subscription_management_screen.dart';
 import '../pages/access_gate_page.dart';
 import '../../../report/presentation/pages/reports_list_page.dart';
 
@@ -36,9 +40,9 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _pickAvatar() async {
-    final picked = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const AvatarPickerPage()),
-    );
+    final picked = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const AvatarPickerPage()));
     if (picked != null && picked.isNotEmpty) {
       setState(() => _avatarUrl = picked);
       try {
@@ -47,9 +51,9 @@ class _ProfilePageState extends State<ProfilePage> {
           await auth.updateProfile(avatarUrl: picked);
         });
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Avatar actualizado')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Avatar actualizado')));
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -59,7 +63,10 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  Future<void> _ensureHashThen(AuthBloc auth, Future<void> Function() action) async {
+  Future<void> _ensureHashThen(
+    AuthBloc auth,
+    Future<void> Function() action,
+  ) async {
     // Si ya tenemos hash, simplemente ejecuta la acción.
     final hasHash = (auth.currentUser?.hashedPassword.isNotEmpty ?? false);
     if (hasHash) {
@@ -83,14 +90,19 @@ class _ProfilePageState extends State<ProfilePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Confirma tu contraseña', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const Text(
+                'Confirma tu contraseña',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: passCtrl,
                 obscureText: true,
                 decoration: InputDecoration(
                   labelText: 'Contraseña',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -132,19 +144,30 @@ class _ProfilePageState extends State<ProfilePage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Seguridad', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const Text(
+            'Seguridad',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _newPassCtrl,
             obscureText: true,
             decoration: InputDecoration(
               labelText: 'Nueva contraseña',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -153,7 +176,9 @@ class _ProfilePageState extends State<ProfilePage> {
             obscureText: true,
             decoration: InputDecoration(
               labelText: 'Confirmar contraseña',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -165,13 +190,19 @@ class _ProfilePageState extends State<ProfilePage> {
                     final conf = _confirmPassCtrl.text;
                     if (newP.length < 6) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('La contraseña debe tener al menos 6 caracteres')),
+                        const SnackBar(
+                          content: Text(
+                            'La contraseña debe tener al menos 6 caracteres',
+                          ),
+                        ),
                       );
                       return;
                     }
                     if (newP != conf) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Las contraseñas no coinciden')),
+                        const SnackBar(
+                          content: Text('Las contraseñas no coinciden'),
+                        ),
                       );
                       return;
                     }
@@ -196,6 +227,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -218,6 +250,16 @@ class _ProfilePageState extends State<ProfilePage> {
         library.loadAllLists(user.id);
       });
     }
+
+    // Usamos el ID real para cargar la suscripción si no está cargada
+    if (user.id.isNotEmpty) {
+      final subProvider = context.read<SubscriptionProvider>();
+      if (subProvider.status == SubscriptionStatus.initial) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          subProvider.checkCurrentStatus(user.id);
+        });
+      }
+    }
     return Scaffold(
       backgroundColor: AppColor.background,
       appBar: AppBar(
@@ -226,7 +268,10 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           TextButton(
             onPressed: auth.isLoading ? null : () => _confirmLogout(auth),
-            child: const Text('Cerrar sesión', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Cerrar sesión',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -242,13 +287,16 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 16),
               _accountSection(auth, user),
               const SizedBox(height: 16),
+              _subscriptionSection(context),
+              const SizedBox(height: 16),
               _securitySection(auth),
               const SizedBox(height: 16),
               _dangerZone(auth),
               const SizedBox(height: 24),
 
               ElevatedButton.icon(
-                onPressed: () => Navigator.pushNamed(context, notificationsHistoryRoute),
+                onPressed: () =>
+                    Navigator.pushNamed(context, notificationsHistoryRoute),
                 icon: const Icon(Icons.history),
                 label: const Text('Historial de Notificaciones'),
                 style: ElevatedButton.styleFrom(
@@ -256,7 +304,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   textStyle: const TextStyle(fontSize: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
 
@@ -290,7 +340,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   textStyle: const TextStyle(fontSize: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text('Ir a Página de Administrador'),
               ),
@@ -306,19 +358,17 @@ class _ProfilePageState extends State<ProfilePage> {
   void _save(AuthBloc auth) async {
     try {
       await _ensureHashThen(auth, () async {
-        await auth.updateProfile(
-          name: _nameCtrl.text.trim(),
-        );
+        await auth.updateProfile(name: _nameCtrl.text.trim());
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil guardado')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Perfil guardado')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al guardar: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
     }
   }
 
@@ -329,8 +379,14 @@ class _ProfilePageState extends State<ProfilePage> {
         title: const Text('Cerrar sesión'),
         content: const Text('¿Seguro que deseas cerrar sesión?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sí')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sí'),
+          ),
         ],
       ),
     );
@@ -338,10 +394,10 @@ class _ProfilePageState extends State<ProfilePage> {
       await auth.logout();
       if (!mounted) return;
       // Usa el Navigator raíz para reemplazar toda la app stack por la vista de bienvenida
-      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
-        '/welcome',
-        (route) => false,
-      );
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushNamedAndRemoveUntil('/welcome', (route) => false);
     }
   }
 
@@ -353,7 +409,11 @@ class _ProfilePageState extends State<ProfilePage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
@@ -364,10 +424,18 @@ class _ProfilePageState extends State<ProfilePage> {
             child: CircleAvatar(
               radius: 28,
               backgroundColor: AppColor.primary,
-              backgroundImage: effectiveAvatar.isNotEmpty ? NetworkImage(effectiveAvatar) : null,
+              backgroundImage: effectiveAvatar.isNotEmpty
+                  ? NetworkImage(effectiveAvatar)
+                  : null,
               child: effectiveAvatar.isEmpty
-                  ? Text(u.userName.isNotEmpty ? u.userName[0].toUpperCase() : 'U',
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))
+                  ? Text(
+                      u.userName.isNotEmpty ? u.userName[0].toUpperCase() : 'U',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
                   : null,
             ),
           ),
@@ -376,29 +444,39 @@ class _ProfilePageState extends State<ProfilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(u.userName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                Text(
+                  u.userName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 Text(u.email, style: const TextStyle(color: Colors.black54)),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColor.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColor.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'Tipo: ${u.userType}',
+                        style: TextStyle(
+                          color: AppColor.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                    child: Text('Tipo: ${u.userType}', style: TextStyle(color: AppColor.primary, fontWeight: FontWeight.w600)),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text('Membresía: ${u.membership.type}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  ),
-                ]),
+                    const SizedBox(width: 8),
+                    const PlanBadge(),
+                  ],
+                ),
               ],
             ),
           ),
@@ -418,12 +496,21 @@ class _ProfilePageState extends State<ProfilePage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Tu actividad', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const Text(
+            'Tu actividad',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 16,
@@ -432,7 +519,10 @@ class _ProfilePageState extends State<ProfilePage> {
               _StatCard(label: 'Kahoots creados', value: created.toString()),
               _StatCard(label: 'En progreso', value: inProgress.toString()),
               _StatCard(label: 'Completados', value: completed.toString()),
-              _StatCard(label: 'Partidas jugadas', value: totalPlayed.toString()),
+              _StatCard(
+                label: 'Partidas jugadas',
+                value: totalPlayed.toString(),
+              ),
             ],
           ),
         ],
@@ -446,18 +536,29 @@ class _ProfilePageState extends State<ProfilePage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Tu cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const Text(
+            'Tu cuenta',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 8),
           TextField(
             controller: _nameCtrl,
             decoration: InputDecoration(
               labelText: 'Nombre',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -468,7 +569,8 @@ class _ProfilePageState extends State<ProfilePage> {
             children: [
               ChoiceChip(
                 label: const Text('Estudiante'),
-                selected: (_type.isNotEmpty ? _type : user.userType) == 'student',
+                selected:
+                    (_type.isNotEmpty ? _type : user.userType) == 'student',
                 onSelected: auth.isLoading
                     ? null
                     : (sel) async {
@@ -480,19 +582,24 @@ class _ProfilePageState extends State<ProfilePage> {
                           });
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Tipo de cuenta: Estudiante')),
+                            const SnackBar(
+                              content: Text('Tipo de cuenta: Estudiante'),
+                            ),
                           );
                         } catch (e) {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('No se pudo actualizar: $e')),
+                            SnackBar(
+                              content: Text('No se pudo actualizar: $e'),
+                            ),
                           );
                         }
                       },
               ),
               ChoiceChip(
                 label: const Text('Profesor'),
-                selected: (_type.isNotEmpty ? _type : user.userType) == 'teacher',
+                selected:
+                    (_type.isNotEmpty ? _type : user.userType) == 'teacher',
                 onSelected: auth.isLoading
                     ? null
                     : (sel) async {
@@ -504,12 +611,16 @@ class _ProfilePageState extends State<ProfilePage> {
                           });
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Tipo de cuenta: Profesor')),
+                            const SnackBar(
+                              content: Text('Tipo de cuenta: Profesor'),
+                            ),
                           );
                         } catch (e) {
                           if (!mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('No se pudo actualizar: $e')),
+                            SnackBar(
+                              content: Text('No se pudo actualizar: $e'),
+                            ),
                           );
                         }
                       },
@@ -517,16 +628,30 @@ class _ProfilePageState extends State<ProfilePage> {
             ],
           ),
           const SizedBox(height: 12),
-          Builder(builder: (ctx) {
-            final nameChanged = _nameCtrl.text.trim() != user.name;
-            return ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColor.primary, foregroundColor: Colors.white),
-              onPressed: (auth.isLoading || !nameChanged) ? null : () => _save(auth),
-              child: auth.isLoading
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Guardar cambios'),
-            );
-          }),
+          Builder(
+            builder: (ctx) {
+              final nameChanged = _nameCtrl.text.trim() != user.name;
+              return ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.primary,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: (auth.isLoading || !nameChanged)
+                    ? null
+                    : () => _save(auth),
+                child: auth.isLoading
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Guardar cambios'),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -538,12 +663,21 @@ class _ProfilePageState extends State<ProfilePage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Opciones de cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const Text(
+            'Opciones de cuenta',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 12),
           OutlinedButton(
             onPressed: auth.isLoading
@@ -553,10 +687,21 @@ class _ProfilePageState extends State<ProfilePage> {
                       context: context,
                       builder: (ctx) => AlertDialog(
                         title: const Text('Eliminar cuenta'),
-                        content: const Text('¿Estás seguro de eliminar tu cuenta de forma permanente?'),
+                        content: const Text(
+                          '¿Estás seguro de eliminar tu cuenta de forma permanente?',
+                        ),
                         actions: [
-                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-                          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Eliminar', style: TextStyle(color: Colors.red))),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancelar'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text(
+                              'Eliminar',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -564,16 +709,95 @@ class _ProfilePageState extends State<ProfilePage> {
                       try {
                         await auth.deleteAccount();
                         if (!mounted) return;
-                        Navigator.of(context).pushNamedAndRemoveUntil('/discover', (route) => false);
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          '/discover',
+                          (route) => false,
+                        );
                       } catch (e) {
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text('No se pudo eliminar la cuenta: $e')));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('No se pudo eliminar la cuenta: $e'),
+                          ),
+                        );
                       }
                     }
                   },
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Eliminar cuenta'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _subscriptionSection(BuildContext context) {
+    final subProvider = context.watch<SubscriptionProvider>();
+    final isPremium = subProvider.isPremium;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isPremium ? Colors.amber.shade50 : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: isPremium
+            ? Border.all(color: Colors.amber.shade300, width: 2)
+            : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isPremium ? Icons.star : Icons.star_outline,
+                color: isPremium ? Colors.amber.shade800 : Colors.grey,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isPremium ? 'Suscripción Premium' : 'Suscripción',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            isPremium
+                ? 'Disfrutas de todas las ventajas de Premium.'
+                : 'Accede a funciones exclusivas creando y jugando sin límites.',
+            style: const TextStyle(color: Colors.black54),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => isPremium
+                      ? const SubscriptionManagementScreen()
+                      : const PlansScreen(),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isPremium
+                  ? Colors.amber.shade700
+                  : AppColor.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: Text(
+              isPremium ? 'Gestionar suscripción' : 'Ver planes Premium',
+            ),
           ),
         ],
       ),
@@ -591,7 +815,10 @@ class _StatTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(color: Colors.black54)),
       ],
@@ -613,13 +840,26 @@ class _StatCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          ),
           const SizedBox(height: 6),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.black54),
+          ),
         ],
       ),
     );

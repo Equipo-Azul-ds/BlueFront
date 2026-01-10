@@ -2,6 +2,7 @@ class GroupQuizAssignment {
   final String id;
   final String groupId;
   final String quizId;
+  final String quizTitle;
   final String assignedBy;
   final DateTime createdAt;
   final DateTime availableFrom;
@@ -12,6 +13,7 @@ class GroupQuizAssignment {
     required this.id,
     required this.groupId,
     required this.quizId,
+    this.quizTitle = '',
     required this.assignedBy,
     required this.createdAt,
     required this.availableFrom,
@@ -30,11 +32,21 @@ class GroupQuizAssignment {
     final availableFromRaw = json['availableFrom'] ?? json['available_from'];
     final availableUntilRaw = json['availableUntil'] ?? json['available_until'];
     final createdRaw = json['createdAt'] ?? json['created_at'];
+    final nestedQuiz = json['quiz'];
+    String parsedTitle = '';
+    if (json['quizTitle'] is String) {
+      parsedTitle = json['quizTitle'] as String;
+    } else if (json['title'] is String) {
+      parsedTitle = json['title'] as String;
+    } else if (nestedQuiz is Map<String, dynamic> && nestedQuiz['title'] is String) {
+      parsedTitle = nestedQuiz['title'] as String;
+    }
 
     return GroupQuizAssignment(
       id: json['id'] as String? ?? json['assignmentId'] as String? ?? '',
       groupId: json['groupId'] as String? ?? json['group_id'] as String? ?? '',
       quizId: json['quizId'] as String? ?? json['quiz_id'] as String? ?? '',
+      quizTitle: parsedTitle,
       assignedBy: json['assignedBy'] as String? ?? json['assigned_by'] as String? ?? '',
       createdAt: createdRaw is String
           ? DateTime.parse(createdRaw)
@@ -54,6 +66,7 @@ class GroupQuizAssignment {
       'id': id,
       'groupId': groupId,
       'quizId': quizId,
+      'quizTitle': quizTitle,
       'assignedBy': assignedBy,
       'createdAt': createdAt.toIso8601String(),
       'availableFrom': availableFrom.toIso8601String(),

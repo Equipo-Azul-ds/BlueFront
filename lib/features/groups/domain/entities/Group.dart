@@ -89,10 +89,11 @@ class Group {
         .map(GroupMember.fromJson)
         .toList();
 
-    final assignmentsJson = (json['quizAssignments'] as List? ?? json['assignments'] as List? ?? [])
-        .whereType<Map<String, dynamic>>()
-        .map(GroupQuizAssignment.fromJson)
-        .toList();
+    final assignmentsRaw = json['quizAssignments'] ?? json['assignments'] ?? json['quizzes'] ?? json['groupQuizzes'];
+    final assignmentsJson = (assignmentsRaw as List? ?? [])
+      .whereType<Map<String, dynamic>>()
+      .map(GroupQuizAssignment.fromJson)
+      .toList();
 
     final completionsJson = (json['completions'] as List? ?? [])
         .whereType<Map<String, dynamic>>()

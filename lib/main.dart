@@ -5,17 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-
 import 'core/constants/colors.dart';
 import 'local/secure_storage.dart';
-
-import 'features/Administrador/Aplication/DataSource/IUserDataSource.dart';
 import 'features/Administrador/Aplication/UseCases/DeleteUserUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/GetUserListUseCase.dart';
+import 'features/Administrador/Aplication/UseCases/ToggleAdminUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/ToggleUserStatusUseCase.dart';
+import 'features/Administrador/Dominio/DataSource/IUserDataSource.dart';
 import 'features/Administrador/Dominio/Repositorio/IUserManagementRepository.dart';
 import 'features/Administrador/Infraestructure/Datasource/UserDataSource.dart';
-import 'features/Administrador/Infraestructure/repositories/UserRepositorie.dart';
+import 'features/Administrador/Infraestructure/repositories/UserRepository.dart';
 import 'features/Administrador/Presentacion/pages/Admin_Page.dart';
 import 'features/Administrador/Presentacion/pages/DashboardPage.dart';
 import 'features/Administrador/Presentacion/pages/UserManagementPage.dart';
@@ -88,6 +87,16 @@ import 'features/user/presentation/pages/profile_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import 'features/subscriptions/domain/repositories/subscription_repository.dart';
+import 'features/subscriptions/application/usecases/subscribe_user_usecase.dart';
+import 'features/subscriptions/application/usecases/get_subscription_status_usecase.dart';
+import 'features/subscriptions/application/usecases/cancel_subscription_usecase.dart';
+import 'features/subscriptions/infrastructure/repositories/simulated_subscription_repository.dart';
+import 'features/subscriptions/infrastructure/repositories/subscription_repository_impl.dart';
+import 'features/subscriptions/presentation/provider/subscription_provider.dart';
+import 'features/subscriptions/presentation/screens/plans_screen.dart';
+import 'features/subscriptions/presentation/screens/subscription_management_screen.dart';
+
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Render
 // API base 1: 'https://backcomun-gc5j.onrender.com'
@@ -129,9 +138,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<http.Client>(
-          create: (_) => http.Client(),
-        ),
+        Provider<http.Client>(create: (_) => http.Client()),
 
         // Reportes: repo + casos de uso + BLoC (ChangeNotifier)
         Provider<ReportsRepository>(
@@ -175,9 +182,13 @@ class MyApp extends StatelessWidget {
         ),
 
         Provider<IUserDataSource>(
-          create: (context) => UserRemoteDataSourceImpl( // Usa 'context' aquí
+          create: (context) => UserRemoteDataSourceImpl(
+            // Usa 'context' aquí
             baseUrl: apiBaseUrl,
-            cliente: context.read<http.Client>(), // Ahora buscará al Provider<http.Client> de arriba
+            cliente: context
+                .read<
+                  http.Client
+                >(), // Ahora buscará al Provider<http.Client> de arriba
           ),
         ),
         Provider<IUserRepository>(
@@ -186,17 +197,20 @@ class MyApp extends StatelessWidget {
           ),
         ),
         Provider<GetUserListUseCase>(
-          create: (context) => GetUserListUseCase(
-            context.read<IUserRepository>(),
-          ),
+          create: (context) =>
+              GetUserListUseCase(context.read<IUserRepository>()),
         ),
         Provider<ToggleUserStatusUseCase>(
-          create: (context) => ToggleUserStatusUseCase(
-            context.read<IUserRepository>(),
-          ),
+          create: (context) =>
+              ToggleUserStatusUseCase(context.read<IUserRepository>()),
         ),
         Provider<DeleteUserUseCase>(
-          create: (context) => DeleteUserUseCase(
+          create: (context) =>
+              DeleteUserUseCase(context.read<IUserRepository>()),
+        ),
+
+        Provider<ToggleAdminRoleUseCase>(
+          create: (context) => ToggleAdminRoleUseCase(
             context.read<IUserRepository>(),
           ),
         ),
@@ -205,6 +219,7 @@ class MyApp extends StatelessWidget {
             getUserListUseCase: context.read<GetUserListUseCase>(),
             toggleUserStatusUseCase: context.read<ToggleUserStatusUseCase>(),
             deleteUserUseCase: context.read<DeleteUserUseCase>(),
+            toggleAdminRoleUseCase: context.read<ToggleAdminRoleUseCase>(),
           ),
         ),
 
@@ -282,20 +297,30 @@ class MyApp extends StatelessWidget {
             repository: context.read<SinglePlayerGameRepository>(),
           ),
         ),
-        ChangeNotifierProxyProvider4<IDiscoverRepository, ThemeRepository, NotificationProvider, IUserRepository, DashboardProvider>(
+        ChangeNotifierProxyProvider4<
+          IDiscoverRepository,
+          ThemeRepository,
+          NotificationProvider,
+          IUserRepository,
+          DashboardProvider
+        >(
           create: (context) => DashboardProvider(
             quizRepository: context.read<IDiscoverRepository>(),
             themeRepository: context.read<ThemeRepository>(),
-            notificationRepository: context.read<NotificationProvider>().repository,
+            notificationRepository: context
+                .read<NotificationProvider>()
+                .repository,
             userRepository: context.read<IUserRepository>(),
           ),
-          update: (context, quiz, theme, notif, user, previous) => DashboardProvider(
-            quizRepository: quiz,
-            themeRepository: theme,
-            notificationRepository: notif.repository,
-            userRepository: user,
-          )..loadDashboardData(),
+          update: (context, quiz, theme, notif, user, previous) =>
+              DashboardProvider(
+                quizRepository: quiz,
+                themeRepository: theme,
+                notificationRepository: notif.repository,
+                userRepository: user,
+              )..loadDashboardData(),
         ),
+
         ChangeNotifierProvider<SinglePlayerChallengeBloc>(
           create: (context) => SinglePlayerChallengeBloc(
             startAttemptUseCase: context.read<StartAttemptUseCase>(),
@@ -480,7 +505,35 @@ class MyApp extends StatelessWidget {
             getKahootProgress: context.read<GetKahootProgressUseCase>(),
           ),
         ),
+        //Epica Suscripción
+        Provider<ISubscriptionRepository>(
+          create: (_) => SimulatedSubscriptionRepository(),
+        ),
+        Provider<SubscribeUserUseCase>(
+          create: (context) =>
+              SubscribeUserUseCase(context.read<ISubscriptionRepository>()),
+        ),
+        Provider<GetSubscriptionStatusUseCase>(
+          create: (context) => GetSubscriptionStatusUseCase(
+            context.read<ISubscriptionRepository>(),
+          ),
+        ),
+        Provider<CancelSubscriptionUseCase>(
+          create: (context) => CancelSubscriptionUseCase(
+            context.read<ISubscriptionRepository>(),
+          ),
+        ),
+        ChangeNotifierProvider<SubscriptionProvider>(
+          create: (context) => SubscriptionProvider(
+            subscribeUserUseCase: context.read<SubscribeUserUseCase>(),
+            getSubscriptionStatusUseCase: context
+                .read<GetSubscriptionStatusUseCase>(),
+            cancelSubscriptionUseCase: context
+                .read<CancelSubscriptionUseCase>(),
+          ),
+        ),
       ],
+
       child: UserProviders(
         baseUrl: apiBaseUrl,
         child: Builder(
@@ -489,7 +542,9 @@ class MyApp extends StatelessWidget {
               debugShowCheckedModeBanner: false,
               title: 'Trivvy',
               // Esto viene de la rama epica9y11 para que funcionen los SnackBar de notificaciones
-              scaffoldMessengerKey: context.read<NotificationProvider>().messengerKey,
+              scaffoldMessengerKey: context
+                  .read<NotificationProvider>()
+                  .messengerKey,
               theme: ThemeData(
                 fontFamily: 'Onest',
                 primarySwatch: createMaterialColor(AppColor.primary),
@@ -536,9 +591,14 @@ class MyApp extends StatelessWidget {
                   Quiz? template;
                   bool explicitClear = false;
                   if (args is Quiz) template = args;
-                  if (args is Map && args['clear'] == true) explicitClear = true;
-                  final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
-                  final shouldClear = template == null &&
+                  if (args is Map && args['clear'] == true)
+                    explicitClear = true;
+                  final quizBloc = Provider.of<QuizEditorBloc>(
+                    context,
+                    listen: false,
+                  );
+                  final shouldClear =
+                      template == null &&
                       (explicitClear ||
                           quizBloc.currentQuiz == null ||
                           (quizBloc.currentQuiz?.quizId.isEmpty ?? false));
@@ -548,7 +608,9 @@ class MyApp extends StatelessWidget {
                   return QuizEditorPage(template: template);
                 },
                 '/questionEditor': (context) {
-                  final args = ModalRoute.of(context)!.settings.arguments as Map<String, String>;
+                  final args =
+                      ModalRoute.of(context)!.settings.arguments
+                          as Map<String, String>;
                   return QuestionEditorPage(
                     quizId: args['quizId']!,
                     questionId: args['questionId']!,
@@ -560,11 +622,16 @@ class MyApp extends StatelessWidget {
                 '/groups': (context) => const GroupsPage(),
                 '/kahoots-category': (context) => const KahootsCategoryPage(),
                 '/kahoot-detail': (context) => const KahootDetailPage(),
+                '/subscriptions': (context) => const PlansScreen(),
+                '/subscription-management': (context) =>
+                    const SubscriptionManagementScreen(),
                 '/admin': (context) => const AdminPage(),
                 '/admin/users': (context) => const UserManagementPage(),
-                '/admin/notifications': (context) => const NotificationAdminPage(),
+                '/admin/notifications': (context) =>
+                    const NotificationAdminPage(),
                 '/admin/dashboard': (context) => const AdminDashboardPage(),
-                '/notifications-history': (context) => const NotificationsHistoryPage(),
+                '/notifications-history': (context) =>
+                    const NotificationsHistoryPage(),
               },
             );
           },
@@ -573,5 +640,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-

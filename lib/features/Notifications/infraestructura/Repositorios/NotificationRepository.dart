@@ -1,4 +1,4 @@
-import '../../Application/DataSource/INotificationDatasource.dart';
+import '../../Dominio/DataSource/INotificationDatasource.dart';
 import '../../Dominio/Entidades/NotificationEntiry.dart';
 import '../../Dominio/Repositorios/INotificationRepository.dart';
 
@@ -35,4 +35,38 @@ class NotificationRepository implements INotificationRepository {
   Future<void> sendAdminNotification(String message) {
     return dataSource.sendAdminNotification(message);
   }
+
+  @override
+  Future<void> sendMassNotification({
+    required String title,
+    required String message,
+    required bool toAdmins,
+    required bool toRegularUsers,
+  }) async {
+    // Llama al endpoint POST /backoffice/massNotification
+    await dataSource.sendMassNotification(
+      title: title,
+      message: message,
+      toAdmins: toAdmins,
+      toRegularUsers: toRegularUsers,
+    );
+  }
+
+  @override
+  Future<List<NotificationEntity>> getAdminNotificationHistory({
+    int limit = 20,
+    int page = 1,
+    String? userId,
+  }) async {
+    // Llama al endpoint GET /backoffice/massNotifications
+    final responseDto = await dataSource.getAdminNotificationHistory(
+      limit: limit,
+      page: page,
+      userId: userId,
+    );
+
+    return responseDto.notifications;
+  }
+
+
 }

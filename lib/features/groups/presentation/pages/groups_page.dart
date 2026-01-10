@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 
 import '../../domain/entities/Group.dart';
@@ -34,115 +33,53 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final bloc = context.watch<GroupsBloc>();
+
+    final owned = bloc.ownedGroups();
+    final joined = bloc.joinedGroups();
+
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.black87),
-        title: const Text('Grupos', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add, color: Colors.black87),
-            onPressed: () => _showCreateOrJoinSheet(context),
-          ),
-        ],
+        title: const Text('Grupos'),
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Theme.of(context).primaryColor,
-          labelColor: Colors.black87,
           tabs: const [
-            Tab(text: 'Unidos'),
             Tab(text: 'Propios'),
+            Tab(text: 'Unidos'),
           ],
         ),
       ),
-      body: _buildBody(bloc),
-    );
-  }
-
-  Widget _buildBody(GroupsBloc bloc) {
-    if (bloc.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (bloc.error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'No pudimos cargar tus grupos.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              if (kDebugMode)
-                Text(
-                  bloc.error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.black54, fontSize: 12),
+      body: bloc.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : bloc.error != null
+              ? Center(child: Text(bloc.error!))
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _groupsList(owned),
+                    _groupsList(joined),
+                  ],
                 ),
-              const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: bloc.loadMyGroups,
-                child: const Text('Reintentar'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final joined = bloc.joinedGroups();
-    final owned = bloc.ownedGroups();
-
-    return TabBarView(
-      controller: _tabController,
-      children: [
-        _groupList(
-          joined,
-          emptyTitle: 'No te has unido a ningún grupo',
-          emptySubtitle: 'Únete con un código de invitación.',
-        ),
-        _groupList(
-          owned,
-          emptyTitle: 'Aún no creas grupos',
-          emptySubtitle: 'Crea un grupo y comienza a colaborar.',
-        ),
-      ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showCreateOrJoinSheet(context),
+        child: const Icon(Icons.group_add),
+      ),
     );
   }
 
-  Widget _groupList(List<Group> groups, {required String emptyTitle, required String emptySubtitle}) {
-    if (groups.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.groups_outlined, size: 48, color: Colors.black45),
-              const SizedBox(height: 12),
-              Text(emptyTitle, style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              Text(emptySubtitle, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
-            ],
-          ),
-        ),
+  Widget _groupsList(List<Group> items) {
+    if (items.isEmpty) {
+      return const Center(
+        child: Text('Aún no hay grupos para mostrar'),
       );
     }
-
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: groups.length,
-      itemBuilder: (context, index) {
-        final g = groups[index];
-        return _groupCard(g);
-      },
+      itemCount: items.length,
+      itemBuilder: (context, index) => _groupCard(items[index]),
     );
   }
+
+// (Clase movida fuera de _GroupsPageState)
 
   Widget _groupCard(Group group) {
     final bloc = context.read<GroupsBloc>();
@@ -206,146 +143,179 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
         final tokenCtrl = TextEditingController();
         final bloc = context.read<GroupsBloc>();
 
-        bool isCreating = false;
-        bool isJoining = false;
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            Future<void> handleCreate() async {
-              final text = nameCtrl.text.trim();
-              if (text.isEmpty) return;
-              setState(() => isCreating = true);
-              try {
-                await bloc.createGroup(text);
-                if (mounted) Navigator.pop(context);
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('No se pudo crear el grupo. Intenta más tarde.')),
-                  );
-                }
-              } finally {
-                if (mounted) setState(() => isCreating = false);
-              }
-            }
-
-            Future<void> handleJoin() async {
-              final text = tokenCtrl.text.trim();
-              if (text.isEmpty) return;
-              setState(() => isJoining = true);
-              try {
-                await bloc.joinByToken(text);
-                if (mounted) Navigator.pop(context);
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('No se pudo unir al grupo. Verifica el código.')),
-                  );
-                }
-              } finally {
-                if (mounted) setState(() => isJoining = false);
-              }
-            }
-
-            return AnimatedPadding(
-              duration: const Duration(milliseconds: 200),
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Acciones rápidas', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF6F6F6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Crear grupo', style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: nameCtrl,
-                            autofocus: true,
-                            textInputAction: TextInputAction.done,
-                            decoration: const InputDecoration(
-                              labelText: 'Nombre del grupo',
-                              hintText: 'Ej. Matemáticas 2026',
-                              border: OutlineInputBorder(),
-                            ),
-                            onSubmitted: (_) => handleCreate(),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: isCreating ? null : handleCreate,
-                              child: isCreating
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text('Crear'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF6F6F6),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Unirse con código', style: TextStyle(fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: tokenCtrl,
-                            textInputAction: TextInputAction.done,
-                            decoration: const InputDecoration(
-                              labelText: 'Token de invitación',
-                              hintText: 'Pega el código que te compartieron',
-                              border: OutlineInputBorder(),
-                            ),
-                            onSubmitted: (_) => handleJoin(),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: isJoining ? null : handleJoin,
-                              child: isJoining
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                    )
-                                  : const Text('Unirse'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+        return _CreateJoinSheet(
+          nameCtrl: nameCtrl,
+          tokenCtrl: tokenCtrl,
+          bloc: bloc,
+          rootContext: context,
         );
       },
+    );
+  }
+}
+// Widget separado para evitar recrear controllers al cerrar teclado/reenfocar
+class _CreateJoinSheet extends StatefulWidget {
+  final TextEditingController nameCtrl;
+  final TextEditingController tokenCtrl;
+  final GroupsBloc bloc;
+  final BuildContext rootContext;
+
+  const _CreateJoinSheet({required this.nameCtrl, required this.tokenCtrl, required this.bloc, required this.rootContext});
+
+  @override
+  State<_CreateJoinSheet> createState() => _CreateJoinSheetState();
+}
+
+class _CreateJoinSheetState extends State<_CreateJoinSheet> {
+  bool isCreating = false;
+  bool isJoining = false;
+
+  @override
+  Widget build(BuildContext context) {
+    Future<void> handleCreate() async {
+      final text = widget.nameCtrl.text.trim();
+      if (text.isEmpty) return;
+      setState(() => isCreating = true);
+      try {
+        await widget.bloc.createGroup(text);
+        if (mounted) {
+          Navigator.pop(widget.rootContext);
+          ScaffoldMessenger.of(widget.rootContext).showSnackBar(
+            const SnackBar(content: Text('Grupo creado exitosamente')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(widget.rootContext).showSnackBar(
+            const SnackBar(content: Text('No se pudo crear el grupo. Intenta más tarde.')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => isCreating = false);
+      }
+    }
+
+    Future<void> handleJoin() async {
+      final input = widget.tokenCtrl.text.trim();
+      if (input.isEmpty) return;
+      // Permitir pegar el link completo o solo el token.
+      String token = input;
+      try {
+        final uri = Uri.parse(input);
+        if (uri.scheme.isNotEmpty) {
+          // Extraer el último segmento como token
+          if (uri.pathSegments.isNotEmpty) {
+            token = uri.pathSegments.last;
+          }
+        } else {
+          // Si no es un URI, intentar dividir por '/'
+          final parts = input.split('/');
+          token = parts.isNotEmpty ? parts.last : input;
+        }
+        token = token.replaceAll('"', '').replaceAll("'", '').trim();
+      } catch (_) {
+        // Si parse falla, usar input tal cual
+        token = input;
+      }
+      // Log para depuración
+      // ignore: avoid_print
+      print('[groups] join attempt input="$input" token="$token"');
+      setState(() => isJoining = true);
+      try {
+        await widget.bloc.joinByToken(token);
+        if (mounted) {
+          ScaffoldMessenger.of(widget.rootContext).showSnackBar(
+            const SnackBar(content: Text('Ingreso al grupo exitoso')),
+          );
+          Navigator.pop(widget.rootContext);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(widget.rootContext).showSnackBar(
+            const SnackBar(content: Text('Link inválido o error al unirse.')),
+          );
+          // ignore: avoid_print
+          print('[groups] join failed: $e');
+        }
+      } finally {
+        if (mounted) setState(() => isJoining = false);
+      }
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        top: 12,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.group_add, color: Colors.black87),
+              const SizedBox(width: 8),
+              const Text('Crear o unirse a un grupo', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text('Crear grupo', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: widget.nameCtrl,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              labelText: 'Nombre del grupo',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => handleCreate(),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: isCreating ? null : handleCreate,
+              icon: isCreating
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.check),
+              label: Text(isCreating ? 'Creando...' : 'Crear grupo'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('Unirse con link', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          TextField(
+            controller: widget.tokenCtrl,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              labelText: 'Link de invitación',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => handleJoin(),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: isJoining ? null : handleJoin,
+              icon: isJoining
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.login),
+              label: Text(isJoining ? 'Uniendo...' : 'Unirse'),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

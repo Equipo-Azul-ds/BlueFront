@@ -18,9 +18,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
   @override
   void initState() {
     super.initState();
-    // Llama al Provider para iniciar la carga de usuarios justo después de que el widget se inserte.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Usamos context.read ya que solo queremos llamar al método, no reconstruir.
       context.read<UserManagementProvider>().loadUsers(adminId);
     });
   }
@@ -31,7 +29,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
       appBar: AppBar(
         title: const Text('Gestión de Usuarios'),
       ),
-      // Usamos Consumer para escuchar los cambios en el estado del Provider
       body: Consumer<UserManagementProvider>(
         builder: (context, provider, child) {
 
@@ -46,7 +43,6 @@ class _UserManagementPageState extends State<UserManagementPage> {
                 children: [
                   const Text('Error al cargar usuarios. Intente de nuevo.'),
                   TextButton(
-                    // Llama al método del Provider para reintentar
                     onPressed: () => provider.loadUsers(adminId),
                     child: const Text('Reintentar'),
                   ),
@@ -68,9 +64,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
               final user = users[index];
               return UserListItem(
                 user: user,
-                // Los callbacks llaman al provider a través de los diálogos de confirmación
                 onBlock: () => _confirmBlockUser(context, user),
                 onDelete: () => _confirmDeleteUser(context, user),
+                onToggleAdmin: () => _confirmToggleAdmin(context, user),
               );
             },
           );
@@ -85,13 +81,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(user.isBlocked ? 'Desbloquear Usuario' : 'Bloquear Usuario'),
-        // ... (Contenido del diálogo)
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // Llamada al Provider (se actualiza la lista automáticamente)
               context.read<UserManagementProvider>().toggleBlockStatus(user.id);
             },
             style: ElevatedButton.styleFrom(
@@ -109,19 +103,36 @@ class _UserManagementPageState extends State<UserManagementPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar Usuario'),
-        // ... (Contenido del diálogo)
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // Llamada al Provider (se actualiza la lista automáticamente)
               context.read<UserManagementProvider>().deleteUser(user.id);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red.shade700,
             ),
             child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+  void _confirmToggleAdmin(BuildContext context, UserEntity user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(user.isAdmin ? 'Quitar privilegios' : 'Dar privilegios'),
+        content: Text('¿Deseas cambiar el estatus de administrador para ${user.name}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<UserManagementProvider>().toggleAdminRole(user.id);
+            },
+            child: const Text('Confirmar'),
           ),
         ],
       ),
