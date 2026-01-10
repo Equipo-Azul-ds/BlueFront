@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../domain/repositories/Media_Repository.dart';
 import '../../application/dtos/upload_media_dto.dart';
 import '../../application/upload_media_usecase.dart';
 import '../../application/get_media_usecase.dart';
@@ -12,6 +13,7 @@ import '../../application/delete_media_usecase.dart';
 /// Bloc responsable de operaciones de media (upload / get / delete).
 /// Inyecta las implementaciones de repositorios (o sus interfaces).
 class MediaEditorBloc extends ChangeNotifier {
+  final MediaRepository mediaRepository;
   final UploadMediaUseCase uploadUseCase;
   final GetMediaUseCase getUseCase;
   final DeleteMediaUseCase deleteUseCase;
@@ -24,16 +26,17 @@ class MediaEditorBloc extends ChangeNotifier {
   Uint8List? lastFileBytes;
 
   MediaEditorBloc({
+    required this.mediaRepository,
     required this.uploadUseCase,
     required this.getUseCase,
     required this.deleteUseCase,
   });
 
   // Sube un archivo dado como UploadMediaDTO
-  Future<dynamic> upload(UploadMediaDTO dto) async {
+  Future<dynamic> upload(UploadMediaDTO dto, {String? bearerToken}) async {
     _startLoading();
     try {
-      final media = await uploadUseCase.run(dto);
+      final media = await uploadUseCase.run(dto, bearerToken: bearerToken);
       lastMedia = media;
       errorMessage = null;
       return media;
@@ -46,7 +49,7 @@ class MediaEditorBloc extends ChangeNotifier {
   }
 
   // Helper: subir directamente desde un XFile (image_picker)
-  Future<dynamic> uploadFromXFile(XFile xfile) async {
+  Future<dynamic> uploadFromXFile(XFile xfile, {String? bearerToken}) async {
     final bytes = await xfile.readAsBytes();
     final dto = UploadMediaDTO(
       fileBytes: bytes,
@@ -54,7 +57,7 @@ class MediaEditorBloc extends ChangeNotifier {
       mimeType: _detectMimeType(xfile.path),
       sizeInBytes: bytes.length,
     );
-    return await upload(dto);
+    return await upload(dto, bearerToken: bearerToken);
   }
 
   // Obtener metadatos + bytes
@@ -93,6 +96,18 @@ class MediaEditorBloc extends ChangeNotifier {
       rethrow;
     } finally {
       _stopLoading();
+    }
+  }
+
+  /// Obtiene los themes disponibles desde el backend (categoría 'theme').
+  Future<List<Map<String, dynamic>>> fetchThemes() async {
+    try {
+      final themes = await mediaRepository.fetchThemes();
+      errorMessage = null;
+      return themes;
+    } catch (e) {
+      errorMessage = 'Error al obtener themes: $e';
+      rethrow;
     }
   }
 
