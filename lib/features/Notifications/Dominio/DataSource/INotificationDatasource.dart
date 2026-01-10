@@ -1,3 +1,4 @@
+import '../../Application/DTO/AdminNotificacationDTO.dart';
 import '../../Application/DTO/NotificationListResponseDTO.dart';
 
 
@@ -14,7 +15,7 @@ abstract class INotificationDataSource {
     required bool toRegularUsers,
   });
 
-  Future<NotificationListResponseDto> getAdminNotificationHistory({
+  Future<AdminNotificationListResponseDto> getAdminNotificationHistory({
     int limit = 20,
     int page = 1,
     String? userId,

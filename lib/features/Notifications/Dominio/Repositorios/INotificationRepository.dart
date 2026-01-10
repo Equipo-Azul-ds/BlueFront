@@ -1,3 +1,4 @@
+import '../Entidades/AdminNotificacation.dart';
 import '../Entidades/NotificationEntiry.dart';
 
 abstract class INotificationRepository {
@@ -20,7 +21,7 @@ abstract class INotificationRepository {
   });
 
 
-  Future<List<NotificationEntity>> getAdminNotificationHistory({
+  Future<List<AdminNotificationEntity>> getAdminNotificationHistory({
     int limit = 20,
     int page = 1,
     String? userId,
