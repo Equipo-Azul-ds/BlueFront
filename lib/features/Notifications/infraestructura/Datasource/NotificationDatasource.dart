@@ -117,13 +117,14 @@ class NotificationRemoteDataSource implements INotificationDataSource {
   }) async {
     final uri = Uri.parse('$baseUrl/backoffice/massNotification');
     final token = await storage.read('token');
-    final adminId = await storage.read('userId');
+    //final adminId = await storage.read('userId');
+    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
 
     final response = await client.post(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': adminId ?? '',
+        'user': adminId ?? '',
       },
       body: jsonEncode({
         "title": title,
@@ -159,13 +160,14 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     final uri = Uri.parse('$baseUrl/backoffice/massNotifications')
         .replace(queryParameters: queryParams);
     final token = await storage.read('token');
-    final adminId = await storage.read('userId');
+    //final adminId = await storage.read('userId');
+    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
 
     final response = await client.get(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': adminId ?? '',
+        'user': adminId ?? '',
         //'Authorization': 'Bearer $token',
       },
     );

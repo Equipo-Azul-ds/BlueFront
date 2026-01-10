@@ -41,16 +41,21 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
   Future<PaginatedResponse> fetchUsers(UserQueryParams params) async {
     final uri = _buildUri('/backoffice/users', params.toMap());
     final token = await storage.read('token');
-    final adminId = await storage.read('userId');
+    //final adminId = await storage.read('userId');
+    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
 
     try {
       final response = await cliente.get(
           uri,
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': adminId ?? '',
+            'userId': adminId ?? '',
           }
       );
+
+      print('--- HTTP RESPONSE ---');
+      print('STATUS: ${response.statusCode}');
+      print('BODY: ${response.body}');
 
       if (response.statusCode == 200) {
         final dynamic jsonBody = json.decode(utf8.decode(response.bodyBytes));
@@ -103,16 +108,20 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
     final String action = (status.toLowerCase() == 'active') ? 'blockUser' : 'unblockUser';
     final uri = Uri.parse('$baseUrl/backoffice/$action/$userId');
     final token = await storage.read('token');
-    final adminId = await storage.read('userId');
+    //final adminId = await storage.read('userId');
+    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
 
 
     final response = await cliente.patch(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': adminId ?? '',
+        'user': adminId ?? '',
       },
     );
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode == 200) {
       return UserDto.fromJson(json.decode(response.body)).toEntity();
@@ -125,18 +134,21 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
 
   @override
   Future<void> deleteUser(String userId) async {
-    // Ajuste del path según la nueva especificación
     final uri = Uri.parse('$baseUrl/backoffice/user/$userId');
     final token = await storage.read('token');
-    final adminId = await storage.read('userId');
+    //final adminId = await storage.read('userId');
+    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
 
     final response = await cliente.delete(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': adminId ?? '',
+        'user': adminId ?? '',
       },
     );
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode == 204) {
 
@@ -155,7 +167,8 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
     final String action = currentlyIsAdmin ? 'removeAdmin' : 'giveAdmin';
     final uri = Uri.parse('$baseUrl/backoffice/$action/$userId');
     final token = await storage.read('token');
-    final adminId = await storage.read('userId');
+    //final adminId = await storage.read('userId');
+    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
 
     print('UserRemoteDataSource.toggleAdminStatus -> PATCH $uri');
 
@@ -163,10 +176,13 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': adminId ?? ''
+        'user': adminId ?? ''
         //'Authorization': 'Bearer $token',,
       },
     );
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode == 200) {
       return UserDto.fromJson(json.decode(response.body)).toEntity();

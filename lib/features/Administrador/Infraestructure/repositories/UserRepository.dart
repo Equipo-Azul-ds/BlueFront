@@ -28,10 +28,10 @@ class UserRepositoryImpl implements IUserRepository {
 
       final paginatedList = PaginatedUserList(
         users: users,
-        totalCount: pagination.totalCount,
-        totalPages: pagination.totalPages,
-        page: pagination.page,
-        limit: pagination.limit,
+        totalCount: pagination?.totalCount ?? users.length,
+        totalPages: pagination?.totalPages ?? 1,
+        page: pagination?.page ?? 1,
+        limit: pagination?.limit ?? 10,
       );
 
       return Right(paginatedList);
@@ -120,6 +120,12 @@ class UserRepositoryImpl implements IUserRepository {
       return Left(UnknownFailure());
     }
   }
+}
+int _safeInt(dynamic value, {int defaultValue = 0}) {
+  if (value == null) return defaultValue;
+  if (value is int) return value;
+  if (value is String) return int.tryParse(value) ?? defaultValue;
+  return defaultValue;
 }
 
 int _toInt(dynamic value) {

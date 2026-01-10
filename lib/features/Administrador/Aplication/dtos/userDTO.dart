@@ -94,10 +94,18 @@ class PaginationInfo {
 
   factory PaginationInfo.fromJson(Map<String, dynamic> json) {
     return PaginationInfo(
-      page: (json['page'] as num?)?.toInt() ?? 1,
-      limit: (json['limit'] as num?)?.toInt() ?? 20,
-      totalCount: (json['totalCount'] as num?)?.toInt() ?? 0,
-      totalPages: (json['totalPages'] as num?)?.toInt() ?? 1,
+      totalCount: json['totalCount'] is String
+          ? int.tryParse(json['totalCount']) ?? 0
+          : json['totalCount'] ?? 0,
+      totalPages: json['totalPages'] is String
+          ? int.tryParse(json['totalPages']) ?? 1
+          : json['totalPages'] ?? 1,
+      page: json['page'] is String
+          ? int.tryParse(json['page']) ?? 1
+          : json['page'] ?? 1,
+      limit: json['limit'] is String
+          ? int.tryParse(json['limit']) ?? 10
+          : json['limit'] ?? 10,
     );
   }
 }
