@@ -17,8 +17,8 @@ List<Widget> buildKahootWidgets(BuildContext context, List<Kahoot> kahoots) {
           kahoot: kahoot,
           onTap: () {
             Navigator.of(context).pushNamed(
-              '/kahoot-detail',
-              arguments: kahoot.id,
+              '/discovery-detail',
+              arguments: kahoot,
             );
           },
         ),
