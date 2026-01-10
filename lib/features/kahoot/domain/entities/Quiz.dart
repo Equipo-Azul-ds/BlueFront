@@ -45,7 +45,11 @@ class Quiz {
       themeId: json['themeId'],
       isLocal: false,
       templateId: json['templateId'],
-      coverImageUrl: json['coverImageUrl'] ?? json['coverImage'] ?? json['cover_image'],
+      // Acepta tanto URL como assetId; si solo viene coverImageId lo guardamos aquí para resolver más adelante.
+      coverImageUrl: json['coverImageUrl'] ??
+          json['coverImage'] ??
+          json['cover_image'] ??
+          json['coverImageId']?.toString(),
       createdAt: DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
       questions: (json['questions'] as List).map((q) => Question.fromJson(q as Map<String, dynamic>)).toList(),
     );

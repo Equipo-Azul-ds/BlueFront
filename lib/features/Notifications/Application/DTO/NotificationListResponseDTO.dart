@@ -5,7 +5,7 @@ class NotificationListResponseDto {
 
   NotificationListResponseDto({required this.notifications});
 
-  /// Factory flexible para el historial de notificaciones
+
   factory NotificationListResponseDto.fromDynamicJson(dynamic json) {
 
     if (json is List) {
@@ -17,7 +17,8 @@ class NotificationListResponseDto {
     }
 
     if (json is Map<String, dynamic>) {
-      final List<dynamic> dataList = (json['notifications'] ?? json['data'] ?? []) as List<dynamic>;
+      // El backend parece devolver la lista en la llave 'data'
+      final List<dynamic> dataList = (json['data'] ?? json['notifications'] ?? []) as List<dynamic>;
       return NotificationListResponseDto(
         notifications: dataList
             .map((item) => NotificationEntity.fromJson(item as Map<String, dynamic>))

@@ -11,9 +11,14 @@ class UploadMediaUseCase {
   });
 
   /// Devuelve la entidad `Media` creada por el backend.
-  Future<Media> run(UploadMediaDTO dto) async {
+  Future<Media> run(UploadMediaDTO dto, {String? bearerToken}) async {
     // Sube los bytes (multipart) al backend y obtiene los metadatos de la entidad Media creada
-    final media = await mediaRepository.uploadFromBytes(dto.fileBytes, dto.fileName, dto.mimeType);
+    final media = await mediaRepository.uploadFromBytes(
+      dto.fileBytes,
+      dto.fileName,
+      dto.mimeType,
+      bearerToken: bearerToken,
+    );
     return media;
   }
 }

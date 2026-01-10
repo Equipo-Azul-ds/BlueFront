@@ -1,6 +1,7 @@
 import 'package:Trivvy/features/Notifications/Dominio/Entidades/NotificationEntiry.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/colors.dart';
+import '../../Dominio/Entidades/AdminNotificacation.dart';
 import '../../Dominio/Repositorios/INotificationRepository.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
@@ -13,14 +14,14 @@ class NotificationProvider extends ChangeNotifier {
 
   NotificationProvider({required this.repository});
   List<NotificationEntity> _history = [];
-  List<NotificationEntity> _adminHistory = [];
+  List<AdminNotificationEntity> _adminHistory = [];
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
   bool _isSending = false;
 
   List<NotificationEntity> get history => _history;
-  List<NotificationEntity> get adminHistory => _adminHistory;
+  List<AdminNotificationEntity> get adminHistory => _adminHistory;
   bool get isSending => _isSending;
 
   final GlobalKey<ScaffoldMessengerState> messengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -249,7 +250,6 @@ class NotificationProvider extends ChangeNotifier {
       );
 
       _showSnackBar('Notificación enviada con éxito', isError: false);
-      // Recargamos el historial administrativo para ver la nueva notificación arriba
       await loadAdminHistory();
     } catch (e) {
       _showSnackBar('Error al enviar: $e', isError: true);
@@ -259,7 +259,6 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// NUEVO: Cargar historial de notificaciones masivas (Backoffice)
   Future<void> loadAdminHistory({int page = 1}) async {
     _isLoading = true;
     notifyListeners();
@@ -276,6 +275,7 @@ class NotificationProvider extends ChangeNotifier {
         _adminHistory.addAll(newNotifications);
       }
     } catch (e) {
+      print('Error en Provider: $e');
       _showSnackBar('Error al cargar historial administrativo', isError: true);
     } finally {
       _isLoading = false;
@@ -283,7 +283,7 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  /// Cargar historial personal (Usuario normal)
+
   Future<void> loadHistory() async {
     _isLoading = true;
     notifyListeners();

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../../../local/secure_storage.dart';
+import '../../Application/DTO/AdminNotificacationDTO.dart';
 import '../../Application/DTO/NotificationListResponseDTO.dart';
 import '../../Dominio/DataSource/INotificationDatasource.dart';
 
@@ -135,6 +136,9 @@ class NotificationRemoteDataSource implements INotificationDataSource {
         }
       }),
     );
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode == 201) {
       return jsonDecode(response.body);
@@ -144,7 +148,7 @@ class NotificationRemoteDataSource implements INotificationDataSource {
   }
 
   @override
-  Future<NotificationListResponseDto> getAdminNotificationHistory({
+  Future<AdminNotificationListResponseDto> getAdminNotificationHistory({
     int limit = 20,
     int page = 1,
     String? userId,
@@ -168,14 +172,17 @@ class NotificationRemoteDataSource implements INotificationDataSource {
       headers: {
         'Content-Type': 'application/json',
         'user': adminId ?? '',
-        //'Authorization': 'Bearer $token',
       },
     );
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode == 200) {
-      return NotificationListResponseDto.fromDynamicJson(jsonDecode(response.body));
+      final dynamic jsonBody = json.decode(utf8.decode(response.bodyBytes));
+      return AdminNotificationListResponseDto.fromDynamicJson(jsonBody);
     } else {
-      throw Exception('Error al obtener historial de admin: ${response.statusCode}');
+      throw Exception('Error al cargar historial: ${response.statusCode}');
     }
   }
 }
