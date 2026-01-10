@@ -1,230 +1,259 @@
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
 
-class HostResultsScreen extends StatelessWidget {
-  final List<Map<String, dynamic>> standings;
-  final int totalQuestions;
-  final String quizTitle;
+import '../../application/dtos/multiplayer_socket_events.dart';
+import '../controllers/multiplayer_session_controller.dart';
+import '../widgets/shared_podium.dart';
 
-  const HostResultsScreen({
-    super.key,
-    required this.standings,
-    required this.totalQuestions,
-    required this.quizTitle,
-  });
+/// Podio final para el anfitrión al terminar la partida.
+class HostResultsScreen extends StatefulWidget {
+  const HostResultsScreen({super.key});
+
+  @override
+  State<HostResultsScreen> createState() => _HostResultsScreenState();
+}
+
+class _HostResultsScreenState extends State<HostResultsScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<double> _scaleAnimation;
+  late final ConfettiController _confettiController;
+  bool _confettiPlayed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
+    _fadeAnimation = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
+    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
+    );
+    _confettiController = ConfettiController(
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  void _triggerConfetti() {
+    if (_confettiPlayed) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _confettiPlayed) return;
+      setState(() => _confettiPlayed = true);
+      _confettiController.play();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final sorted = List<Map<String, dynamic>>.from(standings)
-      ..sort((a, b) => b['score'].compareTo(a['score']));
+    final controller = context.watch<MultiplayerSessionController>();
+    final summary = controller.hostGameEndDto;
+    final quizTitle = controller.quizTitle ?? 'Trivvy!';
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColor.primary, AppColor.secundary],
+    if (summary == null) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AppColor.primary, AppColor.secundary],
+            ),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(color: Colors.white),
           ),
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.workspace_premium, color: Colors.white),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Resultados del anfitrión',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            quizTitle,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.06),
-                          blurRadius: 18,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
+      );
+    }
+
+    final standings = _buildStandings(summary);
+    final totalQuestions =
+        summary.totalQuestions ?? controller.hostResultsDto?.progress.total ?? 0;
+    final participants = summary.totalParticipants;
+    final playersLabel = standings.isEmpty
+        ? 'Sin jugadores'
+        : 'Juego completado · $participants jugadores';
+
+    final top3 = standings.take(3).toList();
+    final rest = standings.skip(3).toList();
+
+    // Trigger confetti on first build with standings
+    if (standings.isNotEmpty) {
+      _triggerConfetti();
+    }
+
+    return Scaffold(
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppColor.primary, AppColor.secundary],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 960),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Juego completado • ${sorted.length} jugadores',
-                          style: const TextStyle(
-                            color: AppColor.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$totalQuestions preguntas',
-                          style: const TextStyle(color: Colors.black54),
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: ListView.separated(
-                            itemCount: sorted.length,
-                            separatorBuilder: (_, _) => const Divider(height: 24),
-                            itemBuilder: (context, index) {
-                              final player = sorted[index];
-                              final rank = index + 1;
-                              final isTopThree = rank <= 3;
-                              final color = isTopThree
-                                  ? [
-                                      const Color(0xFFFFD700),
-                                      const Color(0xFFC0C0C0),
-                                      const Color(0xFFCD7F32),
-                                    ][rank - 1]
-                                  : AppColor.primary.withValues(alpha: 0.1);
-
-                              return Row(
+                        FadeTransition(
+                          opacity: _fadeAnimation,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
-                                    decoration: BoxDecoration(
-                                      color: color,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      '$rank',
-                                      style: TextStyle(
-                                        color: rank == 1
-                                            ? AppColor.primary
-                                            : Colors.black87,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  const Text(
+                                    '🏆 Podio final',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          player['name'] as String,
-                                          style: const TextStyle(
-                                            color: AppColor.primary,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          '${player['correct']} correctas',
-                                          style: const TextStyle(
-                                            color: Colors.black54,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    quizTitle,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        '${player['score']} pts',
-                                        style: const TextStyle(
-                                          color: AppColor.primary,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color:
-                                              AppColor.primary.withValues(alpha: 0.08),
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          '${player['avgTime']}s',
-                                          style: const TextStyle(
-                                            color: AppColor.primary,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    playersLabel,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    ),
+                                    Text(
+                                      totalQuestions > 0
+                                          ? '$totalQuestions preguntas'
+                                          : 'Total de preguntas no disponible',
+                                      style: const TextStyle(color: Colors.white60),
+                                    ),
+                                  ],
+                                ),
+                                FilledButton.tonal(
+                                  onPressed: () => Navigator.of(context)
+                                      .popUntil((route) => route.isFirst),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: AppColor.primary,
                                   ),
-                                ],
-                              );
-                            },
+                                  child: const Text('Salir'),
+                                ),
+                              ],
+                            ),
                           ),
+                        const SizedBox(height: 20),
+                        Expanded(
+                          child: standings.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'Aún no hay datos del podio.',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                )
+                              : Column(
+                                  children: [
+                                    FadeTransition(
+                                      opacity: _fadeAnimation,
+                                      child: ScaleTransition(
+                                        scale: _scaleAnimation,
+                                        child: SharedPodium(top3: top3),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Expanded(
+                                      child: FadeTransition(
+                                        opacity: _fadeAnimation,
+                                        child: Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(18),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(alpha: 0.08),
+                                                blurRadius: 18,
+                                                offset: const Offset(0, 12),
+                                              ),
+                                            ],
+                                          ),
+                                          child: RestOfLeaderboard(entries: rest),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () =>
-                        Navigator.of(context).popUntil((route) => route.isFirst),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppColor.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: const Text(
-                      'Iniciar nuevo juego',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+          IgnorePointer(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConfettiWidget(
+                confettiController: _confettiController,
+                blastDirectionality: BlastDirectionality.explosive,
+                emissionFrequency: 0.03,
+                numberOfParticles: 30,
+                gravity: 0.08,
+                colors: const [
+                  Colors.white,
+                  AppColor.primary,
+                  AppColor.secundary,
+                  AppColor.accent,
+                  Color(0xFFFFCC00), // Gold
+                  Color(0xFFC0C0C0), // Silver
+                  Color(0xFFCD7F32), // Bronze
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  /// Arma standings ordenados a partir del payload de cierre.
+  List<LeaderboardEntry> _buildStandings(HostGameEndEvent summary) {
+    final podium = List<LeaderboardEntry>.from(summary.finalPodium);
+    if (podium.isEmpty && summary.winner != null) {
+      podium.add(summary.winner!);
+    }
+    podium.sort((a, b) => a.rank.compareTo(b.rank));
+    return podium;
+  }
 }
+
+

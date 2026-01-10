@@ -1,7 +1,10 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:Trivvy/features/challenge/application/dtos/single_player_dtos.dart';
 import 'package:Trivvy/features/challenge/application/use_cases/single_player_usecases.dart';
+import 'package:Trivvy/features/challenge/domain/entities/single_player_game.dart';
+import 'package:Trivvy/features/challenge/infrastructure/storage/single_player_attempt_tracker.dart';
 import 'package:Trivvy/features/challenge/presentation/pages/single_player_challenge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
@@ -12,6 +15,7 @@ import 'package:provider/provider.dart';
 import '../features/Administrador/Presentacion/pages/Persona_Page.dart';
 import '../features/discovery/presentation/pages/discover_page.dart';
 import '/features/gameSession/presentation/pages/join_game.dart';
+import '/features/gameSession/presentation/pages/host_lobby.dart';
 import '../common_widgets/kahoot_card.dart';
 import '../common_widgets/main_bottom_nav_bar.dart';
 import '../core/constants/colors.dart';
@@ -313,6 +317,44 @@ class _HomePageContentState extends State<HomePageContent> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      Navigator.of(ctx).pop();
+                                      await _startSinglePlayerQuiz(context, q);
+                                    },
+                                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                                    label: const Text('Jugar en modo solitario'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColor.secundary,
+                                      foregroundColor: AppColor.onPrimary,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      Navigator.of(ctx).pop();
+                                      await _startHostingQuiz(context, q);
+                                    },
+                                    icon: const Icon(Icons.wifi_tethering_rounded, size: 20),
+                                    label: const Text('Hostear en vivo'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColor.primary,
+                                      foregroundColor: AppColor.onPrimary,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Expanded(
@@ -591,7 +633,47 @@ class _HomePageContentState extends State<HomePageContent> {
             ),
           ),
         );
-      },
+      }
+    );
+  }
+
+  Future<void> _startHostingQuiz(BuildContext context, Quiz quiz) async {
+    final kahootId = quiz.quizId.trim();
+    if (kahootId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este quiz debe estar sincronizado para poder hostearlo.')),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HostLobbyScreen(
+          kahootId: kahootId,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _startSinglePlayerQuiz(BuildContext context, Quiz quiz) async {
+    final kahootId = quiz.quizId.trim();
+    if (kahootId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este quiz aún no tiene un ID válido; sincronízalo antes de jugar.')),
+      );
+      return;
+    }
+
+    final resume = await _resolveSinglePlayerResume(context, kahootId);
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SinglePlayerChallengeScreen(
+          quizId: kahootId,
+          initialGame: resume.game,
+          initialSlide: resume.nextSlide,
+        ),
+      ),
     );
   }
 
@@ -608,54 +690,31 @@ class _HomePageContentState extends State<HomePageContent> {
     return map[id] ?? id;
   }
 
-  final List<Map<String, dynamic>> activeTrivvys = [
-    {
-      'id': 'mock_quiz_1',
-      'title': 'Ciencia y Matemática Básica',
-      'questions': 5,
-    },
-    {
-      'id': 'mock_quiz_ddd',
-      'title': 'Domain-Driven Design Básico',
-      'questions': 5,
-    },
-  ];
+  Future<({SinglePlayerGame? game, SlideDTO? nextSlide})>
+      _resolveSinglePlayerResume(BuildContext context, String quizId) async {
+    final tracker = context.read<SinglePlayerAttemptTracker>();
+    final attemptStateUseCase = context.read<GetAttemptStateUseCase>();
+    final authBloc = Provider.of<AuthBloc>(context, listen: false);
+    final userId = authBloc.currentUser?.id ?? '';
+    
+    final storedAttemptId = await tracker.readAttemptId(quizId, userId);
+    if (storedAttemptId == null) {
+      return (game: null, nextSlide: null);
+    }
 
-  Future<void> _startTrivvy(
-    BuildContext context,
-    Map<String, dynamic> quiz,
-  ) async {
-    final startAttempt = Provider.of<StartAttemptUseCase>(
-      context,
-      listen: false,
-    );
     try {
-      final res = await startAttempt.execute(
-        kahootId: quiz['id'] as String,
-        playerId: 'Jugador',
-        totalQuestions: quiz['questions'] as int,
-      );
-      if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SinglePlayerChallengeScreen(
-            nickname: res.game.playerId,
-            quizId: res.game.quizId,
-            totalQuestions: res.game.totalQuestions,
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SinglePlayerChallengeScreen(
-            nickname: 'Jugador',
-            quizId: quiz['id'] as String,
-            totalQuestions: quiz['questions'] as int,
-          ),
-        ),
-      );
+      final attemptState = await attemptStateUseCase.execute(storedAttemptId);
+      final game = attemptState.game;
+      if (game == null ||
+          game.gameProgress.state == GameProgressStatus.COMPLETED) {
+        await tracker.clearAttempt(quizId, userId);
+        return (game: null, nextSlide: null);
+      }
+      return (game: game, nextSlide: attemptState.nextSlide);
+    } catch (e) {
+      print('[dashboard] Failed to resume attempt for quiz=$quizId -> $e');
+      await tracker.clearAttempt(quizId, userId);
+      return (game: null, nextSlide: null);
     }
   }
 
@@ -1192,109 +1251,6 @@ class _HomePageContentState extends State<HomePageContent> {
                   );
                 },
               ),
-            ),
-            SliverPadding(
-              // Sección Trivvys activos
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.025,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Trivvys Activos',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: constraints.maxWidth * 0.045,
-                      ),
-                    ),
-                    Text(
-                      '${activeTrivvys.length} juegos',
-                      style: TextStyle(
-                        color: AppColor.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: constraints.maxWidth * 0.035,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              // Lista de trivvys activos
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.005,
-              ),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final quiz = activeTrivvys[index];
-                  return Container(
-                    margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => _startTrivvy(context, quiz),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: constraints.maxWidth * 0.045,
-                            vertical: screenSize.height * 0.018,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    quiz['title'] as String,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: constraints.maxWidth * 0.042,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${quiz['questions']} preguntas',
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: constraints.maxWidth * 0.035,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Icon(
-                                Icons.play_circle_fill,
-                                color: AppColor.primary,
-                                size: 32,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }, childCount: activeTrivvys.length),
-              ),
-            ),
-            // Espacio inferior para dejar respirar el FAB
-            SliverToBoxAdapter(
-              child: SizedBox(height: min(screenSize.height * 0.06, 120)),
             ),
           ],
         );

@@ -1,303 +1,261 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
-import 'player_results_screen.dart';
+import 'package:Trivvy/core/constants/answer_option_palette.dart';
+import 'package:Trivvy/core/widgets/answer_option_card.dart';
+import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
+import 'package:Trivvy/core/widgets/animated_timer.dart';
 
-const Color _optionBlue = Color(0xFF1C6BFF);
-const Color _optionRed = Color(0xFFFF5C7A);
-const Color _optionGreen = Color(0xFF34C759);
-const Color _optionYellow = Color(0xFFFFC857);
+import '../../application/dtos/multiplayer_socket_events.dart';
+import '../controllers/multiplayer_session_controller.dart';
+import 'package:Trivvy/core/utils/countdown_service.dart';
+import '../utils/phase_navigator.dart';
+import '../widgets/realtime_error_handler.dart';
 
-const List<Color> _optionColors = [
-  _optionBlue,
-  _optionRed,
-  _optionGreen,
-  _optionYellow,
-];
-
-const List<IconData> _optionIcons = [
-  Icons.change_history_rounded,
-  Icons.diamond_outlined,
-  Icons.circle_outlined,
-  Icons.square_outlined,
-];
-
+/// Pantalla de pregunta para el jugador (envío de respuestas y temporizador).
 class PlayerQuestionScreen extends StatefulWidget {
-  final String nickname;
-  final String quizTitle;
-  final List<Map<String, dynamic>> questions;
-  final int currentIndex;
-  final List<bool?> answerProgress;
-  final int basePointsPerQuestion;
-
-  const PlayerQuestionScreen({
-    super.key,
-    required this.nickname,
-    required this.quizTitle,
-    required this.questions,
-    required this.currentIndex,
-    required this.answerProgress,
-    required this.basePointsPerQuestion,
-  });
+  const PlayerQuestionScreen({super.key});
 
   @override
   State<PlayerQuestionScreen> createState() => _PlayerQuestionScreenState();
 }
 
-class _PlayerQuestionScreenState extends State<PlayerQuestionScreen>
-    with SingleTickerProviderStateMixin {
-  late final Map<String, dynamic> _question;
-  late final List<bool?> _progress;
-  late int _timeRemaining;
-  Timer? _countdownTimer;
-  late final AnimationController _reviewController;
-
-  int? _selectedIndex;
-  bool _answerRevealed = false;
-  bool? _wasCorrect;
-  bool _navigated = false;
+class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
+  int _timeRemaining = 0;
+  String? _currentSlideId;
+  int _lastQuestionSequence = 0;
+  int _lastPlayerGameEndSequence = 0;
+  int _lastResultsSequence = 0;
+  bool _sessionTerminated = false;
+  final Set<String> _selectedAnswerIds = <String>{};
+  bool _answerSubmitted = false;
+  bool _currentIsMultiSelect = false;
+  int? _currentMaxSelections;
+  final RealtimeErrorHandler _errorHandler = RealtimeErrorHandler();
+  final CountdownService _countdown = CountdownService();
 
   @override
-  void initState() {
-    super.initState();
-    _question = widget.questions[widget.currentIndex];
-    _progress = List<bool?>.from(widget.answerProgress);
-    _timeRemaining = (_question['time'] as int?) ?? 20;
-    _reviewController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed && _answerRevealed) {
-          _advanceAfterReview();
-        }
-      });
-    _startCountdown();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncWithController();
+    _checkFinalResults();
+    _checkQuestionResults();
+    _checkSessionTermination();
+    _checkRealtimeErrors();
   }
 
-  void _startCountdown() {
-    _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_timeRemaining <= 1) {
-        timer.cancel();
-        setState(() => _timeRemaining = 0);
-        if (!_answerRevealed) {
-          _revealAnswer(null);
-        }
-      } else {
-        setState(() => _timeRemaining--);
-      }
-    });
-  }
-
-  void _handleOptionTap(int index) {
-    if (_answerRevealed) return;
-    _revealAnswer(index);
-  }
-
-  void _revealAnswer(int? selectedIndex) {
-    _countdownTimer?.cancel();
-    final answers = _question['answers'] as List<dynamic>;
-    final bool wasCorrect = selectedIndex != null
-        ? (answers[selectedIndex]['correct'] as bool)
-        : false;
-
-    setState(() {
-      _selectedIndex = selectedIndex;
-      _answerRevealed = true;
-      _wasCorrect = wasCorrect;
-      _progress[widget.currentIndex] = wasCorrect ? true : false;
-    });
-
-    _reviewController.forward(from: 0);
-  }
-
-  void _advanceAfterReview() {
-    if (_navigated) return;
-    final bool hasNext = widget.currentIndex < widget.questions.length - 1;
-    if (hasNext) {
-      _navigated = true;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => PlayerQuestionScreen(
-            nickname: widget.nickname,
-            quizTitle: widget.quizTitle,
-            questions: widget.questions,
-            currentIndex: widget.currentIndex + 1,
-            answerProgress: _progress,
-            basePointsPerQuestion: widget.basePointsPerQuestion,
-          ),
-        ),
-      );
-    } else {
-      _goToResults();
-    }
-  }
-
-  void _goToResults() {
-    if (_navigated) return;
-    _navigated = true;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => PlayerResultsScreen(
-          nickname: widget.nickname,
-          quizTitle: widget.quizTitle,
-          answersProgress: _progress,
-          basePointsPerQuestion: widget.basePointsPerQuestion,
-        ),
-      ),
-    );
+  @override
+  void didUpdateWidget(covariant PlayerQuestionScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncWithController();
+    _checkFinalResults();
+    _checkQuestionResults();
+    _checkSessionTermination();
+    _checkRealtimeErrors();
   }
 
   @override
   void dispose() {
-    _countdownTimer?.cancel();
-    _reviewController.dispose();
+    _countdown.cancel();
     super.dispose();
   }
 
-  Widget _buildReviewBanner() {
-    final bool correct = _wasCorrect ?? false;
-    final String subtitle = correct
-        ? '+${widget.basePointsPerQuestion} puntos'
-        : '0 puntos en esta pregunta';
-    return Container(
-      width: double.infinity,
-      color: correct ? AppColor.success : AppColor.error,
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        children: [
-          Text(
-            correct ? 'Correcto' : 'Incorrecto',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+  /// Resetea estado local al recibir una nueva pregunta del socket.
+  void _syncWithController() {
+    
+    final controller = context.read<MultiplayerSessionController>();
+    final question = controller.currentQuestionDto;
+    if (question == null) return;
+    if (_lastQuestionSequence == controller.questionSequence) return;
+
+    final slide = question.slide;
+
+    _lastQuestionSequence = controller.questionSequence;
+    _currentSlideId = slide.id;
+    _selectedAnswerIds.clear();
+    _answerSubmitted = question.hasAnswered == true;
+
+    _currentIsMultiSelect = _resolveIsMultiSelect(slide);
+    _currentMaxSelections = slide.maxSelections;
+
+    final timeLimit = slide.timeLimitSeconds;
+    final issuedAt = controller.questionStartedAt ?? DateTime.now();
+    final remaining = _countdown.computeRemaining(
+      issuedAt: issuedAt,
+      timeLimitSeconds: timeLimit,
+    );
+    setState(() => _timeRemaining = remaining);
+    _countdown.start(
+      issuedAt: issuedAt,
+      timeLimitSeconds: timeLimit,
+      onTick: (seconds) {
+        if (!mounted) return;
+        setState(() => _timeRemaining = seconds);
+      },
+      onElapsed: () {
+        if (_answerSubmitted) return;
+        _submitAnswers(const <String>[]);
+      },
     );
   }
 
-  Widget _buildQuestionArea(String text, String contextLabel) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            contextLabel,
-            style: const TextStyle(
-              color: AppColor.primary,
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            text,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColor.primary,
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
+  /// Fallback para strings antiguos; la app ya trae slide.isMultiSelect resuelto.
+  bool _isMultiSelect(String slideType) {
+    final normalized = slideType.toLowerCase();
+    return normalized.contains('multi') || normalized.contains('checkbox');
+  }
+
+  /// Determina si la pregunta admite selección múltiple.
+  bool _resolveIsMultiSelect(SlideData slide) {
+    if (slide.isMultiSelect) return true;
+    return _isMultiSelect(slide.slideType);
+  }
+
+  /// Redirige al resumen final cuando llega el evento de fin de juego.
+  void _checkFinalResults() {
+    final controller = context.read<MultiplayerSessionController>();
+    _lastPlayerGameEndSequence = PhaseNavigator.handlePlayerFinalResults(
+      context: context,
+      controller: controller,
+      lastSequence: _lastPlayerGameEndSequence,
     );
   }
 
-  Widget _buildOption(
-    int idx,
-    List<dynamic> answers,
-    double optionWidth,
-  ) {
-    final String ansText = answers[idx]['text'] as String;
-    final baseColor = _optionColors[idx % _optionColors.length];
-    final icon = _optionIcons[idx % _optionIcons.length];
-    final bool isSelected = _selectedIndex == idx;
-    final bool reveal = _answerRevealed;
-    final bool isCorrect = answers[idx]['correct'] as bool;
+  /// Salta a resultados de pregunta cuando llega player_results.
+  void _checkQuestionResults() {
+    final controller = context.read<MultiplayerSessionController>();
+    _lastResultsSequence = PhaseNavigator.handlePlayerQuestionResults(
+      context: context,
+      controller: controller,
+      lastSequence: _lastResultsSequence,
+    );
+  }
 
-    Color backgroundColor = baseColor;
-    IconData? indicatorIcon;
-    if (reveal) {
-      backgroundColor = isCorrect
-          ? AppColor.success
-          : (isSelected ? AppColor.error : baseColor);
-      indicatorIcon = isCorrect ? Icons.check : Icons.close;
+  /// Sale al inicio si el host cierra la sesión o se desconecta.
+  void _checkSessionTermination() {
+    final controller = context.read<MultiplayerSessionController>();
+    _sessionTerminated = PhaseNavigator.handleSessionTermination(
+      context: context,
+      controller: controller,
+      alreadyTerminated: _sessionTerminated,
+    );
+  }
+
+  /// Muestra alertas para errores de conexión/sincronización del socket.
+  void _checkRealtimeErrors() {
+    final controller = context.read<MultiplayerSessionController>();
+    _errorHandler.handle(
+      context: context,
+      controller: controller,
+      onExit: _exitToHome,
+    );
+  }
+
+  void _exitToHome() {
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  /// Maneja selección única o múltiple según configuración del slide.
+  void _handleOptionTap(String answerId) {
+    
+    if (_answerSubmitted) return;
+
+    if (_currentIsMultiSelect) {
+      setState(() {
+        if (_selectedAnswerIds.contains(answerId)) {
+          _selectedAnswerIds.remove(answerId);
+          return;
+        }
+        final maxSelections = _currentMaxSelections;
+        if (maxSelections != null && maxSelections > 0) {
+          if (_selectedAnswerIds.length >= maxSelections) {
+            // Show feedback that max selections reached
+            HapticFeedback.heavyImpact();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Máximo $maxSelections opciones permitidas'),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
+        }
+        _selectedAnswerIds.add(answerId);
+      });
+      return;
     }
 
-    return SizedBox(
-      width: optionWidth,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: ElevatedButton(
-          onPressed: reveal ? null : () => _handleOptionTap(idx),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: backgroundColor,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 50, horizontal: 10),
-            elevation: 8,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, size: 24),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  ansText,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.start,
-                ),
-              ),
-              if (reveal) ...[
-                const SizedBox(width: 8),
-                Icon(indicatorIcon, size: 24),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
+    _submitAnswers(<String>[answerId]);
+  }
+
+  /// Envía la respuesta con el tiempo transcurrido.
+  Future<void> _submitAnswers(List<String> answerIds) async {
+    if (_answerSubmitted) return;
+    final slideId = _currentSlideId;
+    if (slideId == null) return;
+
+    final controller = context.read<MultiplayerSessionController>();
+    setState(() => _answerSubmitted = true);
+    _countdown.cancel();
+    HapticFeedback.mediumImpact();
+    final issuedAt = controller.questionStartedAt ?? DateTime.now();
+    final elapsedMs = DateTime.now().difference(issuedAt).inMilliseconds;
+
+    try {
+      await controller.submitPlayerAnswer(
+        questionId: slideId,
+        answerIds: answerIds,
+        timeElapsedMs: elapsedMs,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Respuesta enviada')));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _answerSubmitted = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al enviar respuesta: $error')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final answers = _question['answers'] as List<dynamic>;
-    final mediaUrl = _question['media'] as String?;
-    final questionLabel = 'Pregunta ${widget.currentIndex + 1} de ${widget.questions.length}';
+    final controller = context.watch<MultiplayerSessionController>();
+    final question = controller.currentQuestionDto;
+
+    if (question == null) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AppColor.secundary, AppColor.primary],
+            ),
+          ),
+          child: const Center(
+            child: Text(
+              'Esperando a que inicie la siguiente pregunta...',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final slide = question.slide;
+    final options = slide.options;
+    final isMultiSelect = _resolveIsMultiSelect(slide);
+    final maxSelections = slide.maxSelections ?? _currentMaxSelections;
+    final quizTitle = controller.quizTitle ?? 'Trivvy!';
+    final questionIndex = question.slide.position;
+    final questionLabel = 'Pregunta ${questionIndex + 1}';
 
     return Scaffold(
       body: Container(
@@ -308,184 +266,198 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen>
             colors: [AppColor.secundary, AppColor.primary],
           ),
         ),
-        child: Column(
-          children: [
-            if (_answerRevealed) _buildReviewBanner(),
-            Expanded(
-              child: Stack(
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Column(
                 children: [
-                  SafeArea(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(
-                            top: _answerRevealed ? 0 : 20.0,
+                  const SizedBox(height: 16),
+                  Text(
+                    quizTitle,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    questionLabel,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  if (isMultiSelect) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      maxSelections != null && maxSelections > 0
+                          ? 'Selecciona hasta $maxSelections opciones'
+                          : 'Selecciona una o más opciones',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  AnimatedTimer(timeRemaining: _timeRemaining),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 24,
+                        horizontal: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 18,
+                            offset: const Offset(0, 10),
                           ),
-                          child: Column(
-                            children: [
-                              Text(
-                                widget.quizTitle,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                questionLabel,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              if (!_answerRevealed)
-                                Container(
-                                  width: 60,
-                                  height: 60,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white54,
-                                      width: 2,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    '$_timeRemaining',
-                                    style: const TextStyle(
-                                      color: AppColor.primary,
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              const SizedBox(height: 14),
-                              _buildQuestionArea(
-                                _question['question'] as String,
-                                _question['context'] as String? ?? widget.quizTitle,
-                              ),
-                              if (mediaUrl != null) ...[
-                                const SizedBox(height: 40),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20.0,
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: Image.asset(
-                                      mediaUrl,
-                                      height: 200,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) =>
-                                          Container(
-                                            height: 200,
-                                            color: Colors.black.withValues(alpha: 0.15),
-                                            child: const Center(
-                                              child: Icon(
-                                                Icons.image_not_supported_outlined,
-                                                color: Colors.white54,
-                                              ),
-                                            ),
-                                          ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            slide.questionText,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColor.primary,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
-                        ),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final availableWidth = constraints.maxWidth;
-                            final optionWidth =
-                                (availableWidth - 32) /
-                                (answers.length == 1 ? 1 : 2);
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8.0,
-                                vertical: 8.0,
-                              ),
-                              child: Wrap(
-                                alignment: WrapAlignment.center,
-                                spacing: 0,
-                                runSpacing: 0,
-                                children: List.generate(
-                                  answers.length,
-                                  (i) => _buildOption(
-                                    i,
-                                    answers,
-                                    optionWidth,
+                          if (slide.imageUrl != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 20),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  slide.imageUrl!,
+                                  height: 180,
+                                  width: double.infinity,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => Container(
+                                    height: 180,
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.image_not_supported_outlined,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
                                   ),
                                 ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final width = constraints.maxWidth;
+                        final crossAxisCount = width < 420 ? 1 : 2;
+                        final childAspectRatio = width < 420 ? 3.4 : 1.2;
+                        return GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: crossAxisCount,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                childAspectRatio: childAspectRatio,
+                              ),
+                          itemCount: options.length,
+                          itemBuilder: (context, index) {
+                            final option = options[index];
+                            final answerId = option.id;
+                            return StaggeredFadeSlide(
+                              index: index,
+                              duration: const Duration(milliseconds: 350),
+                              staggerDelay: const Duration(milliseconds: 60),
+                              child: AnswerOptionCard(
+                                text: option.text,
+                                icon: answerOptionIcons[
+                                    index % answerOptionIcons.length],
+                                color: answerOptionColors[
+                                    index % answerOptionColors.length],
+                                selected: _selectedAnswerIds.contains(answerId),
+                                disabled: _answerSubmitted,
+                                onTap: () => _handleOptionTap(answerId),
                               ),
                             );
                           },
-                        ),
-                      ],
+                        );
+                      },
                     ),
                   ),
-                  if (_answerRevealed)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Container(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          child: Center(
-                            child: SizedBox(
-                              width: 96,
-                              height: 96,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  AnimatedBuilder(
-                                    animation: _reviewController,
-                                    builder: (context, child) =>
-                                        CircularProgressIndicator(
-                                      value: _reviewController.value,
-                                      strokeWidth: 8,
-                                      valueColor:
-                                          const AlwaysStoppedAnimation(Colors.white),
-                                    ),
-                                  ),
-                                  Icon(
-                                    (_wasCorrect ?? false)
-                                        ? Icons.check
-                                        : Icons.close,
-                                    size: 40,
-                                    color: Colors.white,
-                                  ),
-                                ],
-                              ),
+                  if (isMultiSelect && !_answerSubmitted)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: 12,
+                        left: 20,
+                        right: 20,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _selectedAnswerIds.isEmpty
+                              ? null
+                              : () =>
+                                    _submitAnswers(_selectedAnswerIds.toList()),
+                          icon: const Icon(Icons.send_rounded),
+                          label: Text(
+                            maxSelections != null && maxSelections > 0
+                                ? 'Enviar (${_selectedAnswerIds.length}/$maxSelections)'
+                                : 'Enviar (${_selectedAnswerIds.length})',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColor.secundary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: SafeArea(
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: AppColor.primary,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
+                  if (_answerSubmitted)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: 24,
+                        left: 20,
+                        right: 20,
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 18,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: const Text(
+                          'Respuesta enviada. Espera los resultados del anfitrión.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        child: const Text('Salir'),
                       ),
                     ),
-                  ),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

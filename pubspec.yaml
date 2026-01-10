@@ -62,6 +62,12 @@ dependencies:
   # Cliente HTTP para consumir APIs
   http: ^1.1.0
 
+  # Cliente HTTP avanzado (timeouts, interceptores)
+  dio: ^5.7.0
+
+  # Needed by MultipartFile in Dio uploads
+  http_parser: ^4.1.2
+
   # Inyección de dependencias
   get_it: ^9.0.5
 
@@ -78,7 +84,9 @@ dependencies:
 
   # Escáner de códigos QR/cámara
   mobile_scanner: ^5.0.2
+  qr_flutter: ^4.1.0
   path_provider: ^2.0.14
+  socket_io_client: ^2.0.3+1
   intl: ^0.20.2
   
 
@@ -86,9 +94,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   mocktail: ^1.0.0
-
-  # The "flutter_lints" package below contains a set of recommended lints...
-  flutter_lints: ^6.0.0
 
   # Para generar íconos de la app
   flutter_launcher_icons: ^0.14.4
