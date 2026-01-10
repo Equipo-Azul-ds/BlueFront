@@ -111,23 +111,20 @@ const String apiBaseUrl = String.fromEnvironment(
 
 // Token (UUID) usado mientras el backend mockea la verificación real.
 const String apiAuthToken = String.fromEnvironment('API_AUTH_TOKEN', defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333');
-// Feature flag to allow running without Firebase; enable with --dart-define=ENABLE_FIREBASE=true
-const bool firebaseEnabled = bool.fromEnvironment('ENABLE_FIREBASE', defaultValue: false);
-
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  if (!firebaseEnabled) return;
   await Firebase.initializeApp();
   print("Mensaje recibido en segundo plano: ${message.messageId}");
 }
 
 Future<void> main() async {
+  // Mostrar en consola la URL base que la app está usando (útil para depuración)
+  print('API_BASE_URL = $apiBaseUrl');
   WidgetsFlutterBinding.ensureInitialized();
-  if (firebaseEnabled) {
-    await Firebase.initializeApp();
-    // Configurar el handler de segundo plano solo cuando Firebase está habilitado
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  }
+  await Firebase.initializeApp();
+
+  // Configurar el handler de segundo plano
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   runApp(MyApp());
 }
 
@@ -259,7 +256,6 @@ class MyApp extends StatelessWidget {
                 client: context.read<http.Client>(),
               ),
             ),
-            firebaseEnabled: firebaseEnabled,
           )..initNotifications(),
         ),
         Provider<SinglePlayerGameRepositoryImpl>(
