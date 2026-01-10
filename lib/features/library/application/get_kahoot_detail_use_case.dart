@@ -6,7 +6,7 @@ class GetKahootDetailUseCase {
 
   GetKahootDetailUseCase({required this.repository});
 
-  Future<Kahoot> execute(String kahootId) {
-    return repository.getKahootById(kahootId);
+  Future<Kahoot> execute(String kahootId, {String? userId}) {
+    return repository.getKahootById(kahootId, userId: userId);
   }
 }

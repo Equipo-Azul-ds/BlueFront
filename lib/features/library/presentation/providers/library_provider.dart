@@ -1,12 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:Trivvy/features/library/domain/entities/kahoot_model.dart';
-import 'package:Trivvy/features/library/domain/entities/kahoot_progress_model.dart';
 import 'package:Trivvy/features/library/application/get_kahoots_use_cases.dart';
 import 'package:Trivvy/features/library/application/toggle_favorite_use_case.dart';
-import 'package:Trivvy/features/library/application/update_kahoot_progress_usecase.dart';
-import 'package:Trivvy/features/library/application/get_kahoot_progress_usecase.dart';
 
-// Definición de los estados para la interfaz de usuario
 enum LibraryState { initial, loading, loaded, error }
 
 class LibraryProvider with ChangeNotifier {
@@ -15,8 +11,6 @@ class LibraryProvider with ChangeNotifier {
   final GetInProgressKahootsUseCase _getInProgress;
   final GetCompletedKahootsUseCase _getCompleted;
   final ToggleFavoriteUseCase _toggleFavorite;
-  final UpdateKahootProgressUseCase _updateProgress;
-  final GetKahootProgressUseCase _getKahootProgress;
 
   LibraryProvider({
     required GetCreatedKahootsUseCase getCreated,
@@ -24,15 +18,11 @@ class LibraryProvider with ChangeNotifier {
     required GetInProgressKahootsUseCase getInProgress,
     required GetCompletedKahootsUseCase getCompleted,
     required ToggleFavoriteUseCase toggleFavorite,
-    required UpdateKahootProgressUseCase updateProgress,
-    required GetKahootProgressUseCase getKahootProgress,
   }) : _getCreated = getCreated,
        _getFavorite = getFavorite,
        _getInProgress = getInProgress,
        _getCompleted = getCompleted,
-       _toggleFavorite = toggleFavorite,
-       _updateProgress = updateProgress,
-       _getKahootProgress = getKahootProgress;
+       _toggleFavorite = toggleFavorite;
 
   LibraryState _state = LibraryState.initial;
   LibraryState get state => _state;
@@ -50,8 +40,6 @@ class LibraryProvider with ChangeNotifier {
   List<Kahoot> get completedKahoots => _completedKahoots;
 
   Future<void> loadAllLists(String userId) async {
-    if (_state == LibraryState.loading) return;
-
     _state = LibraryState.loading;
     notifyListeners();
 
@@ -71,13 +59,9 @@ class LibraryProvider with ChangeNotifier {
       _state = LibraryState.loaded;
     } catch (e) {
       _state = LibraryState.error;
-      debugPrint('Error al cargar listas de la biblioteca: $e');
+      debugPrint('Error en Biblioteca: $e');
     }
     notifyListeners();
-  }
-
-  Future<KahootProgress?> getKahootProgress(String kahootId, String userId) {
-    return _getKahootProgress.execute(kahootId: kahootId, userId: userId);
   }
 
   Future<void> toggleFavoriteStatus({
@@ -85,28 +69,26 @@ class LibraryProvider with ChangeNotifier {
     required bool currentStatus,
     required String userId,
   }) async {
-    await _toggleFavorite.execute(
-      kahootId: kahootId,
-      isFavorite: !currentStatus,
-    );
+    try {
+      await _toggleFavorite.execute(
+        kahootId: kahootId,
+        userId: userId,
+        isFavorite: currentStatus,
+      );
 
-    await loadAllLists(userId);
-  }
+      if (currentStatus) {
+        // Si era favorito, lo quitamos localmente
+        _favoriteKahoots.removeWhere((k) => k.id == kahootId);
+      } else {
+        // Si no era favorito, recargamos solo la lista de favoritos
+        // para obtener el objeto Kahoot completo desde el servidor.
+        _favoriteKahoots = await _getFavorite(userId: userId);
+      }
 
-  Future<void> updateKahootProgress({
-    required String kahootId,
-    required String userId,
-    required double newPercentage,
-    required bool isCompleted,
-  }) async {
-    await _updateProgress.execute(
-      kahootId: kahootId,
-      userId: userId,
-      newPercentage: newPercentage,
-      isCompleted: isCompleted,
-    );
-
-    // Recargar todas las listas para reflejar el cambio en la UI
-    await loadAllLists(userId);
+      notifyListeners(); // Refresca la UI al instante
+    } catch (e) {
+      debugPrint('Error toggleFavorite en Provider: $e');
+      await loadAllLists(userId);
+    }
   }
 }

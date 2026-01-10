@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../domain/entities/kahoot_model.dart';
-import '../../../../common_widgets/subpage_scaffold.dart';
 import '../providers/library_provider.dart';
 import '../utils/kahoot_list_type.dart';
 
@@ -16,10 +15,12 @@ class KahootListPage extends StatelessWidget {
   });
 
   void _onKahootTap(BuildContext context, String kahootId) {
-    Navigator.pushNamed(context, '/kahoot-detail', arguments: kahootId);
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).pushNamed('/kahoot-detail', arguments: kahootId);
   }
 
-  // Helper para obtener la lista correcta del Provider
   List<Kahoot> _getKahootsFromProvider(LibraryProvider provider) {
     return switch (listType) {
       KahootListType.created => provider.createdKahoots,
@@ -31,38 +32,94 @@ class KahootListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<LibraryProvider>(
-      builder: (context, provider, child) {
-        final kahoots = _getKahootsFromProvider(provider);
+    return Scaffold(
+      appBar: AppBar(title: Text(title), elevation: 0),
+      body: Consumer<LibraryProvider>(
+        builder: (context, provider, child) {
+          final kahoots = _getKahootsFromProvider(provider);
 
-        // Manejo de estado
-        if (provider.state == LibraryState.loading && kahoots.isEmpty) {
-          return const Center(child: CircularProgressIndicator());
-        }
+          if (provider.state == LibraryState.loading && kahoots.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        return SubpageScaffold(
-          title: title,
-          baseIndex: 3,
-          body: kahoots.isEmpty
-              ? Center(child: Text('No hay Kahoots en $title.'))
-              : ListView.builder(
-                  itemCount: kahoots.length,
-                  itemBuilder: (context, index) {
-                    final kahoot = kahoots[index];
-                    final String kahootId = kahoot.id;
+          if (kahoots.isEmpty) {
+            return _buildEmptyState(context);
+          }
 
-                    return ListTile(
-                      title: Text(kahoot.title),
-                      subtitle: Text('Autor: ${kahoot.authorId}'),
-                      trailing: const Icon(Icons.arrow_forward_ios),
-                      onTap: () {
-                        _onKahootTap(context, kahootId);
-                      },
-                    );
-                  },
-                ),
-        );
-      },
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: kahoots.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final kahoot = kahoots[index];
+              return _buildKahootCard(context, kahoot);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.auto_stories_outlined, size: 80, color: Colors.grey[300]),
+          const SizedBox(height: 16),
+          Text(
+            'No hay nada en $title',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKahootCard(BuildContext context, Kahoot kahoot) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.quiz_outlined, color: Colors.blue),
+        ),
+        title: Text(
+          kahoot.title,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              kahoot.description,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              'Autor: ${kahoot.authorName}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+        onTap: () => _onKahootTap(context, kahoot.id),
+      ),
     );
   }
 }

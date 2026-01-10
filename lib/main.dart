@@ -54,12 +54,10 @@ import 'features/media/application/delete_media_usecase.dart';
 import 'features/kahoot/domain/entities/Quiz.dart';
 
 import 'features/library/domain/repositories/library_repository.dart';
-import 'features/library/infrastructure/repositories/mock_library_repository.dart';
+import 'features/library/infrastructure/repositories/library_repository_impl.dart';
 import 'features/library/application/get_kahoots_use_cases.dart';
 import 'features/library/application/get_kahoot_detail_use_case.dart';
-import 'features/library/application/get_kahoot_progress_usecase.dart';
 import 'features/library/application/toggle_favorite_use_case.dart';
-import 'features/library/application/update_kahoot_progress_usecase.dart';
 import 'features/library/presentation/providers/library_provider.dart';
 import 'features/library/presentation/pages/library_page.dart';
 import 'features/library/presentation/pages/kahoots_category_page.dart';
@@ -294,7 +292,12 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        Provider<LibraryRepository>(create: (_) => MockLibraryRepository()),
+        Provider<LibraryRepository>(
+          create: (context) => LibraryRepositoryImpl(
+            baseUrl: apiBaseUrl,
+            client: context.read<http.Client>(),
+          ),
+        ),
         Provider<GetCreatedKahootsUseCase>(
           create: (context) => GetCreatedKahootsUseCase(
             repository: context.read<LibraryRepository>(),
@@ -326,17 +329,6 @@ class MyApp extends StatelessWidget {
             repository: context.read<LibraryRepository>(),
           ),
         ),
-        // ACTUALIZACIÓN DE PROGRESO
-        Provider<UpdateKahootProgressUseCase>(
-          create: (context) => UpdateKahootProgressUseCase(
-            repository: context.read<LibraryRepository>(),
-          ),
-        ),
-        Provider<GetKahootProgressUseCase>(
-          create: (context) => GetKahootProgressUseCase(
-            repository: context.read<LibraryRepository>(),
-          ),
-        ),
         ChangeNotifierProvider<LibraryProvider>(
           create: (context) => LibraryProvider(
             getCreated: context.read<GetCreatedKahootsUseCase>(),
@@ -344,8 +336,6 @@ class MyApp extends StatelessWidget {
             getInProgress: context.read<GetInProgressKahootsUseCase>(),
             getCompleted: context.read<GetCompletedKahootsUseCase>(),
             toggleFavorite: context.read<ToggleFavoriteUseCase>(),
-            updateProgress: context.read<UpdateKahootProgressUseCase>(),
-            getKahootProgress: context.read<GetKahootProgressUseCase>(),
           ),
         ),
         //Epica Suscripción
