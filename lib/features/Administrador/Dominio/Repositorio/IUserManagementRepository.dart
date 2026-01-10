@@ -1,6 +1,6 @@
-// Usaremos 'Either' para manejar errores (Failure) o éxito (Success)
 import 'package:dartz/dartz.dart';
-import '../../../../core/errors/failures.dart'; // Asume un tipo de error base
+import '../../../../core/errors/failures.dart';
+import '../../Aplication/dtos/userDTO.dart';
 import '../../Aplication/dtos/user_query_params.dart';
 import '../entidad/User.dart';
 
@@ -21,11 +21,34 @@ class PaginatedUserList {
   final int page;
   final int limit;
 
+
+  PaginationInfo get pagination => PaginationInfo(
+    totalCount: totalCount,
+    totalPages: totalPages,
+    page: page,
+    limit: limit,
+  );
+
   const PaginatedUserList({
     required this.users,
     required this.totalCount,
     required this.totalPages,
     required this.page,
     required this.limit,
+  });
+}
+
+
+class PaginationInfo {
+  final int totalCount;
+  final int totalPages;
+  final int page;
+  final int limit;
+
+  PaginationInfo({
+    required this.totalCount,
+    required this.totalPages,
+    required this.page,
+    required this.limit
   });
 }

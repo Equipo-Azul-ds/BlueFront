@@ -1,3 +1,5 @@
+// features/Administrador/Presentacion/provider/DashboardProvider.dart
+
 import 'package:flutter/material.dart';
 import '../../../../features/discovery/domain/entities/kahoot.dart';
 import '../../../../features/discovery/domain/entities/theme.dart';
@@ -41,22 +43,26 @@ class DashboardProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    final now = DateTime.now();
+    final weekAgo = now.subtract(const Duration(days: 7));
+
     try {
-      final now = DateTime.now();
-      final weekAgo = now.subtract(const Duration(days: 7));
-      // Obtener usuarios
-      final usersResult = await userRepository.getUsers(const UserQueryParams(limit: 100));
+      // 1. Cargar Usuarios y métricas de nuevos usuarios
+      final usersResult = await userRepository.getUsers(
+          const UserQueryParams(limit: 100, page: 1)
+      );
 
       usersResult.fold(
-            (failure) => print("Error en dashboard usuarios: $failure"),
-            (paginatedList) {
-          _totalUsers = paginatedList.totalCount;
-          _newUsersCount = paginatedList.users.where((u) =>
-          now.difference(u.createdAt).inDays <= 7).length;
+            (failure) => print("Error al obtener usuarios: $failure"),
+            (paginatedResponse) {
+
+          _totalUsers = paginatedResponse.pagination.totalCount;
+
+          // _newUsersCount = paginatedResponse.data.where(...).length;
         },
       );
 
-      // Obtener Categorías
+      // 2. Cargar Temas (Categorías)
       final themesResult = await themeRepository.getThemes();
       List<ThemeVO> themes = [];
       themesResult.fold(
@@ -67,10 +73,11 @@ class DashboardProvider extends ChangeNotifier {
         },
       );
 
-      //  Obtener Kahoots y procesar métricas
+      // 3. Obtener Kahoots (Paginados según el nuevo DTO)
+
       final quizzesResult = await quizRepository.getKahoots(
         query: null,
-        themes: [],
+        themes: [], // Vacío para traer todos los recientes
         orderBy: 'createdAt',
         order: 'desc',
       );
@@ -83,6 +90,7 @@ class DashboardProvider extends ChangeNotifier {
               .where((k) => k.createdAt.isAfter(weekAgo))
               .length;
 
+          // Calcular popularidad
           _calculatePopularity(themes, quizList);
         },
       );
@@ -98,13 +106,13 @@ class DashboardProvider extends ChangeNotifier {
   void _calculatePopularity(List<ThemeVO> themes, List<Kahoot> quizzes) {
     _categoryPopularity = {};
     for (var theme in themes) {
-      final count = quizzes.where((q) => q.themes.contains(theme.name)).length;
-      _categoryPopularity[theme.name] = count;
+      final count = quizzes.where((q) =>
+          q.themes.any((t) => t.toLowerCase() == theme.name.toLowerCase())
+      ).length;
+
+      if (count > 0) {
+        _categoryPopularity[theme.name] = count;
+      }
     }
-
-    var sortedEntries = _categoryPopularity.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    _categoryPopularity = Map.fromEntries(sortedEntries);
   }
 }

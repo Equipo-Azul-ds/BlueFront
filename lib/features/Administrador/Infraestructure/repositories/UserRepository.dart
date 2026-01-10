@@ -16,8 +16,6 @@ class UserRepositoryImpl implements IUserRepository {
 
   @override
   Future<Either<Failure, PaginatedUserList>> getUsers(UserQueryParams params) async {
-    try { print('UserRepositoryImpl.getUsers -> params=${params.toMap()}'); } catch (_) {}
-
     try {
       final response = await remoteDataSource.fetchUsers(params);
 
@@ -25,9 +23,47 @@ class UserRepositoryImpl implements IUserRepository {
           .map((dto) => dto.toEntity())
           .toList();
 
+
+      final pagination = response.pagination;
+
+      final paginatedList = PaginatedUserList(
+        users: users,
+        totalCount: pagination.totalCount,
+        totalPages: pagination.totalPages,
+        page: pagination.page,
+        limit: pagination.limit,
+      );
+
+      return Right(paginatedList);
+    } on ServerException catch (e, st) {
+      print('UserRepositoryImpl.getUsers -> ServerException: ${e.message}');
+      print('Stacktrace: $st');
+      return Left(NetworkFailure());
+    } catch (e, st) {
+      print('UserRepositoryImpl.getUsers -> Unexpected Exception: $e');
+      print('Stacktrace: $st');
+      return Left(UnknownFailure());
+    }
+  }
+
+  @override
+  /*Future<Either<Failure, PaginatedUserList>> getUsers2(UserQueryParams params) async {
+    // Log de inicio de operación consistente con DiscoverRepository.dart
+    try { print('UserRepositoryImpl.getUsers -> params=${params.toMap()}'); } catch (_) {}
+
+    try {
+      final response = await remoteDataSource.fetchUsers(params);
+
+      // Mapear DTOs a Entidades
+      final List<UserEntity> users = response.data
+          .map((dto) => dto.toEntity())
+          .toList();
+
+      // Crear el modelo de lista paginada de Dominio
       final pagination = response.pagination;
       final paginatedList = PaginatedUserList(
         users: users,
+         //Usamos int.tryParse o casting seguro por si vienen como Strings
         totalCount: _toInt(pagination['totalCount']),
         totalPages: _toInt(pagination['totalPages']),
         page: _toInt(pagination['page']),
@@ -46,7 +82,8 @@ class UserRepositoryImpl implements IUserRepository {
       print('Stacktrace: $st');
       return Left(UnknownFailure());
     }
-  }
+  }*/
+
 
   @override
   Future<Either<Failure, UserEntity>> toggleUserStatus(String userId, String currentStatus) async {

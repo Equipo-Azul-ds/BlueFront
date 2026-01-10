@@ -38,7 +38,7 @@ class UserDto {
       userType: json['userType']?.toString() ?? 'student',
       createdAt: json['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
       updatedAt: json['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
-      isAdmin: json['isAdmin'] is bool ? json['isAdmin'] : (json['isAdmin'] == 'true'),
+      isAdmin: json['isAdmin'] == true || json['isAdmin'] == 1,
       status: json['status']?.toString() ?? 'Active',
     );
   }
@@ -62,47 +62,42 @@ class UserDto {
 
 class PaginatedResponse {
   final List<UserDto> data;
-  final Map<String, dynamic> pagination;
+  final PaginationInfo pagination; // El getter que te falta
 
   PaginatedResponse({
     required this.data,
     required this.pagination,
   });
 
-  factory PaginatedResponse.fromDynamicJson(dynamic json) {
-    // Caso: El backend devuelve directamente una lista []
-    if (json is List) {
-      final users = json
-          .map((item) => UserDto.fromJson(item as Map<String, dynamic>))
-          .toList();
-      return PaginatedResponse(
-        data: users,
-        pagination: {
-          'totalCount': users.length,
-          'totalPages': 1,
-          'page': 1,
-          'limit': users.length,
-        },
-      );
-    }
+  factory PaginatedResponse.fromJson(Map<String, dynamic> json) {
+    return PaginatedResponse(
+      data: (json['data'] as List? ?? [])
+          .map((i) => UserDto.fromJson(i))
+          .toList(),
+      pagination: PaginationInfo.fromJson(json['pagination'] ?? {}),
+    );
+  }
+}
 
-    if (json is Map<String, dynamic>) {
-      final List<dynamic> dataList = json['data'] as List<dynamic>? ?? [];
-      final users = dataList
-          .map((item) => UserDto.fromJson(item as Map<String, dynamic>))
-          .toList();
+class PaginationInfo {
+  final int page;
+  final int limit;
+  final int totalCount;
+  final int totalPages;
 
-      return PaginatedResponse(
-        data: users,
-        pagination: json['pagination'] as Map<String, dynamic>? ?? {
-          'totalCount': users.length,
-          'totalPages': 1,
-          'page': 1,
-          'limit': 10,
-        },
-      );
-    }
+  PaginationInfo({
+    required this.page,
+    required this.limit,
+    required this.totalCount,
+    required this.totalPages,
+  });
 
-    throw Exception("Formato de respuesta de usuarios no reconocido");
+  factory PaginationInfo.fromJson(Map<String, dynamic> json) {
+    return PaginationInfo(
+      page: (json['page'] as num?)?.toInt() ?? 1,
+      limit: (json['limit'] as num?)?.toInt() ?? 20,
+      totalCount: (json['totalCount'] as num?)?.toInt() ?? 0,
+      totalPages: (json['totalPages'] as num?)?.toInt() ?? 1,
+    );
   }
 }

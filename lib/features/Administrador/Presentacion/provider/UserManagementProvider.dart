@@ -1,3 +1,6 @@
+import 'package:Trivvy/core/errors/failures.dart';
+import 'package:Trivvy/features/Administrador/Aplication/dtos/userDTO.dart';
+import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
 import '../../Aplication/UseCases/DeleteUserUseCase.dart';
 import '../../Aplication/UseCases/GetUserListUseCase.dart';
@@ -107,3 +110,4 @@ class UserManagementProvider with ChangeNotifier {
     );
   }
 }
+

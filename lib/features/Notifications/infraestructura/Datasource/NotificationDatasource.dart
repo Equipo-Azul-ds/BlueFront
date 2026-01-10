@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
+import '../../../../local/secure_storage.dart';
 import '../../Application/DTO/NotificationListResponseDTO.dart';
 import '../../Dominio/DataSource/INotificationDatasource.dart';
 
@@ -10,6 +11,7 @@ import '../../Dominio/DataSource/INotificationDatasource.dart';
 class NotificationRemoteDataSource implements INotificationDataSource {
   final String baseUrl;
   final http.Client client;
+  final storage = SecureStorage.instance;
 
   NotificationRemoteDataSource({required this.baseUrl, required this.client});
 
@@ -37,7 +39,7 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
     if (response.statusCode != 204) {
       throw Exception(
-        'Error al anular registro'); // [cite: 4]
+        'Error al anular registro');
     }
   }
 
@@ -46,7 +48,6 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     int limit = 20,
     int page = 1,
   }) async {
-    // Construimos la URI con los parámetros de búsqueda
     final uri = Uri.parse('$baseUrl/notifications').replace(
       queryParameters: {
         'limit': limit.toString(),
@@ -61,7 +62,6 @@ class NotificationRemoteDataSource implements INotificationDataSource {
         uri,
         headers: {
           'Content-Type': 'application/json',
-          // 'Authorization': 'Bearer $token', // Agregar el token aquí
         },
       );
 
@@ -86,7 +86,6 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     );
 
     if (response.statusCode == 200) {
-      // Retornamos el JSON para que el Repositorio lo convierta a Entidad
       return jsonDecode(response.body) as Map<String, dynamic>; //
     } else {
       throw Exception('Error al marcar como leída: ${response.statusCode}'); //
@@ -96,7 +95,7 @@ class NotificationRemoteDataSource implements INotificationDataSource {
   @override
   Future<void> sendAdminNotification(String message) async {
     final response = await client.post(
-      Uri.parse('$baseUrl/admin/notifications'), // Endpoint real
+      Uri.parse('$baseUrl/admin/notifications'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer YOUR_TOKEN',
@@ -117,12 +116,14 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     required bool toRegularUsers,
   }) async {
     final uri = Uri.parse('$baseUrl/backoffice/massNotification');
+    final token = await storage.read('token');
+    final adminId = await storage.read('userId');
 
     final response = await client.post(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer YOUR_ADMIN_TOKEN',
+        'Authorization': adminId ?? '',
       },
       body: jsonEncode({
         "title": title,
@@ -147,7 +148,6 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     int page = 1,
     String? userId,
   }) async {
-    // Construcción de URI con parámetros de paginación
     final Map<String, String> queryParams = {
       'limit': limit.toString(),
       'page': page.toString(),
@@ -158,12 +158,15 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
     final uri = Uri.parse('$baseUrl/backoffice/massNotifications')
         .replace(queryParameters: queryParams);
+    final token = await storage.read('token');
+    final adminId = await storage.read('userId');
 
     final response = await client.get(
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer YOUR_ADMIN_TOKEN',
+        'Authorization': adminId ?? '',
+        //'Authorization': 'Bearer $token',
       },
     );
 
