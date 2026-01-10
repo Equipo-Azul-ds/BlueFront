@@ -26,6 +26,7 @@ class SinglePlayerChallengeBloc extends ChangeNotifier {
   QuestionResult? lastResult;
   int? lastCorrectIndex;
   SinglePlayerGame? finalSummary;
+  String? _userId;
 
   void _setLoading(bool value) {
     isLoading = value;
@@ -34,26 +35,29 @@ class SinglePlayerChallengeBloc extends ChangeNotifier {
 
   // Inicia o reanuda un intento: llama al caso de uso que crea/recupera el
   // agregado y obtiene la primera slide (si existe).
-  Future<void> startGame(String kahootId) async {
+  Future<void> startGame(String kahootId, String userId) async {
     _setLoading(true);
     try {
+      _userId = userId;
       final result = await startAttemptUseCase.execute(
         kahootId: kahootId,
       );
 
       _applyGameState(result.game, result.firstSlide);
-      await attemptTracker.saveAttemptId(result.game.quizId, result.game.gameId);
+      await attemptTracker.saveAttemptId(result.game.quizId, result.game.gameId, userId);
     } finally {
       _setLoading(false);
     }
   }
 
   Future<void> hydrateExistingGame(
-    SinglePlayerGame game, {
+    SinglePlayerGame game,
+    String userId, {
     SlideDTO? nextSlide,
   }) async {
+    _userId = userId;
     _applyGameState(game, nextSlide);
-    await attemptTracker.saveAttemptId(game.quizId, game.gameId);
+    await attemptTracker.saveAttemptId(game.quizId, game.gameId, userId);
     notifyListeners();
   }
 
@@ -86,12 +90,12 @@ class SinglePlayerChallengeBloc extends ChangeNotifier {
 
   // Solicita el resumen final del intento (puntos, respuestas, etc.).
   Future<void> finishGame() async {
-    if (currentGame == null) return;
+    if (currentGame == null || _userId == null) return;
     _setLoading(true);
 
     final result = await getSummaryUseCase.execute(currentGame!.gameId);
     finalSummary = result.summaryGame;
-    await attemptTracker.clearAttempt(currentGame!.quizId);
+    await attemptTracker.clearAttempt(currentGame!.quizId, _userId!);
 
     _setLoading(false);
   }
@@ -157,11 +161,12 @@ class SinglePlayerChallengeBloc extends ChangeNotifier {
 
   Future<void> _syncAttemptTracking() async {
     final game = currentGame;
-    if (game == null) return;
+    final userId = _userId;
+    if (game == null || userId == null) return;
     if (game.gameProgress.state == GameProgressStatus.COMPLETED) {
-      await attemptTracker.clearAttempt(game.quizId);
+      await attemptTracker.clearAttempt(game.quizId, userId);
     } else {
-      await attemptTracker.saveAttemptId(game.quizId, game.gameId);
+      await attemptTracker.saveAttemptId(game.quizId, game.gameId, userId);
     }
   }
 }

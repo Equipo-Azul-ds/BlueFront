@@ -14,7 +14,6 @@ class _ResultPalette {
   static const Color successText = Color(0xFF166534);
   static const Color errorBg = Color(0xFFF87171);
   static const Color errorText = Color(0xFF991B1B);
-  static const Color cardBg = Color(0xFFFFFBEB);
   static const Color streakOrange = Color(0xFFF97316);
   static const Color rankPurple = Color(0xFF8B5CF6);
   static const Color pointsBlue = Color(0xFF3B82F6);

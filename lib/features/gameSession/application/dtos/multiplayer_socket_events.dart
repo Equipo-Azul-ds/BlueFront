@@ -428,7 +428,13 @@ class ProgressInfo {
 }
 
 class LeaderboardEntry {
-  LeaderboardEntry({required this.playerId, required this.nickname, required this.score, required this.rank, required this.previousRank});
+  LeaderboardEntry({
+    required this.playerId,
+    required this.nickname,
+    required this.score,
+    required this.rank,
+    required this.previousRank,
+  });
 
   final String playerId;
   final String nickname;

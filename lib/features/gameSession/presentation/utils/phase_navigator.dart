@@ -5,8 +5,9 @@ import '../pages/host_results_screen.dart';
 import '../pages/player_question_results_screen.dart';
 import '../pages/player_results_screen.dart';
 
-/// Centraliza navegación basada en eventos de fase/sincronización.
+/// Centraliza navegación basada en eventos de fase/sincronización mediante monitoreo de cambios de estado del controlador y disparo de transiciones de ruta.
 class PhaseNavigator {
+  /// Detecta evento de fin de juego del host y navega a pantalla de resultados del host si la secuencia avanzó.
   static int handleHostGameEnd({
     required BuildContext context,
     required MultiplayerSessionController controller,
@@ -25,6 +26,7 @@ class PhaseNavigator {
     return nextSeq;
   }
 
+  /// Detecta evento de fin de juego del jugador y navega a pantalla de resultados finales del jugador si la secuencia avanzó.
   static int handlePlayerFinalResults({
     required BuildContext context,
     required MultiplayerSessionController controller,
@@ -43,6 +45,7 @@ class PhaseNavigator {
     return nextSeq;
   }
 
+   /// Detecta resultados del jugador para la pregunta actual y navega a pantalla de resultados de pregunta del jugador si la secuencia cambió.
   static int handlePlayerQuestionResults({
     required BuildContext context,
     required MultiplayerSessionController controller,
@@ -63,6 +66,7 @@ class PhaseNavigator {
     return seq;
   }
 
+  /// Detecta terminación de sesión (sesión cerrada o host salió) y muestra mensaje de despedida; devuelve verdadero si se terminó.
   static bool handleSessionTermination({
     required BuildContext context,
     required MultiplayerSessionController controller,

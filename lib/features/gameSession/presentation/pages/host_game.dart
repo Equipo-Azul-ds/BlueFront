@@ -4,6 +4,7 @@ import 'package:Trivvy/core/constants/colors.dart';
 import 'package:Trivvy/core/constants/answer_option_palette.dart';
 import 'package:Trivvy/core/widgets/answer_option_card.dart';
 import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
+import 'package:Trivvy/core/widgets/animated_timer.dart';
 
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../controllers/multiplayer_session_controller.dart';
@@ -272,7 +273,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
                                         option: options[index],
                                         showResults: showingResults,
                                       );
-                                      // When showing results, animate each tile
+                                      // Cuando se muestran resultados, anima cada mosaico
                                       if (showingResults) {
                                         return StaggeredFadeSlide(
                                           index: 2 + index, // offset by stats + leaderboard
@@ -417,31 +418,7 @@ class _MediaAndTimerBlock extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                height: 72,
-                width: 72,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CircularProgressIndicator(
-                      value: time <= 0 ? 0 : null,
-                      strokeWidth: 6,
-                      color: AppColor.accent,
-                      backgroundColor: AppColor.primary.withValues(alpha: 0.1),
-                    ),
-                    Center(
-                      child: Text(
-                        '$time',
-                        style: const TextStyle(
-                          color: AppColor.primary,
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              AnimatedTimer(timeRemaining: time),
               const SizedBox(height: 6),
               const Text(
                 'Respondiendo...',

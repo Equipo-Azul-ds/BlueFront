@@ -6,30 +6,33 @@ class SinglePlayerAttemptTracker {
 
   const SinglePlayerAttemptTracker(this.secureStorage);
 
-  Future<String?> readAttemptId(String quizId) async {
+  Future<String?> readAttemptId(String quizId, String userId) async {
     final normalized = quizId.trim();
-    if (normalized.isEmpty) return null;
-    final stored = await secureStorage.read(key: _keyFor(normalized));
+    final normalizedUserId = userId.trim();
+    if (normalized.isEmpty || normalizedUserId.isEmpty) return null;
+    final stored = await secureStorage.read(key: _keyFor(normalized, normalizedUserId));
     if (stored == null) return null;
     final candidate = stored.trim();
     return candidate.isEmpty ? null : candidate;
   }
 
-  Future<void> saveAttemptId(String quizId, String attemptId) async {
+  Future<void> saveAttemptId(String quizId, String attemptId, String userId) async {
     final normalizedQuiz = quizId.trim();
     final normalizedAttempt = attemptId.trim();
-    if (normalizedQuiz.isEmpty || normalizedAttempt.isEmpty) return;
+    final normalizedUserId = userId.trim();
+    if (normalizedQuiz.isEmpty || normalizedAttempt.isEmpty || normalizedUserId.isEmpty) return;
     await secureStorage.write(
-      key: _keyFor(normalizedQuiz),
+      key: _keyFor(normalizedQuiz, normalizedUserId),
       value: normalizedAttempt,
     );
   }
 
-  Future<void> clearAttempt(String quizId) async {
+  Future<void> clearAttempt(String quizId, String userId) async {
     final normalized = quizId.trim();
-    if (normalized.isEmpty) return;
-    await secureStorage.delete(key: _keyFor(normalized));
+    final normalizedUserId = userId.trim();
+    if (normalized.isEmpty || normalizedUserId.isEmpty) return;
+    await secureStorage.delete(key: _keyFor(normalized, normalizedUserId));
   }
 
-  String _keyFor(String quizId) => '$_keyPrefix$quizId';
+  String _keyFor(String quizId, String userId) => '${_keyPrefix}${userId}_$quizId';
 }

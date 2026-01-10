@@ -2,7 +2,6 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
-import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
 
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../controllers/multiplayer_session_controller.dart';

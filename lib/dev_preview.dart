@@ -260,7 +260,7 @@ class PreviewMultiplayerSessionController extends MultiplayerSessionController {
   final _PreviewSessionRepository _repository;
 
   String _sessionPin = '246810';
-  String _qrToken = 'mock-qr-token';
+  String _qrToken = 'a1b2c3d4-e5f6-47g8-h9i0-j1k2l3m4n5o6';
   String _quizTitle = 'Trivia de prueba';
   String _nickname = 'Previewer';
   SessionPhase _phase = SessionPhase.lobby;

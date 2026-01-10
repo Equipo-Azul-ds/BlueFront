@@ -4,11 +4,12 @@ import 'package:Trivvy/core/widgets/standard_dialogs.dart';
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../controllers/multiplayer_session_controller.dart';
 
-/// Gestiona errores de conexión/sincronización del socket y muestra un diálogo bloqueante.
+/// Gestiona errores de conexión/sincronización del socket y muestra un diálogo bloqueante para prevenir interacción hasta que se reconozca el error.
 class RealtimeErrorHandler {
   ConnectionErrorEvent? _handledConnectionError;
   SyncErrorEvent? _handledSyncError;
 
+  /// Maneja errores de conexión o sincronización detectando eventos de error nuevo y mostrando diálogo bloqueante si no se ha manejado aún.
   void handle({
     required BuildContext context,
     required MultiplayerSessionController controller,
@@ -30,11 +31,13 @@ class RealtimeErrorHandler {
     }
   }
 
+  /// Reinicia el caché de error manejado para permitir que el mismo error se muestre nuevamente si vuelve a ocurrir.
   void reset() {
     _handledConnectionError = null;
     _handledSyncError = null;
   }
 
+  /// Muestra un diálogo de error bloqueante que previene interacción hasta que el usuario salga.
   void _showBlockingDialog(
     BuildContext context,
     String message,

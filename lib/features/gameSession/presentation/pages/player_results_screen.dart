@@ -4,7 +4,7 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
-import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
+import 'package:Trivvy/features/user/presentation/blocs/auth_bloc.dart';
 
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../controllers/multiplayer_session_controller.dart';
@@ -66,6 +66,8 @@ class _PlayerResultsScreenState extends State<PlayerResultsScreen>
   Widget build(BuildContext context) {
     // Consume resumen final del controlador (incluye streak y aciertos).
     final controller = context.watch<MultiplayerSessionController>();
+    final authBloc = context.read<AuthBloc>();
+    final avatarUrl = authBloc.currentUser?.avatarUrl ?? '';
     final PlayerGameEndEvent? summary = controller.playerGameEndDto;
     final nickname = controller.currentNickname ?? 'Jugador';
     final quizTitle = controller.quizTitle ?? 'Trivvy!';
@@ -179,16 +181,21 @@ class _PlayerResultsScreenState extends State<PlayerResultsScreen>
                                     CircleAvatar(
                                       radius: 36,
                                       backgroundColor: AppColor.accent,
-                                      child: Text(
-                                        nickname.isNotEmpty
-                                            ? nickname[0].toUpperCase()
-                                            : '?',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 32,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                      backgroundImage: avatarUrl.isNotEmpty
+                                          ? NetworkImage(avatarUrl)
+                                          : null,
+                                      child: avatarUrl.isEmpty
+                                          ? Text(
+                                              nickname.isNotEmpty
+                                                  ? nickname[0].toUpperCase()
+                                                  : '?',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : null,
                                     ),
                                     const SizedBox(height: 12),
                                     Text(

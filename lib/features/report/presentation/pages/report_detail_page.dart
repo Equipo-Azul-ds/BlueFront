@@ -45,7 +45,7 @@ class ReportDetailPage extends StatelessWidget {
 
     if (bloc.error != null && bloc.personalResult == null && bloc.sessionReport == null) {
       return _ErrorState(
-        message: 'No se pudo cargar el reporte',
+        message: 'No se pudo cargar el informe',
         detail: bloc.error!,
         onRetry: () => bloc.loadFromSummary(summary),
       );

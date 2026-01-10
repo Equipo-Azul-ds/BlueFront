@@ -8,7 +8,7 @@ import '../widgets/ranking_badge.dart';
 import '../widgets/shimmer_loading.dart';
 import 'report_detail_page.dart';
 
-/// Pantalla estilizada para listar los reportes personales (endpoint my-results).
+/// Pantalla estilizada para listar los informes personales (endpoint my-results).
 class ReportsListPage extends StatefulWidget {
   const ReportsListPage({super.key});
 
@@ -42,48 +42,50 @@ class _ReportsListPageState extends State<ReportsListPage> {
     return Scaffold(
       backgroundColor: AppColor.background,
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
             const _HeroHeader(),
-            RefreshIndicator(
-              onRefresh: _refresh,
-              child: Consumer<ReportsListBloc>(
-                builder: (context, bloc, _) {
-                  if (bloc.isLoading && !bloc.hasData) {
-                    return _SkeletonList();
-                  }
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _refresh,
+                child: Consumer<ReportsListBloc>(
+                  builder: (context, bloc, _) {
+                    if (bloc.isLoading && !bloc.hasData) {
+                      return _SkeletonList();
+                    }
 
-                  if (bloc.error != null && !bloc.hasData) {
-                    return _ErrorState(
-                      message: 'No se pudieron cargar los reportes',
-                      detail: bloc.error!,
-                      onRetry: _refresh,
-                    );
-                  }
-
-                  if (!bloc.isLoading && bloc.items.isEmpty) {
-                    return const _EmptyState();
-                  }
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 180, 16, 24),
-                    itemCount: bloc.items.length + (bloc.canLoadMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index >= bloc.items.length) {
-                        bloc.loadNextPage();
-                        return const Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-                      final item = bloc.items[index];
-                      return _ReportCard(
-                        item: item,
-                        onTap: () => _openDetail(item),
+                    if (bloc.error != null && !bloc.hasData) {
+                      return _ErrorState(
+                        message: 'No se pudieron cargar los informes',
+                        detail: bloc.error!,
+                        onRetry: _refresh,
                       );
-                    },
-                  );
-                },
+                    }
+
+                    if (!bloc.isLoading && bloc.items.isEmpty) {
+                      return const _EmptyState();
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: bloc.items.length + (bloc.canLoadMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index >= bloc.items.length) {
+                          bloc.loadNextPage();
+                          return const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Center(child: CircularProgressIndicator()),
+                          );
+                        }
+                        final item = bloc.items[index];
+                        return _ReportCard(
+                          item: item,
+                          onTap: () => _openDetail(item),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -107,7 +109,7 @@ class _HeroHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 200,
+      width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColor.primary, AppColor.secundary],
@@ -126,12 +128,27 @@ class _HeroHeader extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColor.onPrimary),
-                onPressed: () => Navigator.of(context).maybePop(),
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: AppColor.onPrimary),
+                  onPressed: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      // Fallback: navigate to profile if we can't pop
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/profile',
+                        (route) => false,
+                      );
+                    }
+                  },
+                  padding: EdgeInsets.zero,
+                ),
               ),
               const Text(
-                'Mis reportes',
+                'Informes de Estadísticas',
                 style: TextStyle(
                   color: AppColor.onPrimary,
                   fontSize: 22,
@@ -144,7 +161,7 @@ class _HeroHeader extends StatelessWidget {
           const SizedBox(height: 12),
           const Text(
             'Revisa tus partidas, podios y análisis por pregunta. '
-            'Toca un reporte para abrir su detalle.',
+            'Toca un informe para abrir su detalle.',
             style: TextStyle(
               color: AppColor.onPrimary,
               fontSize: 14,
@@ -270,12 +287,12 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 180, 16, 24),
+      padding: const EdgeInsets.all(16),
       children: const [
         SizedBox(height: 32),
         Center(
           child: Text(
-            'No hay reportes disponibles',
+            'No hay informes disponibles',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
           ),
         ),
@@ -294,7 +311,7 @@ class _ErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 180, 16, 24),
+      padding: const EdgeInsets.all(16),
       children: [
         Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -332,21 +349,6 @@ class _SkeletonList extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 180, 16, 24),
       itemCount: 6,
       itemBuilder: (_, __) => const ReportCardSkeleton(),
-    );
-  }
-}
-
-class _CenteredLoader extends StatelessWidget {
-  const _CenteredLoader();
-
-  @override
-  Widget build(BuildContext context) {
-    return const Center(
-      child: SizedBox(
-        height: 64,
-        width: 64,
-        child: CircularProgressIndicator(strokeWidth: 5),
-      ),
     );
   }
 }

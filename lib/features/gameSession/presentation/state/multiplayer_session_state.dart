@@ -73,16 +73,16 @@ class LobbyState {
   final bool isJoiningSession;
   final bool isResolvingQr;
 
-  /// The session PIN (from current pin or host session response).
+  /// El PIN de la sesión (del PIN actual o respuesta de sesión del anfitrión).
   String? get sessionPin => currentPin ?? hostSession?.sessionPin;
 
-  /// QR token for joining via QR code scan.
+  /// Token QR para unirse mediante escaneo de código QR.
   String? get qrToken => hostSession?.qrToken;
 
-  /// Quiz title from the host session.
+  /// Título del quiz desde la sesión del anfitrión.
   String? get quizTitle => hostSession?.quizTitle;
 
-  /// Cover image URL from the host session.
+  /// URL de imagen de portada desde la sesión del anfitrión.
   String? get coverImageUrl => hostSession?.coverImageUrl;
 
   LobbyState copyWith({
@@ -114,7 +114,7 @@ class LobbyState {
     );
   }
 
-  /// Creates a reset state, optionally clearing host session data.
+  /// Crea un estado reiniciado, opcionalmente limpiando datos de la sesión del anfitrión.
   LobbyState reset({bool clearHostSession = false}) {
     if (clearHostSession) {
       return const LobbyState();
@@ -130,7 +130,7 @@ class LobbyState {
   static const LobbyState initial = LobbyState();
 }
 
-/// Immutable state container for gameplay-related data (questions, results, game end).
+/// Contenedor inmutable de estado para datos relacionados con la jugabilidad.
 class GameplayState {
   const GameplayState({
     this.phase = SessionPhase.lobby,
@@ -193,12 +193,12 @@ class GameplayState {
     );
   }
 
-  /// Resets gameplay state while preserving sequences if needed.
+  /// Reinicia el estado del juego mientras preserva secuencias si es necesario.
   GameplayState reset() {
     return const GameplayState();
   }
 
-  /// Creates a new state for when a question starts, clearing previous phase data.
+  /// Crea un nuevo estado para cuando comienza una pregunta, limpiando datos de fases anteriores.
   GameplayState onQuestionStarted({
     required QuestionStartedEvent question,
     required DateTime issuedAt,
@@ -209,7 +209,6 @@ class GameplayState {
       currentQuestionDto: question,
       questionStartedAt: issuedAt,
       questionSequence: newSequence,
-      // Clear previous results
       hostAnswerSubmissions: null,
       hostResultsDto: null,
       playerResultsDto: null,
@@ -223,7 +222,7 @@ class GameplayState {
   static const GameplayState initial = GameplayState();
 }
 
-/// Immutable state container for session lifecycle events (errors, termination).
+/// Contenedor inmutable de estado para el ciclo de vida de la sesión.
 class SessionLifecycleState {
   const SessionLifecycleState({
     this.socketStatus = MultiplayerSocketStatus.idle,
@@ -253,10 +252,10 @@ class SessionLifecycleState {
   final GameErrorEvent? gameErrorDto;
   final bool shouldEmitClientReady;
 
-  /// Whether the socket is currently connected.
+  /// Cuando el socket está conectado.
   bool get isConnected => socketStatus == MultiplayerSocketStatus.connected;
 
-  /// Whether there's a session termination event pending.
+  /// Cuando hay un evento de terminación de sesión (sesión cerrada o host salió).
   bool get hasTerminationEvent => sessionClosedDto != null || hostLeftDto != null;
 
   SessionLifecycleState copyWith({
@@ -301,14 +300,14 @@ class SessionLifecycleState {
 
   SessionLifecycleState reset() {
     return SessionLifecycleState(
-      socketStatus: socketStatus, // Preserve socket status
+      socketStatus: socketStatus,
     );
   }
 
   static const SessionLifecycleState initial = SessionLifecycleState();
 }
 
-/// Combined immutable state for the entire multiplayer session.
+/// Estado immutable contenedor para toda la sesión multijugador.
 class MultiplayerSessionSnapshot {
   const MultiplayerSessionSnapshot({
     this.lobby = LobbyState.initial,
@@ -332,7 +331,7 @@ class MultiplayerSessionSnapshot {
     );
   }
 
-  /// Full reset of the session state.
+  /// Full reset del estado de la sesión.
   MultiplayerSessionSnapshot reset({bool clearHostSession = false}) {
     return MultiplayerSessionSnapshot(
       lobby: lobby.reset(clearHostSession: clearHostSession),

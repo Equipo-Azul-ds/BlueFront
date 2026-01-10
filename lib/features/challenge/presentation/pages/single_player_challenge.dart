@@ -3,14 +3,16 @@ import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
 import 'package:Trivvy/core/constants/answer_option_palette.dart';
 import 'package:Trivvy/core/widgets/answer_option_card.dart';
+import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
+import 'package:Trivvy/core/widgets/animated_timer.dart';
 import 'package:Trivvy/core/widgets/standard_dialogs.dart';
 import 'package:Trivvy/core/widgets/game_ui_kit.dart';
+import 'package:Trivvy/features/user/presentation/blocs/auth_bloc.dart';
 
 import '../../application/dtos/single_player_dtos.dart';
 import '../../domain/entities/single_player_game.dart';
 import '../blocs/single_player_challenge_bloc.dart';
 import '../controllers/challenge_gameplay_controller.dart';
-import '../widgets/animated_countdown.dart';
 import '../widgets/review_overlay.dart';
 import 'single_player_challenge_results.dart';
 
@@ -45,6 +47,9 @@ class _SinglePlayerChallengeScreenState
     super.didChangeDependencies();
     if (!_initialized) {
       final bloc = Provider.of<SinglePlayerChallengeBloc>(context, listen: false);
+      final authBloc = Provider.of<AuthBloc>(context, listen: false);
+      final userId = authBloc.currentUser?.id ?? '';
+      
       _controller = ChallengeGameplayController(bloc);
       _controller.addListener(_onControllerChanged);
       _controller.onReviewComplete = _navigateToResults;
@@ -53,6 +58,7 @@ class _SinglePlayerChallengeScreenState
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _controller.initialize(
           quizId: widget.quizId,
+          userId: userId,
           resumeGame: widget.initialGame,
           resumeSlide: widget.initialSlide,
         );
@@ -157,76 +163,92 @@ class _SinglePlayerChallengeScreenState
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.only(
-              top: 20,
-              left: 12,
-              right: 12,
-              bottom: _controller.isMultiSelect ? 92 : 24,
-            ),
-            child: Column(
-              key: ValueKey<String>(slide.slideId),
-              children: [
-                if (!_controller.answerRevealed) 
-                  _buildCountdown(slide.timeLimitSeconds),
-                const SizedBox(height: 14),
-                _buildQuestionArea(slide.questionText),
-                if (slide.mediaUrl != null) ...[
-                  const SizedBox(height: 28),
-                  _buildMedia(slide.mediaUrl!),
-                ],
-                const SizedBox(height: 18),
-                if (_controller.isMultiSelect && !_controller.answerRevealed) ...[
-                  Text(
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              _buildCountdown(),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 18,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 18,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        slide.questionText,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColor.primary,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (slide.mediaUrl != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: _buildMedia(slide.mediaUrl!),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              if (_controller.isMultiSelect && !_controller.answerRevealed) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
                     'Selecciona una o más opciones',
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                ],
-                _buildAnswerOptions(slide),
+                ),
+                const SizedBox(height: 12),
               ],
-            ),
+              Expanded(
+                child: _buildAnswerOptions(slide),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildCountdown(int totalTime) {
-    return AnimatedCountdown(
-      timeRemaining: _controller.timeRemaining,
-      totalTime: totalTime,
-      warningThreshold: 5,
-    );
-  }
-
-  Widget _buildQuestionArea(String questionText) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: SurfaceCard(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-        child: Text(
-          questionText,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: AppColor.primary,
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
+  Widget _buildCountdown() {
+    return AnimatedTimer(timeRemaining: _controller.timeRemaining);
   }
 
   Widget _buildMedia(String mediaUrl) {
     Widget buildFallback() {
       return Container(
-        height: 160,
-        color: Colors.grey[300],
-        child: const Center(child: Icon(Icons.broken_image)),
+        height: 180,
+        color: Colors.black.withValues(alpha: 0.1),
+        child: const Center(
+          child: Icon(
+            Icons.image_not_supported_outlined,
+            color: Colors.white70,
+          ),
+        ),
       );
     }
 
@@ -238,26 +260,20 @@ class _SinglePlayerChallengeScreenState
     final image = isRemote
         ? Image.network(
             mediaUrl,
-            height: 360,
+            height: 180,
             width: double.infinity,
             fit: BoxFit.cover,
             errorBuilder: (c, e, s) => buildFallback(),
           )
         : Image.asset(
             mediaUrl,
-            height: 360,
+            height: 180,
             width: double.infinity,
             fit: BoxFit.cover,
             errorBuilder: (c, e, s) => buildFallback(),
           );
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: image,
-      ),
-    );
+    return image;
   }
 
   Widget _buildAnswerOptions(SlideDTO slide) {
@@ -265,23 +281,28 @@ class _SinglePlayerChallengeScreenState
     
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth;
-        final optionWidth = (availableWidth - 32) / (answers.length == 1 ? 1 : 2);
+        final width = constraints.maxWidth;
+        final crossAxisCount = width < 420 ? 1 : 2;
+        final childAspectRatio = width < 420 ? 3.4 : 1.2;
         
-        return Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 0,
-          runSpacing: 0,
-          children: List.generate(
-            answers.length,
-            (idx) => _buildOption(slide, idx, optionWidth),
+        return GridView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: childAspectRatio,
           ),
+          itemCount: answers.length,
+          itemBuilder: (context, idx) {
+            return _buildOption(slide, idx);
+          },
         );
       },
     );
   }
 
-  Widget _buildOption(SlideDTO slide, int idx, double optionWidth) {
+  Widget _buildOption(SlideDTO slide, int idx) {
     final answers = slide.options;
     final ansText = answers[idx].text ?? '';
     final baseColor = answerOptionColors[idx % answerOptionColors.length];
@@ -308,29 +329,26 @@ class _SinglePlayerChallengeScreenState
       }
     }
 
-    return SizedBox(
-      width: optionWidth,
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: AnswerOptionCard(
-          layout: Axis.horizontal,
-          text: ansText,
-          icon: icon,
-          color: backgroundColor,
-          selected: isSelected,
-          disabled: reveal,
-          trailing: indicatorIcon != null ? Icon(indicatorIcon, size: 22) : null,
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
-          onTap: reveal
-              ? null
-              : () {
-                  if (_controller.isMultiSelect) {
-                    _controller.toggleSelection(idx);
-                  } else {
-                    _controller.submitSingle(idx);
-                  }
-                },
-        ),
+    return StaggeredFadeSlide(
+      index: idx,
+      duration: const Duration(milliseconds: 350),
+      staggerDelay: const Duration(milliseconds: 60),
+      child: AnswerOptionCard(
+        text: ansText,
+        icon: icon,
+        color: backgroundColor,
+        selected: isSelected,
+        disabled: reveal,
+        trailing: indicatorIcon != null ? Icon(indicatorIcon, size: 22) : null,
+        onTap: reveal
+            ? null
+            : () {
+                if (_controller.isMultiSelect) {
+                  _controller.toggleSelection(idx);
+                } else {
+                  _controller.submitSingle(idx);
+                }
+              },
       ),
     );
   }
@@ -339,18 +357,31 @@ class _SinglePlayerChallengeScreenState
     return Positioned(
       left: 16,
       right: 16,
-      bottom: 16,
+      bottom: 12,
       child: SafeArea(
         top: false,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 720),
-            child: PrimaryButton(
-              onPressed: _controller.canSubmitMulti
-                  ? () => _controller.submitMultiple()
-                  : null,
-              icon: Icons.send_rounded,
-              label: 'Enviar (${_controller.selectedIndexes.length})',
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _controller.canSubmitMulti
+                    ? () => _controller.submitMultiple()
+                    : null,
+                icon: const Icon(Icons.send_rounded),
+                label: Text(
+                  'Enviar (${_controller.selectedIndexes.length})',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.secundary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -375,3 +406,4 @@ class _SinglePlayerChallengeScreenState
     );
   }
 }
+

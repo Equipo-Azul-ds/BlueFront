@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
 import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
+import 'package:Trivvy/common_widgets/qr_code_display.dart';
 
 import '../controllers/multiplayer_session_controller.dart';
 import 'package:Trivvy/core/widgets/game_ui_kit.dart';
@@ -12,7 +13,7 @@ import 'host_game.dart';
 const _defaultQuizTitle = 'Trivvy!';
 const _placeholderPin = '------';
 
-/// Lobby del anfitrión: crea sesión y muestra jugadores conectados.
+/// Pantalla de lobby del host: crea sesión, muestra PIN de sesión y código QR, muestra lista de jugadores conectados, y maneja inicio del juego.
 class HostLobbyScreen extends StatefulWidget {
   const HostLobbyScreen({
     super.key,
@@ -27,6 +28,7 @@ class HostLobbyScreen extends StatefulWidget {
 
 class _HostLobbyScreenState extends State<HostLobbyScreen> {
   final RealtimeErrorHandler _errorHandler = RealtimeErrorHandler();
+  bool _isQrExpanded = false;
 
   @override
   void initState() {
@@ -34,7 +36,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _initHostSession());
   }
 
-  /// Solicita la creación de la sala y maneja errores locales.
+  /// Solicita la creación de la sala al controlador y maneja errores locales.
   Future<void> _initHostSession() async {
     final controller = context.read<MultiplayerSessionController>();
     try {
@@ -47,7 +49,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
     }
   }
 
-  /// Helper para mostrar mensajes de error/sistema.
+  /// Muestra mensajes de error/sistema mediante snackbar.
   void _showSnack(String message) {
     ScaffoldMessenger.of(
       context,
@@ -69,6 +71,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
     final isLoading = sessionController.isCreatingSession;
     final quizTitle = sessionController.quizTitle ?? _defaultQuizTitle;
     final pinCode = sessionController.sessionPin ?? _placeholderPin;
+    final qrToken = sessionController.qrToken;
     final stateError = sessionController.lastError;
 
     return Scaffold(
@@ -182,6 +185,78 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 24),
+                          // Botón de alternancia del código QR
+                          if (!isLoading && qrToken != null)
+                            GestureDetector(
+                              onTap: () => setState(() => _isQrExpanded = !_isQrExpanded),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: AppColor.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: AppColor.primary.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _isQrExpanded ? Icons.expand_less : Icons.qr_code_2,
+                                      color: AppColor.primary,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _isQrExpanded ? 'Ocultar código QR' : 'Mostrar código QR',
+                                        style: const TextStyle(
+                                          color: AppColor.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      _isQrExpanded ? Icons.expand_less : Icons.expand_more,
+                                      color: AppColor.primary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          // Sección expandible del código QR
+                          if (!isLoading && qrToken != null && _isQrExpanded) ...[
+                            const SizedBox(height: 12),
+                            Center(
+                              child: QrCodeDisplay(
+                                data: qrToken,
+                                size: 180,
+                                backgroundColor: Colors.white,
+                                foregroundColor: AppColor.primary,
+                                label: 'Escanea para unirte',
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: const [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: AppColor.primary,
+                                  size: 18,
+                                ),
+                                SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Escanea el código QR para unirte directamente',
+                                    style: TextStyle(
+                                      color: AppColor.primary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),

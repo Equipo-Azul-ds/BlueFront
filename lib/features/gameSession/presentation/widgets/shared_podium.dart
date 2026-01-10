@@ -4,7 +4,7 @@ import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
 
 import '../../application/dtos/multiplayer_socket_events.dart';
 
-/// Shared podium widget used by both host and player results screens.
+/// Widget de podio compartido que muestra las 3 primeras entradas de la tabla de clasificación con rangos y puntuaciones; utilizado por ambas pantallas de resultados.
 class SharedPodium extends StatelessWidget {
   const SharedPodium({
     super.key,
@@ -13,7 +13,7 @@ class SharedPodium extends StatelessWidget {
   });
 
   final List<LeaderboardEntry> top3;
-  /// If provided, highlights the current player in the podium.
+  /// Si se proporciona, resalta el jugador actual en el podio.
   final int? currentPlayerRank;
 
   @override
@@ -58,7 +58,7 @@ class SharedPodium extends StatelessWidget {
   }
 }
 
-/// Individual podium column with rank, score and name.
+/// Columna individual del podio con icono de rango, puntuación y nombre del jugador; tamaño determinado por factor de altura para visualización escalonada.
 class PodiumColumn extends StatelessWidget {
   const PodiumColumn({
     super.key,
@@ -144,6 +144,7 @@ class PodiumColumn extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Rank icon
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
@@ -190,7 +191,7 @@ class PodiumColumn extends StatelessWidget {
   }
 }
 
-/// Leaderboard entries beyond top 3.
+/// Muestra entradas de la tabla de clasificación más allá de los 3 primeros jugadores clasificados en una lista desplazable con animaciones escalonadas.
 class RestOfLeaderboard extends StatelessWidget {
   const RestOfLeaderboard({
     super.key,
@@ -231,7 +232,7 @@ class RestOfLeaderboard extends StatelessWidget {
         Expanded(
           child: ListView.separated(
             itemCount: entries.length,
-            separatorBuilder: (_, __) => const Divider(height: 20),
+            separatorBuilder: (_, _) => const Divider(height: 20),
             itemBuilder: (context, index) {
               final entry = entries[index];
               final displayRank = entry.rank <= 0 ? index + 4 : entry.rank;
@@ -252,7 +253,7 @@ class RestOfLeaderboard extends StatelessWidget {
   }
 }
 
-/// Single row in the leaderboard.
+/// Fila única en la tabla de clasificación que muestra rango, nombre del jugador con indicador de jugador actual opcional y puntuación.
 class LeaderboardRow extends StatelessWidget {
   const LeaderboardRow({
     super.key,

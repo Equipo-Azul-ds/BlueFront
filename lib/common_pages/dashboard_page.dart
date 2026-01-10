@@ -681,42 +681,14 @@ class _HomePageContentState extends State<HomePageContent> {
     return map[id] ?? id;
   }
 
-  final List<Map<String, dynamic>> activeTrivvys = [
-    {
-      'id': 'mock_quiz_1',
-      'title': 'Ciencia y Matemática Básica',
-      'questions': 5,
-    },
-    {
-      'id': 'mock_quiz_ddd',
-      'title': 'Domain-Driven Design Básico',
-      'questions': 5,
-    },
-  ];
-
-  Future<void> _startTrivvy(
-    BuildContext context,
-    Map<String, dynamic> quiz,
-  ) async {
-    final quizId = quiz['id'] as String;
-    final resume = await _resolveSinglePlayerResume(context, quizId);
-    if (!context.mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => SinglePlayerChallengeScreen(
-          quizId: quizId,
-          initialGame: resume.game,
-          initialSlide: resume.nextSlide,
-        ),
-      ),
-    );
-  }
-
   Future<({SinglePlayerGame? game, SlideDTO? nextSlide})>
       _resolveSinglePlayerResume(BuildContext context, String quizId) async {
     final tracker = context.read<SinglePlayerAttemptTracker>();
     final attemptStateUseCase = context.read<GetAttemptStateUseCase>();
-    final storedAttemptId = await tracker.readAttemptId(quizId);
+    final authBloc = Provider.of<AuthBloc>(context, listen: false);
+    final userId = authBloc.currentUser?.id ?? '';
+    
+    final storedAttemptId = await tracker.readAttemptId(quizId, userId);
     if (storedAttemptId == null) {
       return (game: null, nextSlide: null);
     }
@@ -726,13 +698,13 @@ class _HomePageContentState extends State<HomePageContent> {
       final game = attemptState.game;
       if (game == null ||
           game.gameProgress.state == GameProgressStatus.COMPLETED) {
-        await tracker.clearAttempt(quizId);
+        await tracker.clearAttempt(quizId, userId);
         return (game: null, nextSlide: null);
       }
       return (game: game, nextSlide: attemptState.nextSlide);
     } catch (e) {
       print('[dashboard] Failed to resume attempt for quiz=$quizId -> $e');
-      await tracker.clearAttempt(quizId);
+      await tracker.clearAttempt(quizId, userId);
       return (game: null, nextSlide: null);
     }
   }
@@ -1263,109 +1235,6 @@ class _HomePageContentState extends State<HomePageContent> {
                   );
                 },
               ),
-            ),
-            SliverPadding(
-              // Sección Trivvys activos
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.025,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Trivvys Activos',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: constraints.maxWidth * 0.045,
-                      ),
-                    ),
-                    Text(
-                      '${activeTrivvys.length} juegos',
-                      style: TextStyle(
-                        color: AppColor.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: constraints.maxWidth * 0.035,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              // Lista de trivvys activos
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.005,
-              ),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final quiz = activeTrivvys[index];
-                  return Container(
-                    margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => _startTrivvy(context, quiz),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: constraints.maxWidth * 0.045,
-                            vertical: screenSize.height * 0.018,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    quiz['title'] as String,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: constraints.maxWidth * 0.042,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${quiz['questions']} preguntas',
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: constraints.maxWidth * 0.035,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Icon(
-                                Icons.play_circle_fill,
-                                color: AppColor.primary,
-                                size: 32,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }, childCount: activeTrivvys.length),
-              ),
-            ),
-            // Espacio inferior para dejar respirar el FAB
-            SliverToBoxAdapter(
-              child: SizedBox(height: min(screenSize.height * 0.06, 120)),
             ),
           ],
         );

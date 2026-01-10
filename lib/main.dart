@@ -96,7 +96,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
 
-  defaultValue: 'https://quizzy-backend-0wh2.onrender.com/api',
+  defaultValue: 'https://backcomun-gc5j.onrender.com',
 
 );
 

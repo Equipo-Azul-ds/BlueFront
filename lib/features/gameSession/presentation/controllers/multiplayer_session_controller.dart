@@ -6,16 +6,23 @@ import '../../application/dtos/multiplayer_session_dtos.dart';
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../../application/use_cases/multiplayer_session_usecases.dart';
 import '../../domain/constants/multiplayer_constants.dart';
-import '../../domain/constants/multiplayer_events.dart';
 import '../../domain/repositories/multiplayer_session_realtime.dart';
 import '../state/multiplayer_session_state.dart';
+import 'session_connection_manager.dart';
+import 'session_game_phase_manager.dart';
+import 'session_lobby_manager.dart';
 
 // Re-export commonly used types from state file for backwards compatibility.
 export '../state/multiplayer_session_state.dart' 
     show SessionPhase, SessionPlayer, LobbyState, GameplayState, SessionLifecycleState;
 
-/// Orquesta la sesión multijugador: listeners de socket, estado tipado para UI
-/// y comandos del host/jugador mediante casos de uso.
+/// Orquesta la sesión multijugador: oyentes en tiempo real, estado tipado para UI,
+/// y comandos host/jugador a través de casos de uso.
+/// 
+/// Este controlador compone tres gestores especializados:
+/// - SessionConnectionManager: estado del socket, reconexión, eventos del ciclo de vida
+/// - SessionLobbyManager: lista de jugadores, estado del lobby, unirse/salir
+/// - SessionGamePhaseManager: flujo de preguntas, resultados, transiciones de fase
 class MultiplayerSessionController extends ChangeNotifier {
   MultiplayerSessionController({
     required MultiplayerSessionRealtime realtime,
@@ -35,23 +42,12 @@ class MultiplayerSessionController extends ChangeNotifier {
         _emitHostStartGameUseCase = emitHostStartGameUseCase,
         _emitHostNextPhaseUseCase = emitHostNextPhaseUseCase,
         _emitHostEndSessionUseCase = emitHostEndSessionUseCase,
-        _submitPlayerAnswerUseCase = submitPlayerAnswerUseCase {
-    // Reaccionar a cambios de conexión para reemitir client_ready y propagar UI.
-    _statusSubscription = _realtime.statusStream.listen((status) {
-      _socketStatus = status;
-      if (status == MultiplayerSocketStatus.disconnected) {
-        _shouldEmitClientReady = true;
-      }
-      if (status == MultiplayerSocketStatus.connected && _shouldEmitClientReady) {
-        _safeEmitClientReady();
-      }
-      notifyListeners();
-    });
-    // Errores de socket hacia la UI.
-    _errorSubscription = _realtime.errors.listen((error) {
-      _lastError = error.toString();
-      notifyListeners();
-    });
+        _submitPlayerAnswerUseCase = submitPlayerAnswerUseCase,
+        _connectionManager = SessionConnectionManager(realtime: realtime),
+        _lobbyManager = SessionLobbyManager(realtime: realtime),
+        _gamePhaseManager = SessionGamePhaseManager(realtime: realtime) {
+    // Configura oyentes para todos los gestores
+    _setupManagers();
   }
 
   final MultiplayerSessionRealtime _realtime;
@@ -64,198 +60,146 @@ class MultiplayerSessionController extends ChangeNotifier {
   final EmitHostEndSessionUseCase _emitHostEndSessionUseCase;
   final SubmitPlayerAnswerUseCase _submitPlayerAnswerUseCase;
 
-  CreateSessionResponse? _hostSession;
-  bool _isCreatingSession = false;
-  bool _isJoiningSession = false;
-  bool _isResolvingQr = false;
+  final SessionConnectionManager _connectionManager;
+  final SessionLobbyManager _lobbyManager;
+  final SessionGamePhaseManager _gamePhaseManager;
+
   String? _lastError;
-  String? _currentPin;
-  String? _currentNickname;
-  MultiplayerSocketStatus _socketStatus = MultiplayerSocketStatus.idle;
-  MultiplayerRole? _currentRole;
-  List<SessionPlayer> _players = const [];
-  HostLobbyUpdateEvent? _latestGameStateDto;
-  QuestionStartedEvent? _currentQuestionDto;
-  HostResultsEvent? _hostResultsDto;
-  HostGameEndEvent? _hostGameEndDto;
-  PlayerGameEndEvent? _playerGameEndDto;
-  SessionClosedEvent? _sessionClosedDto;
-  PlayerResultsEvent? _playerResultsDto;
-  PlayerLeftSessionEvent? _playerLeftDto;
-  HostLeftSessionEvent? _hostLeftDto;
-  HostReturnedSessionEvent? _hostReturnedDto;
-  SyncErrorEvent? _syncErrorDto;
-  ConnectionErrorEvent? _connectionErrorDto;
-  HostConnectedSuccessEvent? _hostConnectedSuccessDto;
-  PlayerAnswerConfirmationEvent? _playerAnswerConfirmationDto;
-  GameErrorEvent? _gameErrorDto;
-  DateTime? _questionStartedAt;
-  SessionPhase _phase = SessionPhase.lobby;
-  int _questionSequence = 0;
-  int _hostGameEndSequence = 0;
-  int _playerGameEndSequence = 0;
-  int? _hostAnswerSubmissions;
-  bool _shouldEmitClientReady = false;
 
-  StreamSubscription<MultiplayerSocketStatus>? _statusSubscription;
-  StreamSubscription<Object>? _errorSubscription;
-  StreamSubscription<dynamic>? _gameStateSubscription;
-  StreamSubscription<dynamic>? _questionStartedSubscription;
-  StreamSubscription<dynamic>? _hostResultsSubscription;
-  StreamSubscription<dynamic>? _hostGameEndSubscription;
-  StreamSubscription<dynamic>? _playerGameEndSubscription;
-  StreamSubscription<dynamic>? _sessionClosedSubscription;
-  StreamSubscription<dynamic>? _playerResultsSubscription;
-  StreamSubscription<dynamic>? _hostLobbySubscription;
-  StreamSubscription<dynamic>? _playerConnectedSubscription;
-  StreamSubscription<dynamic>? _hostAnswerUpdateSubscription;
-  StreamSubscription<dynamic>? _playerLeftSubscription;
-  StreamSubscription<dynamic>? _hostLeftSubscription;
-  StreamSubscription<dynamic>? _hostReturnedSubscription;
-  StreamSubscription<dynamic>? _syncErrorSubscription;
-  StreamSubscription<dynamic>? _connectionErrorSubscription;
-  StreamSubscription<dynamic>? _hostConnectedSuccessSubscription;
-  StreamSubscription<dynamic>? _playerAnswerConfirmationSubscription;
-  StreamSubscription<dynamic>? _gameErrorSubscription;
+  /// Configura oyentes en todos los sub-gestores para propagar cambios a la UI.
+  void _setupManagers() {
+    _connectionManager.addListener(_onManagerChanged);
+    _lobbyManager.addListener(_onManagerChanged);
+    _gamePhaseManager.addListener(_onManagerChanged);
+  }
 
-  /// Estado de creación de sala (host).
-  bool get isCreatingSession => _isCreatingSession;
-  bool get isJoiningSession => _isJoiningSession;
-  bool get isResolvingQr => _isResolvingQr;
-  String? get lastError => _lastError;
-  String? get sessionPin => _currentPin ?? _hostSession?.sessionPin;
-  String? get qrToken => _hostSession?.qrToken;
-  String? get currentNickname => _currentNickname;
-  String? get quizTitle => _hostSession?.quizTitle;
-  MultiplayerSocketStatus get socketStatus => _socketStatus;
-  MultiplayerRole? get currentRole => _currentRole;
-  List<SessionPlayer> get lobbyPlayers => List.unmodifiable(_players);
-  HostLobbyUpdateEvent? get latestGameStateDto => _latestGameStateDto;
-  QuestionStartedEvent? get currentQuestionDto => _currentQuestionDto;
-  HostResultsEvent? get hostResultsDto => _hostResultsDto;
-  PlayerResultsEvent? get playerResultsDto => _playerResultsDto;
-  HostGameEndEvent? get hostGameEndDto => _hostGameEndDto;
-  PlayerGameEndEvent? get playerGameEndDto => _playerGameEndDto;
-  SessionClosedEvent? get sessionClosedDto => _sessionClosedDto;
-  PlayerLeftSessionEvent? get playerLeftDto => _playerLeftDto;
-  HostLeftSessionEvent? get hostLeftDto => _hostLeftDto;
-  HostReturnedSessionEvent? get hostReturnedDto => _hostReturnedDto;
-  SyncErrorEvent? get syncErrorDto => _syncErrorDto;
-  ConnectionErrorEvent? get connectionErrorDto => _connectionErrorDto;
-  HostConnectedSuccessEvent? get hostConnectedSuccessDto => _hostConnectedSuccessDto;
-  PlayerAnswerConfirmationEvent? get playerAnswerConfirmationDto => _playerAnswerConfirmationDto;
-  GameErrorEvent? get gameErrorDto => _gameErrorDto;
-  DateTime? get questionStartedAt => _questionStartedAt;
-  SessionPhase get phase => _phase;
-  int get questionSequence => _questionSequence;
-  int get hostGameEndSequence => _hostGameEndSequence;
-  int get playerGameEndSequence => _playerGameEndSequence;
-  int? get hostAnswerSubmissions => _hostAnswerSubmissions;
+  void _onManagerChanged() {
+    notifyListeners();
+  }
 
-  /// Returns an immutable snapshot of the current session state.
-  /// Useful for consumers that prefer working with immutable state objects.
+  /// Estado de creación de sala (host)
+  bool get isCreatingSession => _lobbyManager.isCreatingSession;
+  bool get isJoiningSession => _lobbyManager.isJoiningSession;
+  bool get isResolvingQr => _lobbyManager.isResolvingQr;
+  String? get lastError => _lastError ?? _connectionManager.lastError;
+  String? get sessionPin => _lobbyManager.currentPin ?? _lobbyManager.hostSession?.sessionPin;
+  String? get qrToken => _lobbyManager.hostSession?.qrToken;
+  String? get currentNickname => _lobbyManager.currentNickname;
+  String? get quizTitle => _lobbyManager.hostSession?.quizTitle;
+  MultiplayerSocketStatus get socketStatus => _connectionManager.socketStatus;
+  MultiplayerRole? get currentRole => _lobbyManager.currentRole;
+  List<SessionPlayer> get lobbyPlayers => _lobbyManager.players;
+  HostLobbyUpdateEvent? get latestGameStateDto => _lobbyManager.latestGameStateDto;
+  QuestionStartedEvent? get currentQuestionDto => _gamePhaseManager.currentQuestionDto;
+  HostResultsEvent? get hostResultsDto => _gamePhaseManager.hostResultsDto;
+  PlayerResultsEvent? get playerResultsDto => _gamePhaseManager.playerResultsDto;
+  HostGameEndEvent? get hostGameEndDto => _gamePhaseManager.hostGameEndDto;
+  PlayerGameEndEvent? get playerGameEndDto => _gamePhaseManager.playerGameEndDto;
+  SessionClosedEvent? get sessionClosedDto => _gamePhaseManager.sessionClosedDto;
+  PlayerLeftSessionEvent? get playerLeftDto => _lobbyManager.playerLeftDto;
+  HostLeftSessionEvent? get hostLeftDto => _connectionManager.hostLeftDto;
+  HostReturnedSessionEvent? get hostReturnedDto => _connectionManager.hostReturnedDto;
+  SyncErrorEvent? get syncErrorDto => _connectionManager.syncErrorDto;
+  ConnectionErrorEvent? get connectionErrorDto => _connectionManager.connectionErrorDto;
+  HostConnectedSuccessEvent? get hostConnectedSuccessDto => _lobbyManager.hostConnectedSuccessDto;
+  PlayerAnswerConfirmationEvent? get playerAnswerConfirmationDto => _lobbyManager.playerAnswerConfirmationDto;
+  GameErrorEvent? get gameErrorDto => _connectionManager.gameErrorDto;
+  DateTime? get questionStartedAt => _gamePhaseManager.questionStartedAt;
+  SessionPhase get phase => _gamePhaseManager.phase;
+  int get questionSequence => _gamePhaseManager.questionSequence;
+  int get hostGameEndSequence => _gamePhaseManager.hostGameEndSequence;
+  int get playerGameEndSequence => _gamePhaseManager.playerGameEndSequence;
+  int? get hostAnswerSubmissions => _gamePhaseManager.hostAnswerSubmissions;
+
+  /// Devuelve una instantánea inmutable del estado actual de la sesión.
+  /// Útil para consumidores que prefieren trabajar con objetos de estado inmutable.
   MultiplayerSessionSnapshot get snapshot => MultiplayerSessionSnapshot(
     lobby: LobbyState(
-      hostSession: _hostSession,
-      currentPin: _currentPin,
-      currentNickname: _currentNickname,
-      currentRole: _currentRole,
-      players: _players,
-      latestGameStateDto: _latestGameStateDto,
-      isCreatingSession: _isCreatingSession,
-      isJoiningSession: _isJoiningSession,
-      isResolvingQr: _isResolvingQr,
+      hostSession: _lobbyManager.hostSession,
+      currentPin: _lobbyManager.currentPin,
+      currentNickname: _lobbyManager.currentNickname,
+      currentRole: _lobbyManager.currentRole,
+      players: _lobbyManager.players,
+      latestGameStateDto: _lobbyManager.latestGameStateDto,
+      isCreatingSession: _lobbyManager.isCreatingSession,
+      isJoiningSession: _lobbyManager.isJoiningSession,
+      isResolvingQr: _lobbyManager.isResolvingQr,
     ),
     gameplay: GameplayState(
-      phase: _phase,
-      currentQuestionDto: _currentQuestionDto,
-      questionStartedAt: _questionStartedAt,
-      questionSequence: _questionSequence,
-      hostAnswerSubmissions: _hostAnswerSubmissions,
-      hostResultsDto: _hostResultsDto,
-      playerResultsDto: _playerResultsDto,
-      hostGameEndDto: _hostGameEndDto,
-      hostGameEndSequence: _hostGameEndSequence,
-      playerGameEndDto: _playerGameEndDto,
-      playerGameEndSequence: _playerGameEndSequence,
+      phase: _gamePhaseManager.phase,
+      currentQuestionDto: _gamePhaseManager.currentQuestionDto,
+      questionStartedAt: _gamePhaseManager.questionStartedAt,
+      questionSequence: _gamePhaseManager.questionSequence,
+      hostAnswerSubmissions: _gamePhaseManager.hostAnswerSubmissions,
+      hostResultsDto: _gamePhaseManager.hostResultsDto,
+      playerResultsDto: _gamePhaseManager.playerResultsDto,
+      hostGameEndDto: _gamePhaseManager.hostGameEndDto,
+      hostGameEndSequence: _gamePhaseManager.hostGameEndSequence,
+      playerGameEndDto: _gamePhaseManager.playerGameEndDto,
+      playerGameEndSequence: _gamePhaseManager.playerGameEndSequence,
     ),
     lifecycle: SessionLifecycleState(
-      socketStatus: _socketStatus,
-      lastError: _lastError,
-      sessionClosedDto: _sessionClosedDto,
-      playerLeftDto: _playerLeftDto,
-      hostLeftDto: _hostLeftDto,
-      hostReturnedDto: _hostReturnedDto,
-      syncErrorDto: _syncErrorDto,
-      connectionErrorDto: _connectionErrorDto,
-      hostConnectedSuccessDto: _hostConnectedSuccessDto,
-      playerAnswerConfirmationDto: _playerAnswerConfirmationDto,
-      gameErrorDto: _gameErrorDto,
-      shouldEmitClientReady: _shouldEmitClientReady,
+      socketStatus: _connectionManager.socketStatus,
+      lastError: _lastError ?? _connectionManager.lastError,
+      sessionClosedDto: _gamePhaseManager.sessionClosedDto,
+      playerLeftDto: _lobbyManager.playerLeftDto,
+      hostLeftDto: _connectionManager.hostLeftDto,
+      hostReturnedDto: _connectionManager.hostReturnedDto,
+      syncErrorDto: _connectionManager.syncErrorDto,
+      connectionErrorDto: _connectionManager.connectionErrorDto,
+      hostConnectedSuccessDto: _lobbyManager.hostConnectedSuccessDto,
+      playerAnswerConfirmationDto: _lobbyManager.playerAnswerConfirmationDto,
+      gameErrorDto: _connectionManager.gameErrorDto,
+      shouldEmitClientReady: _connectionManager.shouldEmitClientReady,
     ),
   );
 
   @override
   void dispose() {
-    _statusSubscription?.cancel();
-    _errorSubscription?.cancel();
-    _gameStateSubscription?.cancel();
-    _questionStartedSubscription?.cancel();
-    _hostResultsSubscription?.cancel();
-    _hostGameEndSubscription?.cancel();
-    _playerGameEndSubscription?.cancel();
-    _sessionClosedSubscription?.cancel();
-    _playerResultsSubscription?.cancel();
-    _hostLobbySubscription?.cancel();
-    _playerConnectedSubscription?.cancel();
-    _hostAnswerUpdateSubscription?.cancel();
-    _playerLeftSubscription?.cancel();
-    _hostLeftSubscription?.cancel();
-    _hostReturnedSubscription?.cancel();
-    _syncErrorSubscription?.cancel();
-    _connectionErrorSubscription?.cancel();
-    _hostConnectedSuccessSubscription?.cancel();
-    _playerAnswerConfirmationSubscription?.cancel();
-    _gameErrorSubscription?.cancel();
+    _connectionManager.removeListener(_onManagerChanged);
+    _lobbyManager.removeListener(_onManagerChanged);
+    _gamePhaseManager.removeListener(_onManagerChanged);
+    _connectionManager.dispose();
+    _lobbyManager.dispose();
+    _gamePhaseManager.dispose();
     _realtime.disconnect();
     super.dispose();
   }
 
-  /// El host crea la sesión e inicia listeners de sincronización.
+  /// El host crea la sesión e inicia listeners de sincronización para lobby, fase de juego y eventos del ciclo de vida.
   Future<void> initializeHostLobby({
     required String kahootId,
     String? jwt,
   }) async {
-    _resetSessionState();
-    _isCreatingSession = true;
+    _resetSessionState(clearHostSession: true);
+    _lobbyManager.setIsCreatingSession(true);
     _lastError = null;
     notifyListeners();
     try {
-      _currentRole = MultiplayerRole.host;
-      _hostSession = await _initializeHostLobbyUseCase.execute(
+      _lobbyManager.setCurrentRole(MultiplayerRole.host);
+      final session = await _initializeHostLobbyUseCase.execute(
         kahootId: kahootId,
         jwt: jwt,
       );
-      final sessionPin = _hostSession?.sessionPin;
-      if (sessionPin == null || sessionPin.isEmpty) {
+      final sessionPin = session.sessionPin;
+      if (sessionPin.isEmpty) {
         throw StateError('El backend no devolvió un PIN de sesión válido.');
       }
-      _currentPin = sessionPin;
-      _registerSyncListeners();
-      _registerRealtimeListeners();
-      _markReadyForSync();
+      _lobbyManager.setHostSession(session);
+      _registerAllListeners();
+      _connectionManager.markReadyForSync();
     } catch (error) {
       _lastError = error.toString();
       rethrow;
     } finally {
-      _isCreatingSession = false;
+      _lobbyManager.setIsCreatingSession(false);
       notifyListeners();
     }
   }
 
-  /// Resuelve un PIN a partir de un token QR.
+  /// Resuelve un PIN de sesión a partir de un token QR llamando al servicio backend.
   Future<String> resolvePinFromQrToken(String qrToken) async {
-    _isResolvingQr = true;
+    _lobbyManager.setIsResolvingQr(true);
     _lastError = null;
     notifyListeners();
     try {
@@ -264,69 +208,69 @@ class MultiplayerSessionController extends ChangeNotifier {
       _lastError = error.toString();
       rethrow;
     } finally {
-      _isResolvingQr = false;
+      _lobbyManager.setIsResolvingQr(false);
       notifyListeners();
     }
   }
 
-  /// El jugador se conecta a la sala y envía su nickname.
+  /// El jugador se conecta a la sala con PIN y nickname, registra oyentes y emite evento de unirse.
   Future<void> joinLobby({
     required String pin,
     required String nickname,
     String? jwt,
   }) async {
-    _isJoiningSession = true;
+    _lobbyManager.setIsJoiningSession(true);
     _lastError = null;
     String safeNickname;
     try {
       safeNickname = _validateNickname(nickname);
     } catch (error) {
       _lastError = error.toString();
-      _isJoiningSession = false;
+      _lobbyManager.setIsJoiningSession(false);
       notifyListeners();
       rethrow;
     }
-    _currentNickname = safeNickname;
+    _lobbyManager.setCurrentNickname(safeNickname);
     notifyListeners();
-    final previousPin = _currentPin;
+    final previousPin = _lobbyManager.currentPin;
     try {
-      _players = const [];
-      _currentRole = MultiplayerRole.player;
+      _lobbyManager.setCurrentRole(MultiplayerRole.player);
       await _joinLobbyUseCase.execute(
         pin: pin,
         jwt: jwt,
       );
-      _currentPin = pin;
-      _registerSyncListeners();
-      _registerRealtimeListeners();
-      _markReadyForSync();
+      _lobbyManager.setCurrentPin(pin);
+      _registerAllListeners();
+      _connectionManager.markReadyForSync();
       _realtime.emitPlayerJoin(PlayerJoinPayload(nickname: safeNickname));
     } catch (error) {
       _lastError = error.toString();
-      _currentPin = previousPin;
+      if (previousPin != null) {
+        _lobbyManager.setCurrentPin(previousPin);
+      }
       rethrow;
     } finally {
-      _isJoiningSession = false;
+      _lobbyManager.setIsJoiningSession(false);
       notifyListeners();
     }
   }
 
-  /// Host inicia la partida.
+  /// El host inicia la partida emitiendo evento de inicio para disparar transición a fase de pregunta.
   void emitHostStartGame() {
     _emitHostStartGameUseCase.execute();
   }
 
-  /// Host avanza a la siguiente fase (resultados o siguiente pregunta).
+  /// El host avanza a la siguiente fase (resultados o siguiente pregunta) emitiendo evento de avance de fase.
   void emitHostNextPhase() {
     _emitHostNextPhaseUseCase.execute();
   }
 
-  /// Host fuerza fin de sesión.
+  /// El host fuerza fin de sesión emitiendo evento de fin de sesión a todos los jugadores.
   void emitHostEndSession() {
     _emitHostEndSessionUseCase.execute();
   }
 
-  /// Jugador envía respuesta con tiempo consumido.
+  /// El jugador envía respuesta con ID de pregunta, opciones de respuesta y tiempo consumido; emitido al servidor.
   Future<void> submitPlayerAnswer({
     required String questionId,
     required List<String> answerIds,
@@ -339,395 +283,60 @@ class MultiplayerSessionController extends ChangeNotifier {
     );
   }
 
-  /// Limpia estado y abandona la sesión.
+  /// Limpia estado y abandona la sesión emitiendo evento de salida al servidor.
   Future<void> leaveSession() async {
     await _leaveSessionUseCase.execute();
     _resetSessionState(clearHostSession: true);
     notifyListeners();
   }
 
-  /// True si el host puede iniciar juego (socket ok y hay jugadores en lobby).
+  /// Devuelve verdadero si el host puede iniciar el juego (socket conectado y jugadores en lobby).
   bool get canHostStartGame =>
-      _socketStatus == MultiplayerSocketStatus.connected &&
-      _players.isNotEmpty;
+      _connectionManager.socketStatus == MultiplayerSocketStatus.connected &&
+      _lobbyManager.players.isNotEmpty;
       
-  /// Limpia resultados parciales del host.
+  /// Limpia resultados parciales del host y notifica a oyentes.
   void clearHostResults() {
-    _hostResultsDto = null;
-    notifyListeners();
+    _gamePhaseManager.clearHostResults();
   }
 
-  /// Limpia caché de cierre de juego (host).
+  /// Limpia caché de cierre de juego (host) y notifica a oyentes.
   void clearHostGameEnd() {
-    _hostGameEndDto = null;
-    notifyListeners();
+    _gamePhaseManager.clearHostGameEnd();
   }
 
-  /// Limpia caché de cierre de juego (jugador).
+  /// Limpia caché de cierre de juego (jugador) y notifica a oyentes.
   void clearPlayerGameEnd() {
-    _playerGameEndDto = null;
-    notifyListeners();
+    _gamePhaseManager.clearPlayerGameEnd();
   }
 
-  /// Limpia cache de resultados de pregunta (jugador).
+  /// Limpia cache de resultados de pregunta (jugador) y notifica a oyentes.
   void clearPlayerResults() {
-    _playerResultsDto = null;
-    notifyListeners();
+    _gamePhaseManager.clearPlayerResults();
   }
 
-  /// Limpia evento de sesión cerrada.
+  /// Limpia evento de sesión cerrada y notifica a oyentes.
   void clearSessionClosed() {
-    _sessionClosedDto = null;
-    notifyListeners();
+    _gamePhaseManager.clearSessionClosed();
+  }
+
+  // ==================== Private Methods ====================
+
+  /// Registra todos los oyentes (lobby, fase de juego y eventos del ciclo de vida) con manejador de errores.
+  void _registerAllListeners() {
+    _lobbyManager.registerLobbyListeners(_handleEventError);
+    _gamePhaseManager.registerGamePhaseListeners(_handleEventError);
+    _connectionManager.registerLifecycleListeners(_handleEventError);
   }
 
   /// Limpia cachés y contadores entre sesiones o al salir.
   void _resetSessionState({bool clearHostSession = false}) {
-    if (clearHostSession) {
-      _hostSession = null;
-      _currentPin = null;
-      _currentNickname = null;
-      _currentRole = null;
-    }
-    _players = const [];
-    _latestGameStateDto = null;
+    _lobbyManager.resetLobbyState(clearHostSession: clearHostSession);
+    _gamePhaseManager.resetGamePhaseState();
     _lastError = null;
-    _currentQuestionDto = null;
-    _hostResultsDto = null;
-    _playerResultsDto = null;
-    _hostGameEndDto = null;
-    _playerGameEndDto = null;
-    _sessionClosedDto = null;
-    _playerLeftDto = null;
-    _hostLeftDto = null;
-    _hostReturnedDto = null;
-    _syncErrorDto = null;
-    _connectionErrorDto = null;
-    _questionStartedAt = null;
-    _phase = SessionPhase.lobby;
-    _questionSequence = 0;
-    _hostGameEndSequence = 0;
-    _playerGameEndSequence = 0;
-    _hostAnswerSubmissions = null;
-    _shouldEmitClientReady = false;
   }
 
-  /// Registra listeners de sincronización inicial (estado general + lobby).
-  void _registerSyncListeners() {
-    _registerGameStateListener();
-    _registerLobbyListeners();
-  }
-
-  /// Sync inicial/recuperación de lobby.
-  void _registerGameStateListener() {
-    _gameStateSubscription?.cancel();
-    _gameStateSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.gameStateUpdate)
-        .listen(_handleGameStateSync, onError: _handleEventError);
-  }
-
-  /// Eventos que pueden llegar en lobby o reconexiones.
-  void _registerLobbyListeners() {
-    _hostLobbySubscription?.cancel();
-    _hostLobbySubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostLobbyUpdate)
-        .listen(_handleHostLobbyUpdate, onError: _handleEventError);
-
-    _playerConnectedSubscription?.cancel();
-    _playerConnectedSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerConnectedToSession)
-        .listen(_handlePlayerConnectedToSession, onError: _handleEventError);
-
-    _hostAnswerUpdateSubscription?.cancel();
-    _hostAnswerUpdateSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostAnswerUpdate)
-        .listen(_handleHostAnswerUpdate, onError: _handleEventError);
-
-    _playerLeftSubscription?.cancel();
-    _playerLeftSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerLeftSession)
-      .listen(_handlePlayerLeftSession, onError: _handleEventError);
-
-    _hostLeftSubscription?.cancel();
-    _hostLeftSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostLeftSession)
-      .listen(_handleHostLeftSession, onError: _handleEventError);
-
-    _hostReturnedSubscription?.cancel();
-    _hostReturnedSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostReturnedToSession)
-      .listen(_handleHostReturnedSession, onError: _handleEventError);
-
-    _syncErrorSubscription?.cancel();
-    _syncErrorSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.syncError)
-      .listen(_handleSyncError, onError: _handleEventError);
-
-    _connectionErrorSubscription?.cancel();
-    _connectionErrorSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.connectionError)
-      .listen(_handleConnectionError, onError: _handleEventError);
-
-    _hostConnectedSuccessSubscription?.cancel();
-    _hostConnectedSuccessSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostConnectedSuccess)
-      .listen(_handleHostConnectedSuccess, onError: _handleEventError);
-
-    _playerAnswerConfirmationSubscription?.cancel();
-    _playerAnswerConfirmationSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerAnswerConfirmation)
-      .listen(_handlePlayerAnswerConfirmation, onError: _handleEventError);
-
-    _gameErrorSubscription?.cancel();
-    _gameErrorSubscription = _realtime
-      .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.gameError)
-      .listen(_handleGameError, onError: _handleEventError);
-  }
-
-  /// Eventos de juego en vivo (preguntas, resultados, fin de juego).
-  void _registerRealtimeListeners() {
-    _questionStartedSubscription?.cancel();
-    _questionStartedSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.questionStarted)
-        .listen(_handleQuestionStarted, onError: _handleEventError);
-
-    _hostResultsSubscription?.cancel();
-    _hostResultsSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostResults)
-        .listen(_handleHostResults, onError: _handleEventError);
-
-    _hostGameEndSubscription?.cancel();
-    _hostGameEndSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostGameEnd)
-        .listen(_handleHostGameEnd, onError: _handleEventError);
-
-    _playerGameEndSubscription?.cancel();
-    _playerGameEndSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerGameEnd)
-        .listen(_handlePlayerGameEnd, onError: _handleEventError);
-
-    _sessionClosedSubscription?.cancel();
-    _sessionClosedSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.sessionClosed)
-        .listen(_handleSessionClosed, onError: _handleEventError);
-
-    _playerResultsSubscription?.cancel();
-    _playerResultsSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.playerResults)
-        .listen(_handlePlayerResults, onError: _handleEventError);
-  }
-
-  /// Marca bandera para emitir client_ready al reconectar.
-  void _markReadyForSync() {
-    _shouldEmitClientReady = true;
-    _safeEmitClientReady();
-  }
-
-  /// Evita perder snapshots; solo emite si el socket está listo.
-  void _safeEmitClientReady() {
-    if (!_realtime.isConnected) {
-      return;
-    }
-    try {
-      _realtime.emitClientReady();
-      _shouldEmitClientReady = false;
-    } catch (error) {
-      _lastError = error.toString();
-      notifyListeners();
-    }
-  }
-
-  /// Actualiza snapshot de lobby/estado general.
-  void _handleGameStateSync(Map<String, dynamic> payload) {
-    try {
-      final event = HostLobbyUpdateEvent.fromJson(payload);
-      _latestGameStateDto = event;
-      _applyPlayersFromPayload(event.players);
-      _phase = _parsePhase(event.state);
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Refresca lobby del host ante cambios de jugadores.
-  void _handleHostLobbyUpdate(Map<String, dynamic> payload) {
-    try {
-      final event = HostLobbyUpdateEvent.fromJson(payload);
-      _latestGameStateDto = event;
-      _applyPlayersFromPayload(event.players);
-      _phase = _parsePhase(event.state);
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Sincroniza nickname y estado al conectar como jugador.
-  void _handlePlayerConnectedToSession(Map<String, dynamic> payload) {
-    try {
-      final event = PlayerConnectedEvent.fromJson(payload);
-      if (event.nickname.isNotEmpty) {
-        _currentNickname = event.nickname;
-      }
-      _phase = _parsePhase(event.state);
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Actualiza contador de respuestas recibidas (host).
-  void _handleHostAnswerUpdate(Map<String, dynamic> payload) {
-    try {
-      final event = HostAnswerUpdateEvent.fromJson(payload);
-      _hostAnswerSubmissions = event.numberOfSubmissions;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Marca al jugador saliente como desconectado sin sacarlo del lobby.
-  void _handlePlayerLeftSession(Map<String, dynamic> payload) {
-    try {
-      final event = PlayerLeftSessionEvent.fromJson(payload);
-      _playerLeftDto = event;
-      final leavingId = event.userId;
-      final leavingNick = event.nickname;
-      if (_players.isNotEmpty && (leavingId != null || leavingNick != null)) {
-        _players = List.unmodifiable(
-          _players.map((p) {
-            final idMatches = leavingId != null && p.playerId == leavingId;
-            final nickMatches = leavingNick != null && p.nickname == leavingNick;
-            return (idMatches || nickMatches) ? p.markDisconnected() : p;
-          }),
-        );
-      }
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Recibe aviso de que el host abandonó.
-  void _handleHostLeftSession(Map<String, dynamic> payload) {
-    try {
-      final event = HostLeftSessionEvent.fromJson(payload);
-      _hostLeftDto = event;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Notifica que el host volvió a la sesión.
-  void _handleHostReturnedSession(Map<String, dynamic> payload) {
-    try {
-      final event = HostReturnedSessionEvent.fromJson(payload);
-      _hostReturnedDto = event;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja error de sincronización fatal.
-  void _handleSyncError(Map<String, dynamic> payload) {
-    try {
-      final event = SyncErrorEvent.fromJson(payload);
-      _syncErrorDto = event;
-      _lastError = event.message ?? MultiplayerConstants.errorSyncDefault;
-      _phase = SessionPhase.end;
-      _realtime.disconnect();
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja error de conexión y propaga mensaje.
-  void _handleConnectionError(Map<String, dynamic> payload) {
-    try {
-      final event = ConnectionErrorEvent.fromJson(payload);
-      _connectionErrorDto = event;
-      _lastError = event.message ?? MultiplayerConstants.errorConnectionDefault;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja confirmación de conexión exitosa del host.
-  void _handleHostConnectedSuccess(Map<String, dynamic> payload) {
-    try {
-      final event = HostConnectedSuccessEvent.fromJson(payload);
-      _hostConnectedSuccessDto = event;
-      _lastError = null;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja confirmación de respuesta del jugador recibida por el servidor.
-  void _handlePlayerAnswerConfirmation(Map<String, dynamic> payload) {
-    try {
-      final event = PlayerAnswerConfirmationEvent.fromJson(payload);
-      _playerAnswerConfirmationDto = event;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja errores de juego enviados por el servidor.
-  void _handleGameError(Map<String, dynamic> payload) {
-    try {
-      final event = GameErrorEvent.fromJson(payload);
-      _gameErrorDto = event;
-      _lastError = event.message;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Convierte summaries a entidad local de jugador de sesión y limpia flags de desconexión.
-  void _applyPlayersFromPayload(List<SessionPlayerSummary> players) {
-    _players = List.unmodifiable(
-      players.map((p) => SessionPlayer(playerId: p.playerId, nickname: p.nickname)).toList(),
-    );
-  }
-
-  /// Traduce string de fase a enum local.
-  SessionPhase _parsePhase(dynamic value) {
-    final normalized = value?.toString().toLowerCase();
-    switch (normalized) {
-      case 'question':
-      case 'questions':
-        return SessionPhase.question;
-      case 'results':
-        return SessionPhase.results;
-      case 'end':
-        return SessionPhase.end;
-      default:
-        return SessionPhase.lobby;
-    }
-  }
-
-  /// Deduce timestamp de emisión de la pregunta a partir de tiempo restante.
-  DateTime _resolveQuestionIssuedAt(int? timeRemainingMs, int timeLimitSeconds) {
-    if (timeRemainingMs != null && timeLimitSeconds > 0) {
-      final totalMs = timeLimitSeconds * 1000;
-      final elapsedMs = totalMs - timeRemainingMs;
-      final clampedElapsed = elapsedMs.clamp(0, totalMs);
-      return DateTime.now().subtract(Duration(milliseconds: clampedElapsed));
-    }
-    return DateTime.now();
-  }
-
-  /// Valida nickname y devuelve versión sanitizada; falla si no cumple.
+  /// Valida nickname y devuelve versión sanitizada; falla si no cumple formato.
   String _validateNickname(String nickname) {
     final trimmed = nickname.trim();
     if (trimmed.length < MultiplayerConstants.nicknameMinLength || 
@@ -740,85 +349,7 @@ class MultiplayerSessionController extends ChangeNotifier {
     return trimmed;
   }
 
-  /// Maneja inicio de pregunta y resetea cachés de fases anteriores.
-  void _handleQuestionStarted(Map<String, dynamic> payload) {
-    try {
-      final event = QuestionStartedEvent.fromJson(payload);
-      _questionSequence++;
-      _phase = SessionPhase.question;
-      _currentQuestionDto = event;
-      _questionStartedAt = _resolveQuestionIssuedAt(event.timeRemainingMs, event.slide.timeLimitSeconds);
-      // Limpiar cachés de otras fases para evitar renders obsoletos.
-      _hostResultsDto = null;
-      _playerResultsDto = null;
-      _hostGameEndDto = null;
-      _playerGameEndDto = null;
-      _hostAnswerSubmissions = null;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja resultados de pregunta enviados al host.
-  void _handleHostResults(Map<String, dynamic> payload) {
-    try {
-      _hostResultsDto = HostResultsEvent.fromJson(payload);
-      _phase = SessionPhase.results;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja resultados de pregunta para el jugador.
-  void _handlePlayerResults(Map<String, dynamic> payload) {
-    try {
-      _playerResultsDto = PlayerResultsEvent.fromJson(payload);
-      _phase = SessionPhase.results;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja evento de cierre final para el host.
-  void _handleHostGameEnd(Map<String, dynamic> payload) {
-    try {
-      _hostGameEndDto = HostGameEndEvent.fromJson(payload);
-      _hostGameEndSequence++;
-      _phase = SessionPhase.end;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja evento de cierre final para el jugador.
-  void _handlePlayerGameEnd(Map<String, dynamic> payload) {
-    try {
-      _playerGameEndDto = PlayerGameEndEvent.fromJson(payload);
-      _playerGameEndSequence++;
-      _phase = SessionPhase.end;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Maneja evento de sesión cerrada por backend.
-  void _handleSessionClosed(Map<String, dynamic> payload) {
-    try {
-      final event = SessionClosedEvent.fromJson(payload);
-      _sessionClosedDto = event;
-      _phase = SessionPhase.end;
-      notifyListeners();
-    } catch (error) {
-      _handleEventError(error);
-    }
-  }
-
-  /// Captura error de parsing/listener y notifica UI.
+  /// Captura error de parsing/oyente y notifica a oyentes de UI.
   void _handleEventError(Object error) {
     _lastError = error.toString();
     notifyListeners();

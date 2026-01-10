@@ -73,14 +73,15 @@ class ChallengeGameplayController extends ChangeNotifier {
   /// Initializes the gameplay session. Call from didChangeDependencies.
   Future<void> initialize({
     required String quizId,
+    required String userId,
     SinglePlayerGame? resumeGame,
     SlideDTO? resumeSlide,
   }) async {
     try {
       if (resumeGame != null) {
-        await _bloc.hydrateExistingGame(resumeGame, nextSlide: resumeSlide);
+        await _bloc.hydrateExistingGame(resumeGame, userId, nextSlide: resumeSlide);
       } else {
-        await _bloc.startGame(quizId);
+        await _bloc.startGame(quizId, userId);
       }
     } catch (error) {
       onError?.call(error);

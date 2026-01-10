@@ -81,7 +81,54 @@ class JoinGameScreenState extends State<JoinGameScreen> {
           .timeout(const Duration(seconds: 10), onTimeout: () {
         throw TimeoutException('La sala no respondió, verifica el PIN.');
       });
+      
       if (!mounted) return;
+      
+      // Verifica que no haya errores de conexión antes de navegar
+      if (sessionController.connectionErrorDto != null) {
+        final errorMsg = sessionController.connectionErrorDto?.message ?? 'Error de conexión desconocido';
+        await _showErrorDialog(
+          title: 'No se pudo unir',
+          message: errorMsg,
+        );
+        return;
+      }
+      
+      // Verifica que no haya errores del servidor antes de navegar
+      if (sessionController.gameErrorDto != null) {
+        final errorMsg = sessionController.gameErrorDto?.message ?? 'Error del juego desconocido';
+        await _showErrorDialog(
+          title: 'No se pudo unir',
+          message: errorMsg,
+        );
+        return;
+      }
+      
+      // Espera un frame para asegurar que todos los eventos socket se procesaron
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      if (!mounted) return;
+      
+      // Verifica de nuevo después del delay
+      if (sessionController.connectionErrorDto != null) {
+        final errorMsg = sessionController.connectionErrorDto?.message ?? 'Error de conexión desconocido';
+        await _showErrorDialog(
+          title: 'No se pudo unir',
+          message: errorMsg,
+        );
+        return;
+      }
+      
+      if (sessionController.gameErrorDto != null) {
+        final errorMsg = sessionController.gameErrorDto?.message ?? 'Error del juego desconocido';
+        await _showErrorDialog(
+          title: 'No se pudo unir',
+          message: errorMsg,
+        );
+        return;
+      }
+      
+      // Solo navega si la conexión es exitosa y sin errores
       Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => const PlayerLobbyScreen()));

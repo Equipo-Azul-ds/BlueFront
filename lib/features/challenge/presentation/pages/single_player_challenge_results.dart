@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:Trivvy/core/constants/colors.dart';
 import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
 import 'package:Trivvy/core/widgets/game_ui_kit.dart';
+import 'package:Trivvy/features/user/presentation/blocs/auth_bloc.dart';
 import '../../application/use_cases/single_player_usecases.dart';
 import '../../domain/entities/single_player_game.dart';
 import '../blocs/single_player_results_bloc.dart';
@@ -134,6 +135,8 @@ class _SinglePlayerChallengeResultsScreenState
           final nickname = game.playerId;
           final finalScore = game.gameScore.score;
           final totalQuestions = game.totalQuestions;
+          final authBloc = Provider.of<AuthBloc>(context, listen: false);
+          final avatarUrl = authBloc.currentUser?.avatarUrl ?? '';
             final correctAnswers = game.totalCorrect ??
               game.gameAnswers
                 .where((qr) => qr.evaluatedAnswer.wasCorrect)
@@ -203,16 +206,21 @@ class _SinglePlayerChallengeResultsScreenState
                                     CircleAvatar(
                                       radius: 36,
                                       backgroundColor: AppColor.accent,
-                                      child: Text(
-                                        nickname.isNotEmpty
-                                            ? nickname[0].toUpperCase()
-                                            : "?",
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 32,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                      backgroundImage: avatarUrl.isNotEmpty
+                                          ? NetworkImage(avatarUrl)
+                                          : null,
+                                      child: avatarUrl.isEmpty
+                                          ? Text(
+                                              nickname.isNotEmpty
+                                                  ? nickname[0].toUpperCase()
+                                                  : "?",
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : null,
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
