@@ -48,10 +48,16 @@ class UserEntity {
 
 
   static UserStatus parseStatus(String status) {
-    if (status.toLowerCase() == 'blocked') {
-      return UserStatus.blocked;
+    switch (status.toLowerCase()) {
+      case 'active':
+      case 'activo':
+        return UserStatus.active;
+      case 'blocked':
+      case 'bloqueado':
+        return UserStatus.blocked;
+      default:
+        return UserStatus.active;
     }
-    return UserStatus.active;
   }
 
   UserEntity copyWith({

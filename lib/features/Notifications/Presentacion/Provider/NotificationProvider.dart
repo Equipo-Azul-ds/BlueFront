@@ -60,7 +60,7 @@ class NotificationProvider extends ChangeNotifier {
   void _handleIncomingMessage(RemoteMessage message) {
     final newNotif = NotificationEntity(
       id: message.messageId ?? DateTime.now().toString(),
-      type: message.data['type'] ?? 'admin_notification', // [cite: 1]
+      type: message.data['type'] ?? 'admin_notification',
       message: message.notification?.body ?? 'Nuevo mensaje recibido',
       isRead: false,
       createdAt: DateTime.now(),
@@ -98,7 +98,7 @@ class NotificationProvider extends ChangeNotifier {
 
   Future<void> registerDeviceToken(String fcmToken) async {
     try {
-      // Se envía el token y el deviceType 'android' como indica el esqueleto JSON
+
       await repository.registerToken(fcmToken, "android");
       print("Token registrado exitosamente en el backend.");
     } catch (e) {
@@ -137,7 +137,7 @@ class NotificationProvider extends ChangeNotifier {
       await repository.markAsRead(id); //
       final index = _history.indexWhere((n) => n.id == id);
       if (index != -1) {
-        // Actualizamos localmente para feedback inmediato
+        // Actualiza localmente para feedback inmediato
         _history[index] = _history[index].copyWith(isRead: true);
         notifyListeners();
       }
@@ -165,52 +165,7 @@ class NotificationProvider extends ChangeNotifier {
 
 
 
-  void simulateIncomingNotification() {
-    // 1. Creamos un objeto que simule la estructura de RemoteMessage de Firebase
-    // Basado en el tipo de notificación del backend
-    final String mockTitle = "Aviso del Sistema";
-    final String mockBody = "¡Prueba de notificación exitosa";
 
-    // 2. Mostramos el SnackBar usando tus colores de AppColor
-    final snackBar = SnackBar(
-      backgroundColor: AppColor.primary, // Deep blue
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            mockTitle,
-            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColor.onPrimary),
-          ),
-          Text(
-            mockBody,
-            style: const TextStyle(color: Colors.white70),
-          ),
-        ],
-      ),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      action: SnackBarAction(
-        label: 'CERRAR',
-        textColor: AppColor.accent, // Azul vibrante
-        onPressed: () {},
-      ),
-    );
-
-    messengerKey.currentState?.showSnackBar(snackBar);
-
-    // 3. Lo agregamos al historial local (Entity)
-    final mockEntity = NotificationEntity(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      type: 'admin_notification', // Tipo definido en el DTO
-      message: mockBody,
-      isRead: false,
-      createdAt: DateTime.now(),
-    );
-
-    _history.insert(0, mockEntity);
-    notifyListeners();
-  }
 
   Future<void> printCurrentToken() async {
     try {
@@ -222,7 +177,7 @@ class NotificationProvider extends ChangeNotifier {
 
         // Opcional: Mostrar un SnackBar para confirmar que se obtuvo
         messengerKey.currentState?.showSnackBar(
-          const SnackBar(content: Text('Token impreso en consola')),
+          SnackBar(content: Text('Token = $token')),
         );
       } else {
         print("No se pudo obtener el token.");

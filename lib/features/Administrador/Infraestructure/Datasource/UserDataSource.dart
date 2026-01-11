@@ -68,49 +68,23 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
     }
   }
 
-  @override
-  /*Future<PaginatedResponse> fetchUsers2(UserQueryParams params) async {
-    final uri = _buildUri(
-      '/users',
-      params.toMap(),
-    );
 
-    try {
-      print('UserRemoteDataSource.fetchUsers -> GET $uri');
-      final response = await cliente.get(uri, headers: {'Content-Type': 'application/json'});
-      print(
-        'UserRemoteDataSource.fetchUsers -> Response status: ${response.statusCode} headers: ${response.headers}',
-      );
-
-      if (response.statusCode == 200) {
-        // 1. Decodificamos sin forzar el tipo Map
-        final dynamic jsonBody = json.decode(response.body);
-
-        // 2. Usamos el factory flexible que creamos arriba
-        return PaginatedResponse.fromDynamicJson(jsonBody);
-      } else if (response.statusCode == 400) {
-        throw ServerException(message: "400: Parámetros de consulta inválidos.");
-      } else {
-        final msg = 'Fallo al cargar usuarios: ${response.statusCode} - ${response.body}';
-        print('UserRemoteDataSource.fetchUsers -> $msg');
-        throw ServerException(message: msg);
-      }
-    } catch (e, st) {
-      print('UserRemoteDataSource.fetchUsers -> Exception performing HTTP GET: $e');
-      print('Stacktrace: $st');
-      rethrow;
-    }
-  }*/
 
   @override
-  Future<UserEntity> toggleUserStatus(String userId, String status) async {
+  Future<UserEntity> toggleUserStatus(String userId, String currentStatus) async {
 
-    final String action = (status.toLowerCase() == 'active') ? 'blockUser' : 'unblockUser';
+    final bool isCurrentlyActive = currentStatus.trim().toLowerCase() == 'active';
+
+    final String action = isCurrentlyActive ? 'blockUser' : 'unblockUser';
     final uri = Uri.parse('$baseUrl/backoffice/$action/$userId');
     final token = await storage.read('token');
     //final adminId = await storage.read('userId');
     final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
 
+    print('--- HTTP REQUEST (Toggle Status) ---');
+    print('URL: PATCH $uri');
+    print('HEADERS: {"Content-Type": "application/json", "user": "$adminId"}');
+    print('ACTION: $action para el usuario $userId de estado $currentStatus');
 
     final response = await cliente.patch(
       uri,
@@ -124,7 +98,13 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
     print('BODY: ${response.body}');
 
     if (response.statusCode == 200) {
-      return UserDto.fromJson(json.decode(response.body)).toEntity();
+      final Map<String, dynamic> jsonBody = json.decode(response.body);
+
+      final userData = jsonBody['user'];
+      if (userData != null) {
+        return UserDto.fromJson(userData).toEntity();
+      }
+      return UserDto.fromJson(jsonBody).toEntity();
     } else if (response.statusCode == 400) {
       throw ServerException(message: 'El usuario no existe');
     } else {
@@ -177,7 +157,6 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
       headers: {
         'Content-Type': 'application/json',
         'user': adminId ?? ''
-        //'Authorization': 'Bearer $token',,
       },
     );
     print('--- HTTP RESPONSE ---');
@@ -185,7 +164,8 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
     print('BODY: ${response.body}');
 
     if (response.statusCode == 200) {
-      return UserDto.fromJson(json.decode(response.body)).toEntity();
+      final Map<String, dynamic> jsonBody = json.decode(response.body);
+      return UserDto.fromJson(jsonBody['user']).toEntity();
     } else if (response.statusCode == 400) {
       throw ServerException(message: 'El usuario con el id dado no existe');
     } else if (response.statusCode == 401) {

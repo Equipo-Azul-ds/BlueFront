@@ -57,7 +57,7 @@ class UserListItem extends StatelessWidget {
                 ),
                 Text(user.email, style: Theme.of(context).textTheme.bodyMedium),
                 Text(
-                  'Username: @${user.username} | Unido: ${user.formattedJoinDate}',
+                  'Username: ${user.username} | Unido: ${user.formattedJoinDate}',
                   style: Theme.of(context).textTheme.bodySmall!.copyWith(color: Colors.grey.shade600),
                 ),
               ],
@@ -68,11 +68,10 @@ class UserListItem extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Botón Admin (Nuevo)
               IconButton(
                 icon: Icon(
-                  user.isAdmin ? Icons.admin_panel_settings : Icons.person_add_alt_1,
-                  color: user.isAdmin ? Colors.amber : Colors.grey,
+                  user.isAdmin ? Icons.admin_panel_settings : Icons.person_outline,
+                  color: user.isAdmin ? Colors.blue : Colors.grey,
                 ),
                 tooltip: user.isAdmin ? 'Quitar privilegios Admin' : 'Hacer Administrador',
                 onPressed: onToggleAdmin,

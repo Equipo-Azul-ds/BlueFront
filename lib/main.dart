@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'core/constants/colors.dart';
+import 'features/discovery/presentation/pages/DiscoveryDetailPage.dart';
 import 'local/secure_storage.dart';
 import 'features/Administrador/Aplication/UseCases/DeleteUserUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/GetUserListUseCase.dart';
@@ -182,12 +183,11 @@ class MyApp extends StatelessWidget {
 
         Provider<IUserDataSource>(
           create: (context) => UserRemoteDataSourceImpl(
-            // Usa 'context' aquí
             baseUrl: apiBaseUrl,
             cliente: context
                 .read<
                   http.Client
-                >(), // Ahora buscará al Provider<http.Client> de arriba
+                >(),
           ),
         ),
         Provider<IUserRepository>(
@@ -619,6 +619,7 @@ class MyApp extends StatelessWidget {
                 '/groups': (context) => const GroupsPage(),
                 '/kahoots-category': (context) => const KahootsCategoryPage(),
                 '/kahoot-detail': (context) => const KahootDetailPage(),
+                '/discovery-detail': (context) => const DiscoveryDetailPage(),
                 '/subscriptions': (context) => const PlansScreen(),
                 '/subscription-management': (context) =>
                     const SubscriptionManagementScreen(),
