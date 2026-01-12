@@ -58,15 +58,27 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   void _handleIncomingMessage(RemoteMessage message) {
+    final String title = message.notification?.title
+        ?? message.data['title']
+        ?? 'Nueva notificación';
+
+    final String body = message.notification?.body
+        ?? message.data['body']
+        ?? 'Has recibido un nuevo mensaje';
+
     final newNotif = NotificationEntity(
-      id: message.messageId ?? DateTime.now().toString(),
-      type: message.data['type'] ?? 'admin_notification',
-      message: message.notification?.body ?? 'Nuevo mensaje recibido',
+      id: message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      type: message.data['type'] ?? 'general',
+      title: title,
+      message: body,
       isRead: false,
       createdAt: DateTime.now(),
+      resourceId: message.data['resourceId'],
     );
 
+
     _history.insert(0, newNotif);
+
     notifyListeners();
   }
 
@@ -116,7 +128,7 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchHistory() async {
+  /*Future<void> fetchHistory() async {
     _isLoading = true;
     notifyListeners();
 
@@ -126,6 +138,20 @@ class NotificationProvider extends ChangeNotifier {
       print("Historial cargado: ${_history.length} elementos");
     } catch (e) {
       print("Error real al cargar historial: $e");
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }*/
+
+  Future<void> fetchHistory() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      _history = await repository.getHistory();
+    } catch (e) {
+      print('Error al cargar historial: $e');
+      _showSnackBar('Error al cargar tus notificaciones', isError: true);
     } finally {
       _isLoading = false;
       notifyListeners();

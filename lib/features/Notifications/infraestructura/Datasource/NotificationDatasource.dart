@@ -18,11 +18,20 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
   @override
   Future<void> registerDevice(String token, String deviceType) async {
+    //final tokenid = await storage.read('token');
+    //final userId = await storage.read('userId');
+    const String debugUserId = '123e4567-e89b-42d3-a456-426614174123';
+
     final response = await client.post(
       Uri.parse('$baseUrl/notifications/register-device'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({"token": token, "deviceType": deviceType}), //
+      headers: {'Content-Type': 'application/json',
+        'x-debug-user-id': debugUserId,},
+      body: jsonEncode({"token": token, "device": deviceType}),
     );
+
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode != 201) {
       throw Exception(
@@ -32,11 +41,19 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
   @override
   Future<void> unregisterDevice(String token) async {
+    //final tokenid = await storage.read('token');
+    //final userId = await storage.read('userId');
+    const String debugUserId = '123e4567-e89b-42d3-a456-426614174000';
     final response = await client.delete(
       Uri.parse('$baseUrl/notifications/unregister-device'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json',
+        'x-debug-user-id': debugUserId,},
       body: jsonEncode({"token": token}),
     );
+
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode != 204) {
       throw Exception(
@@ -49,11 +66,15 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     int limit = 20,
     int page = 1,
   }) async {
+    //final tokenid = await storage.read('token');
+    //final userId = await storage.read('userId');
+    const String debugUserId = '123e4567-e89b-42d3-a456-426614174000';
     final uri = Uri.parse('$baseUrl/notifications').replace(
-      queryParameters: {
-        'limit': limit.toString(),
-        'page': page.toString(),
-      },
+      //queryParameters: {
+        //'limit': limit.toString(),
+        //'page': page.toString(),
+      //},
+
     );
 
     try {
@@ -61,15 +82,20 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
       final response = await client.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json',
+          'x-debug-user-id': debugUserId,},
       );
 
+      print('URL: PATCH $uri');
+      print('HEADERS: {"Content-Type": "application/json", "user": "$debugUserId"}');
+      print('--- HTTP RESPONSE ---');
+      print('STATUS: ${response.statusCode}');
+      print('BODY: ${response.body}');
+
       if (response.statusCode == 200) {
-        final dynamic jsonBody = jsonDecode(response.body);
-        return NotificationListResponseDto.fromDynamicJson(jsonBody);
-      } else {
+        final dynamic decodedJson = jsonDecode(response.body);
+        return NotificationListResponseDto.fromDynamicJson(decodedJson);
+      }else {
         throw Exception('Error al recuperar historial: ${response.statusCode}');
       }
     } catch (e) {
@@ -136,6 +162,8 @@ class NotificationRemoteDataSource implements INotificationDataSource {
         }
       }),
     );
+    print('URL: PATCH $uri');
+    print('HEADERS: {"Content-Type": "application/json", "user": "$adminId"}');
     print('--- HTTP RESPONSE ---');
     print('STATUS: ${response.statusCode}');
     print('BODY: ${response.body}');
@@ -174,6 +202,8 @@ class NotificationRemoteDataSource implements INotificationDataSource {
         'user': adminId ?? '',
       },
     );
+    print('URL: PATCH $uri');
+    print('HEADERS: {"Content-Type": "application/json", "user": "$adminId"}');
     print('--- HTTP RESPONSE ---');
     print('STATUS: ${response.statusCode}');
     print('BODY: ${response.body}');
