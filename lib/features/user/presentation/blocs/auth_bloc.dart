@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:bcrypt/bcrypt.dart';
@@ -26,6 +28,12 @@ class AuthBloc extends ChangeNotifier {
   User? currentUser;
   bool isLoading = false;
   String? error;
+  Timer? _tokenRefreshTimer;
+  bool sessionExpiring = false;
+  int sessionExpiryTick = 0; // aumenta cada vez que se debe mostrar el aviso
+  static const Duration _tokenTtl = Duration(hours: 24);
+  static const Duration _refreshLead = Duration(hours: 2);
+  static const String _tokenIssuedAtKey = 'tokenIssuedAt';
 
   AuthBloc({
     required this.repository,
@@ -56,67 +64,27 @@ class AuthBloc extends ChangeNotifier {
           }
         } catch (_) {}
       }
+      await _scheduleTokenRefresh();
     });
   }
 
   // Login simplificado: busca por username/email y guarda token mock.
   Future<User?> login(String userOrEmail, String password) async {
     return _run<User?>(() async {
-      // Debug de entrada
+      // Llama al endpoint real de login y guarda el token para siguientes peticiones.
       // ignore: avoid_print
-      print('[auth] login start input=$userOrEmail isEmail=${userOrEmail.contains('@')}');
-
-      final isEmail = userOrEmail.contains('@');
-      User? user;
-      if (isEmail) {
-        user = await repository.getOneByEmail(userOrEmail);
-        // fallback: algunos backends permiten login por username en el mismo campo
-        user ??= await repository.getOneByName(userOrEmail);
-      } else {
-        user = await repository.getOneByName(userOrEmail);
+      print('[auth] login POST /auth/login username=$userOrEmail');
+      final result = await repository.login(userOrEmail, password);
+      final token = result['token'] as String;
+      final user = result['user'] as User;
+      if (token.isEmpty) {
+        throw Exception('Token vacío en respuesta');
       }
-
-      if (user == null) {
-        // ignore: avoid_print
-        print('[auth] login user not found for $userOrEmail');
-        throw Exception('Usuario no encontrado');
-      }
-
-      // ignore: avoid_print
-      print('[auth] login fetched id=${user.id} userName=${user.userName} email=${user.email} type=${user.userType}');
-
-      final hpw = user.hashedPassword;
-      if (hpw.isEmpty) {
-        // ignore: avoid_print
-        print('[auth] login empty hashedPassword for user=${user.userName} -> permitiendo acceso temporal (sin verificación)');
-        currentUser = user;
-        await storage.write('token', 'mock-token');
-        await storage.write('currentUserId', user.id);
-        return user;
-      }
-
-      // Debug mínimo (no imprime la contraseña). Deja este print temporal mientras validamos el backend.
-      // ignore: avoid_print
-      print('[auth] login user=${user.userName} hashLen=${hpw.length} prefix=${hpw.substring(0, hpw.length > 7 ? 7 : hpw.length)}');
-
-      final looksBcrypt = hpw.startsWith(r'$2');
-      // ignore: avoid_print
-      print('[auth] login looksBcrypt=$looksBcrypt');
-      final ok = looksBcrypt ? BCrypt.checkpw(password, hpw) : password == hpw;
-
-      // ignore: avoid_print
-      print('[auth] login passwordMatch=$ok');
-
-      if (!ok) {
-        throw Exception('Contraseña incorrecta');
-      }
-
-      currentUser = user;
-      await storage.write('token', 'mock-token');
+      await storage.write('token', token);
       await storage.write('currentUserId', user.id);
-      if (hpw.isNotEmpty) {
-        await storage.write('hashedPassword', hpw);
-      }
+      await _recordTokenIssuedAt();
+      await _scheduleTokenRefresh();
+      currentUser = user;
       return user;
     });
   }
@@ -135,12 +103,13 @@ class AuthBloc extends ChangeNotifier {
     required String email,
     required String password,
     required String userType,
-    required String avatarUrl,
+    String avatarUrl = '',
     String name = '',
   }) async {
     return _run<User?>(() async {
       final id = const Uuid().v4();
-      final hashed = BCrypt.hashpw(password, BCrypt.gensalt());
+      // Backend exige password en texto plano; no aplicar hash aquí.
+      final plainPassword = password;
       // Usa exactamente el nombre que el usuario ingresó en el formulario (ya validado como no vacío)
       final safeName = name.trim();
       final safeAvatar = avatarUrl.trim().isEmpty
@@ -151,7 +120,7 @@ class AuthBloc extends ChangeNotifier {
           id: id,
           userName: userName,
           email: email,
-          hashedPassword: hashed,
+          hashedPassword: plainPassword,
           userType: userType,
           avatarUrl: safeAvatar,
           name: safeName,
@@ -161,7 +130,7 @@ class AuthBloc extends ChangeNotifier {
       final createdUser = await getUserByName(userName);
       currentUser = createdUser;
       await storage.write('currentUserId', createdUser.id);
-      await storage.write('hashedPassword', hashed);
+      await storage.write('hashedPassword', plainPassword);
 
       // Si por alguna razón el backend devolvió name vacío, fuerza un PATCH inmediato con name e invariantes.
       if (createdUser.name.trim().isEmpty && safeName.isNotEmpty) {
@@ -175,7 +144,6 @@ class AuthBloc extends ChangeNotifier {
             description: createdUser.description,
             avatarUrl: createdUser.avatarUrl,
             userType: createdUser.userType,
-            hashedPassword: hashed,
             theme: createdUser.theme,
             language: createdUser.language,
             gameStreak: createdUser.gameStreak,
@@ -190,18 +158,7 @@ class AuthBloc extends ChangeNotifier {
   Future<void> updateProfile({String? name, String? description, String? avatarUrl, String? theme, String? language}) async {
     await _run(() async {
       if (currentUser == null) throw Exception('No session');
-      // Garantiza que tengamos hashedPassword antes de enviar el PATCH
-      if (currentUser!.hashedPassword.isEmpty) {
-        try {
-          final fetched = await repository.getOneById(currentUser!.id);
-          if (fetched != null && fetched.hashedPassword.isNotEmpty) {
-            currentUser = currentUser!.copyWith(hashedPassword: fetched.hashedPassword);
-            await storage.write('hashedPassword', fetched.hashedPassword);
-          }
-        } catch (_) {}
-      }
       final user = currentUser!;
-      final hpw = user.hashedPassword;
       final fields = <String, dynamic>{
         'userName': user.userName,
         'email': user.email,
@@ -220,7 +177,6 @@ class AuthBloc extends ChangeNotifier {
       }
       if (theme != null && theme != user.theme) fields['theme'] = theme;
       if (language != null && language != user.language) fields['language'] = language;
-      if (hpw.isNotEmpty) fields['hashedPassword'] = hpw;
       // Debug: imprime los campos que se enviarán
       // ignore: avoid_print
       print('[auth] updateProfile id=${user.id} sending fields=$fields');
@@ -232,7 +188,6 @@ class AuthBloc extends ChangeNotifier {
           description: fields['description'],
           avatarUrl: fields['avatarUrl'],
           userType: fields['userType'],
-          hashedPassword: fields['hashedPassword'],
           theme: fields['theme'],
           language: fields['language'],
           gameStreak: fields['gameStreak'],
@@ -245,58 +200,47 @@ class AuthBloc extends ChangeNotifier {
     await _run(() async {
       final user = currentUser;
       if (user == null) throw Exception('No session');
-      // Garantiza hash antes de enviar PATCH de tipo
-      if (user.hashedPassword.isEmpty) {
-        try {
-          final fetched = await repository.getOneById(user.id);
-          if (fetched != null && fetched.hashedPassword.isNotEmpty) {
-            currentUser = user.copyWith(hashedPassword: fetched.hashedPassword);
-            await storage.write('hashedPassword', fetched.hashedPassword);
-          }
-        } catch (_) {}
-      }
       // Debug: imprime los campos que se enviarán
       // ignore: avoid_print
-      print('[auth] changeUserType id=${user.id} userName=${user.userName} email=${user.email} newType=$newType hasHash=${user.hashedPassword.isNotEmpty}');
-      final params = EditUserParams(
-        id: user.id,
-        userName: user.userName,
-        email: user.email,
-        userType: newType,
-        avatarUrl: user.avatarUrl,
-        name: user.name,
-        description: user.description,
-        theme: user.theme,
-        language: user.language,
-        gameStreak: user.gameStreak,
-        hashedPassword: currentUser!.hashedPassword.isNotEmpty ? currentUser!.hashedPassword : null,
+      print('[auth] changeUserType id=${user.id} userName=${user.userName} email=${user.email} newType=$newType');
+      currentUser = await updateSettings(
+        UpdateUserSettingsParams(
+          userName: user.userName,
+          email: user.email,
+          name: user.name,
+          description: user.description,
+          avatarUrl: user.avatarUrl,
+          userType: newType,
+          theme: user.theme,
+          language: user.language,
+          gameStreak: user.gameStreak,
+        ),
       );
-      await editUser(params);
       currentUser = user.copyWith(userType: newType, updatedAt: DateTime.now());
     });
   }
 
-  Future<void> changePassword(String newPassword) async {
+  Future<void> changePassword({required String currentPassword, required String newPassword, required String confirmNewPassword}) async {
     await _run(() async {
       final user = currentUser;
       if (user == null) throw Exception('No session');
-      final hashed = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-      final params = EditUserParams(
-        id: user.id,
-        userName: user.userName,
-        email: user.email,
-        userType: user.userType,
-        avatarUrl: user.avatarUrl,
-        name: user.name,
-        description: user.description,
-        theme: user.theme,
-        language: user.language,
-        gameStreak: user.gameStreak,
-        hashedPassword: hashed,
+      currentUser = await updateSettings(
+        UpdateUserSettingsParams(
+          userName: user.userName,
+          email: user.email,
+          name: user.name,
+          description: user.description,
+          avatarUrl: user.avatarUrl,
+          userType: user.userType,
+          theme: user.theme,
+          language: user.language,
+          gameStreak: user.gameStreak,
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+          confirmNewPassword: confirmNewPassword,
+        ),
       );
-      await editUser(params);
-      currentUser = user.copyWith(updatedAt: DateTime.now(), hashedPassword: hashed);
-      await storage.write('hashedPassword', hashed);
+      // No almacenamos hash local; el backend maneja el cambio.
     });
   }
 
@@ -320,6 +264,9 @@ class AuthBloc extends ChangeNotifier {
   Future<void> logout() async {
     await _run(() async {
       currentUser = null;
+      _tokenRefreshTimer?.cancel();
+      sessionExpiring = false;
+      sessionExpiryTick = 0;
       await storage.deleteAll();
     });
   }
@@ -330,8 +277,95 @@ class AuthBloc extends ChangeNotifier {
       if (user == null) throw Exception('No session');
       await repository.delete(user.id);
       currentUser = null;
+      _tokenRefreshTimer?.cancel();
+      sessionExpiring = false;
+      sessionExpiryTick = 0;
       await storage.deleteAll();
     });
+  }
+
+  @override
+  void dispose() {
+    _tokenRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _recordTokenIssuedAt([DateTime? at]) async {
+    final ts = (at ?? DateTime.now()).toIso8601String();
+    await storage.write(_tokenIssuedAtKey, ts);
+  }
+
+  Future<DateTime?> _readTokenIssuedAt() async {
+    final raw = await storage.read(_tokenIssuedAtKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return DateTime.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _scheduleTokenRefresh() async {
+    _tokenRefreshTimer?.cancel();
+    var issuedAt = await _readTokenIssuedAt();
+    if (issuedAt == null) {
+      issuedAt = DateTime.now();
+      await _recordTokenIssuedAt(issuedAt);
+    }
+    final refreshAt = issuedAt.add(_tokenTtl - _refreshLead);
+    final wait = refreshAt.difference(DateTime.now());
+    if (wait.isNegative) {
+      await _refreshTokenNow();
+      return;
+    }
+    _tokenRefreshTimer = Timer(wait, () {
+      _onSessionExpiring();
+    });
+  }
+
+  void _onSessionExpiring() {
+    sessionExpiring = true;
+    sessionExpiryTick++;
+    notifyListeners();
+  }
+
+  Future<bool> refreshSession() async {
+    try {
+      await _refreshTokenNow(manual: true);
+      sessionExpiring = false;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      sessionExpiring = true;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> _refreshTokenNow({bool manual = false}) async {
+    final token = await storage.read('token');
+    if (token == null || token.isEmpty) return;
+    try {
+      final result = await repository.checkStatus();
+      final newToken = (result['token'] ?? '').toString();
+      final user = result['user'] as User;
+      if (newToken.isNotEmpty) {
+        await storage.write('token', newToken);
+        await _recordTokenIssuedAt();
+      }
+      await storage.write('currentUserId', user.id);
+      currentUser = user;
+      sessionExpiring = false;
+      await _scheduleTokenRefresh();
+    } catch (e) {
+      // ignore: avoid_print
+      print('[auth] token refresh failed: $e');
+      if (!manual) {
+        sessionExpiring = true;
+        sessionExpiryTick++;
+        notifyListeners();
+      }
+    }
   }
 
   Future<T> _run<T>(Future<T> Function() op) async {

@@ -37,6 +37,20 @@ class UserRepositoryImpl implements UserRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> checkStatus() async {
+    final uri = Uri.parse('$baseUrl/auth/check-status');
+    final res = await _post(uri, const {});
+    _ensureSuccess(res, allowed: {200});
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final token = (data['token'] ?? '').toString();
+    final userJson = data['user'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : Map<String, dynamic>.from(data);
+    final user = User.fromJson(userJson);
+    return {'token': token, 'user': user};
+  }
+
+  @override
   Future<User?> getOneById(String id) async {
     final uri = Uri.parse('$baseUrl/user/$id');
     final res = await _get(uri);
@@ -87,26 +101,23 @@ class UserRepositoryImpl implements UserRepository {
   Future<void> create(User user) async {
     final uri = Uri.parse('$baseUrl/user');
     if (user.hashedPassword.isEmpty) {
-      throw Exception('hashedPassword requerido para crear usuario');
+      throw Exception('password requerido para crear usuario');
     }
+
+    // Normaliza según contrato del backend: password en claro, campos exactos y restricciones.
+    final safeNameRaw = user.name.trim().isEmpty ? user.userName : user.name.trim();
+    final safeName = safeNameRaw.length > 148 ? safeNameRaw.substring(0, 148) : safeNameRaw;
+    final mappedType = user.userType.toUpperCase().contains('TEACH') ? 'TEACHER' : 'STUDENT';
+
     final body = <String, dynamic>{
-      'userName': user.userName,
-      'email': user.email,
-      'hashedPassword': user.hashedPassword,
-      'userType': user.userType,
-      'avatarUrl': (user.avatarUrl.isNotEmpty &&
-              (user.avatarUrl.startsWith('http://') ||
-                  user.avatarUrl.startsWith('https://')))
-          ? user.avatarUrl
-          : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(user.userName)}&background=0D47A1&color=fff',
-      'name': user.name.trim(),
+      'email': user.email.trim(),
+      'username': user.userName.trim(),
+      'password': user.hashedPassword, // password plano según contrato
+      'name': safeName,
+      'type': mappedType,
     };
-    // Debug: confirma que el nombre se está enviando en el body
-    // ignore: avoid_print
-    print('[user_repository] create body name="${body['name']}" userName="${body['userName']}"');
-    // Debug ligero para diagnosticar errores del backend
-    // Nota: no imprime la contraseña en claro, solo el hash.
-    // Puedes retirar esto en producción si no lo necesitas.
+
+    // Debug: confirma payload enviado al registrar
     // ignore: avoid_print
     print('[user_repository] POST /user body=$body');
 
@@ -201,109 +212,87 @@ class UserRepositoryImpl implements UserRepository {
 
   @override
   Future<User> getCurrentUser() async {
-    final id = await currentUserIdProvider();
-    if (id == null || id.isEmpty) {
-      throw Exception('No current user id available');
-    }
-    final uri = Uri.parse('$baseUrl/user/$id');
+    // Usa el endpoint de perfil autenticado y el token en headersProvider
+    final uri = Uri.parse('$baseUrl/user/profile/');
     final res = await _get(uri);
-    _ensureSuccess(res);
-    return User.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+    _ensureSuccess(res, allowed: {200});
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    return User.fromJson(data);
   }
 
   @override
   Future<User> updateSettings({
-    String? id,
     String? userName,
     String? email,
     String? name,
     String? description,
     String? avatarUrl,
     String? userType,
-    String? hashedPassword,
     String? theme,
     String? language,
     int? gameStreak,
+    String? currentPassword,
+    String? newPassword,
+    String? confirmNewPassword,
   }) async {
-    final currentId = await currentUserIdProvider();
-    if (currentId == null || currentId.isEmpty) {
-      throw Exception('No current user id available');
-    }
-    final uri = Uri.parse('$baseUrl/user/$currentId');
-    // Sanitize avatar if provided
-    String? safeAvatar = avatarUrl;
-    if (safeAvatar != null && safeAvatar.isNotEmpty) {
-      final startsHttp = safeAvatar.startsWith('http://') || safeAvatar.startsWith('https://');
-      if (!startsHttp) {
-        safeAvatar = 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(userName ?? '')}&background=0D47A1&color=fff';
-      }
-    }
-    // Normalize theme if provided
-    String? safeTheme = theme;
-    if (safeTheme != null && safeTheme.isNotEmpty) {
-      final lower = safeTheme.toLowerCase();
-      if (lower.contains('dark')) {
-        safeTheme = 'dark';
-      } else {
-        safeTheme = 'light';
-      }
-    }
-    // Normalize language if provided
-    String? safeLang = language;
-    if (safeLang != null && safeLang.isNotEmpty) {
-      final lower = safeLang.toLowerCase();
-      if (lower.startsWith('en')) {
-        safeLang = 'en';
-      } else {
-        safeLang = 'es';
-      }
-    }
-    // Normalize game streak if provided
-    int? safeStreak = gameStreak;
-    if (safeStreak != null) {
-      if (safeStreak < 0) safeStreak = 0;
-    }
-    final body = <String, dynamic>{
-      if (userName != null) 'userName': userName,
-      if (email != null) 'email': email,
-      if (name != null) 'name': name,
-      if (description != null) 'description': description,
-      if (safeAvatar != null) 'avatarUrl': safeAvatar,
-      if (userType != null) 'userType': userType,
-      if (hashedPassword != null && hashedPassword.isNotEmpty) 'hashedPassword': hashedPassword,
-      if (safeTheme != null) 'theme': safeTheme,
-      if (safeLang != null) 'language': safeLang,
-      if (safeStreak != null) 'gameStreak': safeStreak,
-    };
-    // Debug: imprime payload de PATCH
-    // ignore: avoid_print
-    print('[user_repo] PATCH $uri body=$body');
-    final res = await _patch(uri, body);
-    if (res.statusCode >= 400) {
-      // ignore: avoid_print
-      print('[user_repo] PATCH $uri -> ${res.statusCode} ${res.body}');
-    }
-    _ensureSuccess(res, allowed: {200, 204});
+    // PATCH del perfil autenticado usando token: /user/profile/
+    final uri = Uri.parse('$baseUrl/user/profile/');
 
-    // Algunos endpoints pueden responder 204 o cuerpo vacío; maneja eso de forma segura
-    final trimmed = res.body.trim();
-    if (res.statusCode == 204 || trimmed.isEmpty) {
-      final refreshed = await getOneById(currentId);
-      if (refreshed == null) {
-        throw Exception('Patch succeeded but user could not be reloaded');
+    // Mapear a nombres exactos del contrato
+    final String? mappedUsername = userName;
+    final String? mappedEmail = email;
+    final String? mappedName = name;
+    final String? mappedDescription = description;
+    // Backend espera 'avatarAssetId' (no URL). Intentamos extraer un id válido.
+    String? mappedAvatarId;
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      try {
+        final u = Uri.parse(avatarUrl);
+        final seed = u.queryParameters['seed'];
+        if (seed != null && seed.isNotEmpty) {
+          mappedAvatarId = seed; // usa el seed como id
+        } else if (!avatarUrl.contains('://')) {
+          // Si no parece URL, asumimos que es un id ya válido
+          mappedAvatarId = avatarUrl;
+        }
+      } catch (_) {
+        // Si no es una URL válida, podría ser directamente un id
+        if (!avatarUrl.contains('://')) mappedAvatarId = avatarUrl;
       }
-      return refreshed;
     }
-    try {
-      return User.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
-    } catch (e) {
-      // Si el cuerpo no es JSON válido, intenta re-fetch.
-      final refreshed = await getOneById(currentId);
-      if (refreshed == null) {
-        throw Exception('Patch succeeded but response was invalid and user could not be reloaded');
-      }
-      return refreshed;
-    }
+    final String? mappedThemePref = theme != null
+        ? (theme.toUpperCase() == 'DARK' ? 'DARK' : 'LIGHT')
+        : null;
+    // Mapear tipo si se envía (student/teacher -> STUDENT/TEACHER)
+    final String? mappedType = userType != null
+        ? (userType.toUpperCase().contains('TEACH') ? 'TEACHER' : 'STUDENT')
+        : null;
+
+    final payload = <String, dynamic>{
+      if (mappedUsername != null) 'username': mappedUsername,
+      if (mappedEmail != null) 'email': mappedEmail,
+      if (mappedName != null) 'name': mappedName,
+      if (mappedDescription != null) 'description': mappedDescription,
+      if (mappedAvatarId != null) 'avatarAssetId': mappedAvatarId,
+      if (mappedThemePref != null) 'themePreference': mappedThemePref,
+      if (mappedType != null) 'type': mappedType,
+      if (currentPassword != null) 'currentPassword': currentPassword,
+      if (newPassword != null) 'newPassword': newPassword,
+      if (confirmNewPassword != null) 'confirmNewPassword': confirmNewPassword,
+    };
+
+    // Debug: imprime payload y URL
+    // ignore: avoid_print
+    print('[user_repo] PATCH $uri body=$payload');
+
+    final res = await _patch(uri, payload);
+    // ignore: avoid_print
+    print('[user_repo] PATCH $uri -> ${res.statusCode} ${res.body}');
+    _ensureSuccess(res, allowed: {200});
+
+    // Respuesta con objeto user anidado
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    return User.fromJson(data);
   }
 
   @override
@@ -338,6 +327,30 @@ class UserRepositoryImpl implements UserRepository {
       headers: {...headers, 'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
+  }
+
+  // Login de auth: no requiere Authorization y retorna token + usuario
+  Future<Map<String, dynamic>> login(String username, String password) async {
+    final uri = Uri.parse('$baseUrl/auth/login');
+    final res = await client.post(
+      uri,
+      headers: const {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'username': username.trim(),
+        'password': password,
+      }),
+    );
+    _ensureSuccess(res, allowed: {200, 201});
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final token = (data['token'] ?? '').toString();
+    final userJson = data['user'] is Map<String, dynamic>
+      ? Map<String, dynamic>.from(data['user'] as Map)
+      : Map<String, dynamic>.from(data);
+    final user = User.fromJson(userJson);
+    return {'token': token, 'user': user};
   }
 
   Future<http.Response> _put(Uri uri, Map<String, dynamic> body) async {
