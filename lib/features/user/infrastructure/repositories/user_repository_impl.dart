@@ -87,26 +87,23 @@ class UserRepositoryImpl implements UserRepository {
   Future<void> create(User user) async {
     final uri = Uri.parse('$baseUrl/user');
     if (user.hashedPassword.isEmpty) {
-      throw Exception('hashedPassword requerido para crear usuario');
+      throw Exception('password requerido para crear usuario');
     }
+
+    // Normaliza según contrato del backend: password en claro, campos exactos y restricciones.
+    final safeNameRaw = user.name.trim().isEmpty ? user.userName : user.name.trim();
+    final safeName = safeNameRaw.length > 148 ? safeNameRaw.substring(0, 148) : safeNameRaw;
+    final mappedType = user.userType.toUpperCase().contains('TEACH') ? 'TEACHER' : 'STUDENT';
+
     final body = <String, dynamic>{
-      'userName': user.userName,
-      'email': user.email,
-      'hashedPassword': user.hashedPassword,
-      'userType': user.userType,
-      'avatarUrl': (user.avatarUrl.isNotEmpty &&
-              (user.avatarUrl.startsWith('http://') ||
-                  user.avatarUrl.startsWith('https://')))
-          ? user.avatarUrl
-          : 'https://ui-avatars.com/api/?name=${Uri.encodeComponent(user.userName)}&background=0D47A1&color=fff',
-      'name': user.name.trim(),
+      'email': user.email.trim(),
+      'username': user.userName.trim(),
+      'password': user.hashedPassword, // password plano según contrato
+      'name': safeName,
+      'type': mappedType,
     };
-    // Debug: confirma que el nombre se está enviando en el body
-    // ignore: avoid_print
-    print('[user_repository] create body name="${body['name']}" userName="${body['userName']}"');
-    // Debug ligero para diagnosticar errores del backend
-    // Nota: no imprime la contraseña en claro, solo el hash.
-    // Puedes retirar esto en producción si no lo necesitas.
+
+    // Debug: confirma payload enviado al registrar
     // ignore: avoid_print
     print('[user_repository] POST /user body=$body');
 

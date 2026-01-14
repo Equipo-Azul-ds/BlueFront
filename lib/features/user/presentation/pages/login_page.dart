@@ -7,7 +7,8 @@ import 'signup_page.dart';
 import 'reset_password_page.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final String? initialUserOrEmail;
+  const LoginPage({super.key, this.initialUserOrEmail});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -16,12 +17,25 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final FocusNode _passwordFocus = FocusNode();
   bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Prefill user/email when coming from a registro exitoso.
+    if (widget.initialUserOrEmail != null && widget.initialUserOrEmail!.isNotEmpty) {
+      _emailController.text = widget.initialUserOrEmail!;
+      // Lleva el foco directo a la contraseña para que solo la escriba.
+      Future.microtask(() => _passwordFocus.requestFocus());
+    }
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -112,6 +126,7 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _passwordController,
+                        focusNode: _passwordFocus,
                         obscureText: _obscure,
                         decoration: InputDecoration(
                           labelText: 'Contraseña',

@@ -140,7 +140,8 @@ class AuthBloc extends ChangeNotifier {
   }) async {
     return _run<User?>(() async {
       final id = const Uuid().v4();
-      final hashed = BCrypt.hashpw(password, BCrypt.gensalt());
+      // Backend exige password en texto plano; no aplicar hash aquí.
+      final plainPassword = password;
       // Usa exactamente el nombre que el usuario ingresó en el formulario (ya validado como no vacío)
       final safeName = name.trim();
       final safeAvatar = avatarUrl.trim().isEmpty
@@ -151,7 +152,7 @@ class AuthBloc extends ChangeNotifier {
           id: id,
           userName: userName,
           email: email,
-          hashedPassword: hashed,
+          hashedPassword: plainPassword,
           userType: userType,
           avatarUrl: safeAvatar,
           name: safeName,
@@ -161,7 +162,7 @@ class AuthBloc extends ChangeNotifier {
       final createdUser = await getUserByName(userName);
       currentUser = createdUser;
       await storage.write('currentUserId', createdUser.id);
-      await storage.write('hashedPassword', hashed);
+      await storage.write('hashedPassword', plainPassword);
 
       // Si por alguna razón el backend devolvió name vacío, fuerza un PATCH inmediato con name e invariantes.
       if (createdUser.name.trim().isEmpty && safeName.isNotEmpty) {
@@ -175,7 +176,7 @@ class AuthBloc extends ChangeNotifier {
             description: createdUser.description,
             avatarUrl: createdUser.avatarUrl,
             userType: createdUser.userType,
-            hashedPassword: hashed,
+            hashedPassword: plainPassword,
             theme: createdUser.theme,
             language: createdUser.language,
             gameStreak: createdUser.gameStreak,
@@ -293,6 +294,7 @@ class AuthBloc extends ChangeNotifier {
         language: user.language,
         gameStreak: user.gameStreak,
         hashedPassword: hashed,
+            // password plano ya enviado al crear
       );
       await editUser(params);
       currentUser = user.copyWith(updatedAt: DateTime.now(), hashedPassword: hashed);

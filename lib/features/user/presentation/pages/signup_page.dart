@@ -6,6 +6,7 @@ import '../../../../core/constants/colors.dart';
 import '../blocs/auth_bloc.dart';
 import 'account_type_page.dart';
 import 'avatar_picker_page.dart';
+import 'login_page.dart';
 
 class SignUpPage extends StatefulWidget {
   final String? initialType; // 'teacher' o 'student'
@@ -224,7 +225,12 @@ class _SignUpPageState extends State<SignUpPage> {
         )
         .then((_) {
       if (!mounted) return;
-      Navigator.of(context).pushNamedAndRemoveUntil('/dashboard', (route) => false);
+      // Redirige a login con el username precargado para que solo escriba su contraseña.
+      final userOrEmail = _userNameCtrl.text.trim();
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => LoginPage(initialUserOrEmail: userOrEmail)),
+        (route) => false,
+      );
     }).catchError((e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
