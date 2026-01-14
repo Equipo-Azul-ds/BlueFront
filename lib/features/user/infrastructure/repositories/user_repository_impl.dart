@@ -337,6 +337,30 @@ class UserRepositoryImpl implements UserRepository {
     );
   }
 
+  // Login de auth: no requiere Authorization y retorna token + usuario
+  Future<Map<String, dynamic>> login(String username, String password) async {
+    final uri = Uri.parse('$baseUrl/auth/login');
+    final res = await client.post(
+      uri,
+      headers: const {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'username': username.trim(),
+        'password': password,
+      }),
+    );
+    _ensureSuccess(res, allowed: {200, 201});
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final token = (data['token'] ?? '').toString();
+    final userJson = data['user'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(data)
+        : data; // User.fromJson soporta anidado
+    final user = User.fromJson(userJson);
+    return {'token': token, 'user': user};
+  }
+
   Future<http.Response> _put(Uri uri, Map<String, dynamic> body) async {
     final headers = await headersProvider();
     return client.put(

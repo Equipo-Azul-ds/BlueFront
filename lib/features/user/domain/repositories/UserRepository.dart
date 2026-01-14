@@ -36,4 +36,8 @@ abstract class UserRepository {
   });
 
   Future<User> setMembershipPremium(bool enabled);
+
+  /// Auth login: POST /auth/login returns token + user
+  /// Returns a map with keys 'token' (String) and 'user' (User)
+  Future<Map<String, dynamic>> login(String username, String password);
 }
