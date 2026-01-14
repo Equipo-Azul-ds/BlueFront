@@ -41,4 +41,7 @@ abstract class UserRepository {
   /// Auth login: POST /auth/login returns token + user
   /// Returns a map with keys 'token' (String) and 'user' (User)
   Future<Map<String, dynamic>> login(String username, String password);
+
+  /// Auth check-status: POST /auth/check-status with bearer token, returns new token + user
+  Future<Map<String, dynamic>> checkStatus();
 }

@@ -37,6 +37,20 @@ class UserRepositoryImpl implements UserRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> checkStatus() async {
+    final uri = Uri.parse('$baseUrl/auth/check-status');
+    final res = await _post(uri, const {});
+    _ensureSuccess(res, allowed: {200});
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final token = (data['token'] ?? '').toString();
+    final userJson = data['user'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(data['user'] as Map)
+        : Map<String, dynamic>.from(data);
+    final user = User.fromJson(userJson);
+    return {'token': token, 'user': user};
+  }
+
+  @override
   Future<User?> getOneById(String id) async {
     final uri = Uri.parse('$baseUrl/user/$id');
     final res = await _get(uri);
@@ -333,8 +347,8 @@ class UserRepositoryImpl implements UserRepository {
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     final token = (data['token'] ?? '').toString();
     final userJson = data['user'] is Map<String, dynamic>
-        ? Map<String, dynamic>.from(data)
-        : data; // User.fromJson soporta anidado
+      ? Map<String, dynamic>.from(data['user'] as Map)
+      : Map<String, dynamic>.from(data);
     final user = User.fromJson(userJson);
     return {'token': token, 'user': user};
   }

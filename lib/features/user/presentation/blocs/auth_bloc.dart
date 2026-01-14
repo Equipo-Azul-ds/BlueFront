@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:bcrypt/bcrypt.dart';
@@ -26,6 +28,10 @@ class AuthBloc extends ChangeNotifier {
   User? currentUser;
   bool isLoading = false;
   String? error;
+  Timer? _tokenRefreshTimer;
+  static const Duration _tokenTtl = Duration(hours: 24);
+  static const Duration _refreshLead = Duration(hours: 2);
+  static const String _tokenIssuedAtKey = 'tokenIssuedAt';
 
   AuthBloc({
     required this.repository,
@@ -56,6 +62,7 @@ class AuthBloc extends ChangeNotifier {
           }
         } catch (_) {}
       }
+      await _scheduleTokenRefresh();
     });
   }
 
@@ -73,6 +80,8 @@ class AuthBloc extends ChangeNotifier {
       }
       await storage.write('token', token);
       await storage.write('currentUserId', user.id);
+      await _recordTokenIssuedAt();
+      await _scheduleTokenRefresh();
       currentUser = user;
       return user;
     });
@@ -253,6 +262,7 @@ class AuthBloc extends ChangeNotifier {
   Future<void> logout() async {
     await _run(() async {
       currentUser = null;
+      _tokenRefreshTimer?.cancel();
       await storage.deleteAll();
     });
   }
@@ -263,8 +273,68 @@ class AuthBloc extends ChangeNotifier {
       if (user == null) throw Exception('No session');
       await repository.delete(user.id);
       currentUser = null;
+      _tokenRefreshTimer?.cancel();
       await storage.deleteAll();
     });
+  }
+
+  @override
+  void dispose() {
+    _tokenRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _recordTokenIssuedAt([DateTime? at]) async {
+    final ts = (at ?? DateTime.now()).toIso8601String();
+    await storage.write(_tokenIssuedAtKey, ts);
+  }
+
+  Future<DateTime?> _readTokenIssuedAt() async {
+    final raw = await storage.read(_tokenIssuedAtKey);
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return DateTime.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _scheduleTokenRefresh() async {
+    _tokenRefreshTimer?.cancel();
+    var issuedAt = await _readTokenIssuedAt();
+    if (issuedAt == null) {
+      issuedAt = DateTime.now();
+      await _recordTokenIssuedAt(issuedAt);
+    }
+    final refreshAt = issuedAt.add(_tokenTtl - _refreshLead);
+    final wait = refreshAt.difference(DateTime.now());
+    if (wait.isNegative) {
+      await _refreshTokenNow();
+      return;
+    }
+    _tokenRefreshTimer = Timer(wait, () {
+      _refreshTokenNow();
+    });
+  }
+
+  Future<void> _refreshTokenNow() async {
+    final token = await storage.read('token');
+    if (token == null || token.isEmpty) return;
+    try {
+      final result = await repository.checkStatus();
+      final newToken = (result['token'] ?? '').toString();
+      final user = result['user'] as User;
+      if (newToken.isNotEmpty) {
+        await storage.write('token', newToken);
+        await _recordTokenIssuedAt();
+      }
+      await storage.write('currentUserId', user.id);
+      currentUser = user;
+      await _scheduleTokenRefresh();
+    } catch (e) {
+      // ignore: avoid_print
+      print('[auth] token refresh failed: $e');
+    }
   }
 
   Future<T> _run<T>(Future<T> Function() op) async {
