@@ -92,7 +92,7 @@ class AuthBloc extends ChangeNotifier {
     required String email,
     required String password,
     required String userType,
-    required String avatarUrl,
+    String avatarUrl = '',
     String name = '',
   }) async {
     return _run<User?>(() async {
@@ -133,7 +133,6 @@ class AuthBloc extends ChangeNotifier {
             description: createdUser.description,
             avatarUrl: createdUser.avatarUrl,
             userType: createdUser.userType,
-            hashedPassword: plainPassword,
             theme: createdUser.theme,
             language: createdUser.language,
             gameStreak: createdUser.gameStreak,
@@ -148,18 +147,7 @@ class AuthBloc extends ChangeNotifier {
   Future<void> updateProfile({String? name, String? description, String? avatarUrl, String? theme, String? language}) async {
     await _run(() async {
       if (currentUser == null) throw Exception('No session');
-      // Garantiza que tengamos hashedPassword antes de enviar el PATCH
-      if (currentUser!.hashedPassword.isEmpty) {
-        try {
-          final fetched = await repository.getOneById(currentUser!.id);
-          if (fetched != null && fetched.hashedPassword.isNotEmpty) {
-            currentUser = currentUser!.copyWith(hashedPassword: fetched.hashedPassword);
-            await storage.write('hashedPassword', fetched.hashedPassword);
-          }
-        } catch (_) {}
-      }
       final user = currentUser!;
-      final hpw = user.hashedPassword;
       final fields = <String, dynamic>{
         'userName': user.userName,
         'email': user.email,
@@ -178,7 +166,6 @@ class AuthBloc extends ChangeNotifier {
       }
       if (theme != null && theme != user.theme) fields['theme'] = theme;
       if (language != null && language != user.language) fields['language'] = language;
-      if (hpw.isNotEmpty) fields['hashedPassword'] = hpw;
       // Debug: imprime los campos que se enviarán
       // ignore: avoid_print
       print('[auth] updateProfile id=${user.id} sending fields=$fields');
@@ -190,7 +177,6 @@ class AuthBloc extends ChangeNotifier {
           description: fields['description'],
           avatarUrl: fields['avatarUrl'],
           userType: fields['userType'],
-          hashedPassword: fields['hashedPassword'],
           theme: fields['theme'],
           language: fields['language'],
           gameStreak: fields['gameStreak'],
@@ -203,59 +189,47 @@ class AuthBloc extends ChangeNotifier {
     await _run(() async {
       final user = currentUser;
       if (user == null) throw Exception('No session');
-      // Garantiza hash antes de enviar PATCH de tipo
-      if (user.hashedPassword.isEmpty) {
-        try {
-          final fetched = await repository.getOneById(user.id);
-          if (fetched != null && fetched.hashedPassword.isNotEmpty) {
-            currentUser = user.copyWith(hashedPassword: fetched.hashedPassword);
-            await storage.write('hashedPassword', fetched.hashedPassword);
-          }
-        } catch (_) {}
-      }
       // Debug: imprime los campos que se enviarán
       // ignore: avoid_print
-      print('[auth] changeUserType id=${user.id} userName=${user.userName} email=${user.email} newType=$newType hasHash=${user.hashedPassword.isNotEmpty}');
-      final params = EditUserParams(
-        id: user.id,
-        userName: user.userName,
-        email: user.email,
-        userType: newType,
-        avatarUrl: user.avatarUrl,
-        name: user.name,
-        description: user.description,
-        theme: user.theme,
-        language: user.language,
-        gameStreak: user.gameStreak,
-        hashedPassword: currentUser!.hashedPassword.isNotEmpty ? currentUser!.hashedPassword : null,
+      print('[auth] changeUserType id=${user.id} userName=${user.userName} email=${user.email} newType=$newType');
+      currentUser = await updateSettings(
+        UpdateUserSettingsParams(
+          userName: user.userName,
+          email: user.email,
+          name: user.name,
+          description: user.description,
+          avatarUrl: user.avatarUrl,
+          userType: newType,
+          theme: user.theme,
+          language: user.language,
+          gameStreak: user.gameStreak,
+        ),
       );
-      await editUser(params);
       currentUser = user.copyWith(userType: newType, updatedAt: DateTime.now());
     });
   }
 
-  Future<void> changePassword(String newPassword) async {
+  Future<void> changePassword({required String currentPassword, required String newPassword, required String confirmNewPassword}) async {
     await _run(() async {
       final user = currentUser;
       if (user == null) throw Exception('No session');
-      final hashed = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-      final params = EditUserParams(
-        id: user.id,
-        userName: user.userName,
-        email: user.email,
-        userType: user.userType,
-        avatarUrl: user.avatarUrl,
-        name: user.name,
-        description: user.description,
-        theme: user.theme,
-        language: user.language,
-        gameStreak: user.gameStreak,
-        hashedPassword: hashed,
-            // password plano ya enviado al crear
+      currentUser = await updateSettings(
+        UpdateUserSettingsParams(
+          userName: user.userName,
+          email: user.email,
+          name: user.name,
+          description: user.description,
+          avatarUrl: user.avatarUrl,
+          userType: user.userType,
+          theme: user.theme,
+          language: user.language,
+          gameStreak: user.gameStreak,
+          currentPassword: currentPassword,
+          newPassword: newPassword,
+          confirmNewPassword: confirmNewPassword,
+        ),
       );
-      await editUser(params);
-      currentUser = user.copyWith(updatedAt: DateTime.now(), hashedPassword: hashed);
-      await storage.write('hashedPassword', hashed);
+      // No almacenamos hash local; el backend maneja el cambio.
     });
   }
 

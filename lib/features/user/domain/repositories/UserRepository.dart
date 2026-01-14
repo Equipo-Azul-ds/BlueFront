@@ -22,17 +22,18 @@ abstract class UserRepository {
   Future<User> getCurrentUser();
 
   Future<User> updateSettings({
-    String? id,
     String? userName,
     String? email,
     String? name,
     String? description,
     String? avatarUrl,
     String? userType,
-    String? hashedPassword,
     String? theme, // 'light' | 'dark'
     String? language, // 'es' | 'en' | ...
     int? gameStreak,
+    String? currentPassword,
+    String? newPassword,
+    String? confirmNewPassword,
   });
 
   Future<User> setMembershipPremium(bool enabled);
