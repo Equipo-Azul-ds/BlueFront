@@ -82,6 +82,7 @@ import 'features/user/presentation/blocs/auth_bloc.dart';
 import 'features/user/presentation/user_providers.dart';
 import 'features/user/presentation/pages/access_gate_page.dart';
 import 'features/user/presentation/pages/profile_page.dart';
+import 'features/user/presentation/widgets/session_expiry_listener.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -535,7 +536,8 @@ class MyApp extends StatelessWidget {
         baseUrl: apiBaseUrl,
         child: Builder(
           builder: (context) {
-            return MaterialApp(
+            return SessionExpiryListener(
+              child: MaterialApp(
               debugShowCheckedModeBanner: false,
               title: 'Trivvy',
               // Esto viene de la rama epica9y11 para que funcionen los SnackBar de notificaciones
@@ -631,6 +633,7 @@ class MyApp extends StatelessWidget {
                 '/notifications-history': (context) =>
                     const NotificationsHistoryPage(),
               },
+              ),
             );
           },
         ),

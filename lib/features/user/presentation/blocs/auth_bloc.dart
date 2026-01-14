@@ -29,6 +29,8 @@ class AuthBloc extends ChangeNotifier {
   bool isLoading = false;
   String? error;
   Timer? _tokenRefreshTimer;
+  bool sessionExpiring = false;
+  int sessionExpiryTick = 0; // aumenta cada vez que se debe mostrar el aviso
   static const Duration _tokenTtl = Duration(hours: 24);
   static const Duration _refreshLead = Duration(hours: 2);
   static const String _tokenIssuedAtKey = 'tokenIssuedAt';
@@ -263,6 +265,8 @@ class AuthBloc extends ChangeNotifier {
     await _run(() async {
       currentUser = null;
       _tokenRefreshTimer?.cancel();
+      sessionExpiring = false;
+      sessionExpiryTick = 0;
       await storage.deleteAll();
     });
   }
@@ -274,6 +278,8 @@ class AuthBloc extends ChangeNotifier {
       await repository.delete(user.id);
       currentUser = null;
       _tokenRefreshTimer?.cancel();
+      sessionExpiring = false;
+      sessionExpiryTick = 0;
       await storage.deleteAll();
     });
   }
@@ -313,11 +319,30 @@ class AuthBloc extends ChangeNotifier {
       return;
     }
     _tokenRefreshTimer = Timer(wait, () {
-      _refreshTokenNow();
+      _onSessionExpiring();
     });
   }
 
-  Future<void> _refreshTokenNow() async {
+  void _onSessionExpiring() {
+    sessionExpiring = true;
+    sessionExpiryTick++;
+    notifyListeners();
+  }
+
+  Future<bool> refreshSession() async {
+    try {
+      await _refreshTokenNow(manual: true);
+      sessionExpiring = false;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      sessionExpiring = true;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> _refreshTokenNow({bool manual = false}) async {
     final token = await storage.read('token');
     if (token == null || token.isEmpty) return;
     try {
@@ -330,10 +355,16 @@ class AuthBloc extends ChangeNotifier {
       }
       await storage.write('currentUserId', user.id);
       currentUser = user;
+      sessionExpiring = false;
       await _scheduleTokenRefresh();
     } catch (e) {
       // ignore: avoid_print
       print('[auth] token refresh failed: $e');
+      if (!manual) {
+        sessionExpiring = true;
+        sessionExpiryTick++;
+        notifyListeners();
+      }
     }
   }
 
