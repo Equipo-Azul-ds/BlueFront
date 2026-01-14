@@ -10,7 +10,7 @@ class ToggleUserStatusUseCase {
   ToggleUserStatusUseCase(this.repository);
 
   Future<Either<Failure, UserEntity>> execute(String userId, String currentStatus) {
-    final newStatus = currentStatus == 'Active' ? 'Blocked' : 'Active';
-    return repository.toggleUserStatus(userId, newStatus);
+
+    return repository.toggleUserStatus(userId, currentStatus);
   }
 }

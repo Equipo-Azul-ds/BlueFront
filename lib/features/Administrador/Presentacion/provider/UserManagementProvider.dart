@@ -63,15 +63,22 @@ class UserManagementProvider with ChangeNotifier {
     final userIndex = _users.indexWhere((u) => u.id == userId);
     if (userIndex == -1) return;
 
+    final oldUser = _users[userIndex];
     final user = _users[userIndex];
     final String currentStatus = user.status == UserStatus.active ? 'Active' : 'Blocked';
+    print('$currentStatus en el provider y el estado es ${user.status}');
 
     final result = await toggleUserStatusUseCase.execute(userId, currentStatus);
+
 
     result.fold(
           (failure) => print("Error al cambiar estado de bloqueo"),
           (updatedUser) {
-        _users[userIndex] = updatedUser;
+        _users[userIndex] = oldUser.copyWith(
+          isAdmin: updatedUser.isAdmin,
+          status: updatedUser.status,
+        );
+        print("Status recibido del servidor: ${updatedUser.status}");
         notifyListeners();
       },
     );
@@ -82,15 +89,17 @@ class UserManagementProvider with ChangeNotifier {
     final userIndex = _users.indexWhere((u) => u.id == userId);
     if (userIndex == -1) return;
 
-    final user = _users[userIndex];
-
-
-    final result = await toggleAdminRoleUseCase.execute(userId, user.isAdmin);
+    final oldUser = _users[userIndex];
+    final result = await toggleAdminRoleUseCase.execute(userId, oldUser.isAdmin);
 
     result.fold(
           (failure) => print("Error al cambiar rol administrativo"),
           (updatedUser) {
-        _users[userIndex] = updatedUser;
+
+        _users[userIndex] = oldUser.copyWith(
+          isAdmin: updatedUser.isAdmin,
+          status: updatedUser.status,
+        );
         notifyListeners();
       },
     );

@@ -22,18 +22,26 @@ abstract class UserRepository {
   Future<User> getCurrentUser();
 
   Future<User> updateSettings({
-    String? id,
     String? userName,
     String? email,
     String? name,
     String? description,
     String? avatarUrl,
     String? userType,
-    String? hashedPassword,
     String? theme, // 'light' | 'dark'
     String? language, // 'es' | 'en' | ...
     int? gameStreak,
+    String? currentPassword,
+    String? newPassword,
+    String? confirmNewPassword,
   });
 
   Future<User> setMembershipPremium(bool enabled);
+
+  /// Auth login: POST /auth/login returns token + user
+  /// Returns a map with keys 'token' (String) and 'user' (User)
+  Future<Map<String, dynamic>> login(String username, String password);
+
+  /// Auth check-status: POST /auth/check-status with bearer token, returns new token + user
+  Future<Map<String, dynamic>> checkStatus();
 }

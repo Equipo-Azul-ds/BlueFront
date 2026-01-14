@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'core/constants/colors.dart';
+import 'features/discovery/presentation/pages/DiscoveryDetailPage.dart';
 import 'local/secure_storage.dart';
 import 'features/Administrador/Aplication/UseCases/DeleteUserUseCase.dart';
 import 'features/Administrador/Aplication/UseCases/GetUserListUseCase.dart';
@@ -81,6 +82,7 @@ import 'features/user/presentation/blocs/auth_bloc.dart';
 import 'features/user/presentation/user_providers.dart';
 import 'features/user/presentation/pages/access_gate_page.dart';
 import 'features/user/presentation/pages/profile_page.dart';
+import 'features/user/presentation/widgets/session_expiry_listener.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -98,13 +100,13 @@ import 'features/subscriptions/presentation/screens/subscription_management_scre
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Render
-// API base 1: 'https://backcomun-gc5j.onrender.com'
+// API base 1: 'https://backcomun-gc5j.onrender.com' -- https://backcomun-mzvy.onrender.com 
 // API base 2: https://quizzy-backend-0wh2.onrender.com/api
 // https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
 
-  defaultValue: 'https://quizzy-backend-1-zpvc.onrender.com',
+  defaultValue: 'https://backcomun-mzvy.onrender.com',
 
 );
 
@@ -201,12 +203,11 @@ class MyApp extends StatelessWidget {
 
         Provider<IUserDataSource>(
           create: (context) => UserRemoteDataSourceImpl(
-            // Usa 'context' aquí
             baseUrl: apiBaseUrl,
             cliente: context
                 .read<
                   http.Client
-                >(), // Ahora buscará al Provider<http.Client> de arriba
+                >(),
           ),
         ),
         Provider<IUserRepository>(
@@ -554,7 +555,8 @@ class MyApp extends StatelessWidget {
         baseUrl: apiBaseUrl,
         child: Builder(
           builder: (context) {
-            return MaterialApp(
+            return SessionExpiryListener(
+              child: MaterialApp(
               debugShowCheckedModeBanner: false,
               title: 'Trivvy',
               // Esto viene de la rama epica9y11 para que funcionen los SnackBar de notificaciones
@@ -638,6 +640,7 @@ class MyApp extends StatelessWidget {
                 '/groups': (context) => const GroupsPage(),
                 '/kahoots-category': (context) => const KahootsCategoryPage(),
                 '/kahoot-detail': (context) => const KahootDetailPage(),
+                '/discovery-detail': (context) => const DiscoveryDetailPage(),
                 '/subscriptions': (context) => const PlansScreen(),
                 '/subscription-management': (context) =>
                     const SubscriptionManagementScreen(),
@@ -649,6 +652,7 @@ class MyApp extends StatelessWidget {
                 '/notifications-history': (context) =>
                     const NotificationsHistoryPage(),
               },
+              ),
             );
           },
         ),

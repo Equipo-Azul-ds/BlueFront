@@ -98,32 +98,69 @@ class User {
       };
 
   factory User.fromJson(Map<String, dynamic> json) {
-    final dynamic rawHash = json['hashedPassword'] ??
-        json['password'] ??
-        json['pwd'] ??
-        json['pass'] ??
-        json['passwordHash'] ??
-        json['password_hash'] ??
-        json['hashed_password'] ??
-        json['hashPassword'] ??
-        json['hash_password'];
+    // Soporta respuestas anidadas { user: { ... } } y nombres alternativos de campos.
+    final Map<String, dynamic> src =
+        (json['user'] is Map<String, dynamic>) ? Map<String, dynamic>.from(json['user']) : json;
+
+    final dynamic rawHash = src['hashedPassword'] ??
+        src['password'] ??
+        src['pwd'] ??
+        src['pass'] ??
+        src['passwordHash'] ??
+        src['password_hash'] ??
+        src['hashed_password'] ??
+        src['hashPassword'] ??
+        src['hash_password'];
     final hashed = rawHash == null ? '' : rawHash.toString();
 
+    final profile = (src['userProfileDetails'] is Map<String, dynamic>)
+        ? Map<String, dynamic>.from(src['userProfileDetails'])
+        : const <String, dynamic>{};
+    final preferences = (src['preferences'] is Map<String, dynamic>)
+        ? Map<String, dynamic>.from(src['preferences'])
+        : const <String, dynamic>{};
+
+    final String id = (src['id'] ?? '').toString();
+    final String userName = (src['userName'] ?? src['username'] ?? '').toString();
+    final String email = (src['email'] ?? '').toString();
+    final String userType = (src['userType'] ?? src['type'] ?? 'student').toString();
+    final String themeRaw = (preferences['theme'] ?? src['theme'] ?? 'light').toString();
+    final String theme = themeRaw.toLowerCase() == 'dark' ? 'dark' : (themeRaw.toUpperCase() == 'DARK' ? 'dark' : 'light');
+    final String name = (profile['name'] ?? src['name'] ?? '').toString();
+    final String description = (profile['description'] ?? src['description'] ?? '').toString();
+    final String avatarUrl = (profile['avatarAssetUrl'] ?? src['avatarUrl'] ?? '').toString();
+    final bool isPremium = (src['isPremium'] == true);
+
+    final Membership membership = isPremium ? Membership.premium() : Membership.free();
+
+    DateTime createdAt;
+    DateTime updatedAt;
+    try {
+      createdAt = DateTime.parse((src['createdAt'] ?? DateTime.now().toIso8601String()).toString());
+    } catch (_) {
+      createdAt = DateTime.now();
+    }
+    try {
+      updatedAt = DateTime.parse((src['updatedAt'] ?? DateTime.now().toIso8601String()).toString());
+    } catch (_) {
+      updatedAt = DateTime.now();
+    }
+
     return User(
-      id: json['id'] as String,
-      userName: json['userName'] as String,
-      name: (json['name'] ?? '') as String,
-      description: (json['description'] ?? '') as String,
-      email: json['email'] as String,
+      id: id,
+      userName: userName,
+      name: name,
+      description: description,
+      email: email,
       hashedPassword: hashed,
-      userType: json['userType'] as String,
-      avatarUrl: (json['avatarUrl'] ?? '') as String,
-      theme: (json['theme'] ?? 'light') as String,
-      language: (json['language'] ?? 'es') as String,
-      gameStreak: (json['gameStreak'] ?? 0) as int,
-      membership: Membership.fromJson(json['membership'] as Map<String, dynamic>),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      userType: userType,
+      avatarUrl: avatarUrl,
+      theme: theme,
+      language: (src['language'] ?? 'es').toString(),
+      gameStreak: (src['gameStreak'] is int) ? src['gameStreak'] as int : 0,
+      membership: membership,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 }

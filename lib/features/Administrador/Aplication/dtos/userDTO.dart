@@ -38,7 +38,7 @@ class UserDto {
       userType: json['userType']?.toString() ?? 'student',
       createdAt: json['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
       updatedAt: json['updatedAt']?.toString() ?? DateTime.now().toIso8601String(),
-      isAdmin: json['isAdmin'] == true || json['isAdmin'] == 1,
+      isAdmin: json['isadmin'] ?? json['isAdmin'] ?? false,
       status: json['status']?.toString() ?? 'Active',
     );
   }
