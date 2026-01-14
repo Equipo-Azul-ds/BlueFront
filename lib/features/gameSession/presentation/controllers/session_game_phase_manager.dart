@@ -128,6 +128,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
     try {
       final event = QuestionStartedEvent.fromJson(payload);
       _questionSequence++;
+      print('[EVENT] ← RECEIVED: question_started (seq=$_questionSequence, questionId=${event.slide.id}, timeLimit=${event.slide.timeLimitSeconds}s)');
       _phase = SessionPhase.question;
       _currentQuestionDto = event;
       _questionStartedAt =
@@ -140,6 +141,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
       _hostAnswerSubmissions = null;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing question_started: $error');
       onEventError(error);
     }
   }
@@ -151,9 +153,11 @@ class SessionGamePhaseManager extends ChangeNotifier {
   ) {
     try {
       _hostResultsDto = HostResultsEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: host_results (state=${_hostResultsDto?.state}, players=${_hostResultsDto?.leaderboard.length})');
       _phase = SessionPhase.results;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing host_results: $error');
       onEventError(error);
     }
   }
@@ -165,9 +169,11 @@ class SessionGamePhaseManager extends ChangeNotifier {
   ) {
     try {
       _playerResultsDto = PlayerResultsEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: player_results (rank=${_playerResultsDto?.rank}, correct=${_playerResultsDto?.isCorrect})');
       _phase = SessionPhase.results;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing player_results: $error');
       onEventError(error);
     }
   }
@@ -180,9 +186,11 @@ class SessionGamePhaseManager extends ChangeNotifier {
     try {
       _hostGameEndDto = HostGameEndEvent.fromJson(payload);
       _hostGameEndSequence++;
+      print('[EVENT] ← RECEIVED: host_game_end (seq=$_hostGameEndSequence, podium=${_hostGameEndDto?.finalPodium.length})');
       _phase = SessionPhase.end;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing host_game_end: $error');
       onEventError(error);
     }
   }
@@ -195,9 +203,11 @@ class SessionGamePhaseManager extends ChangeNotifier {
     try {
       _playerGameEndDto = PlayerGameEndEvent.fromJson(payload);
       _playerGameEndSequence++;
+      print('[EVENT] ← RECEIVED: player_game_end (seq=$_playerGameEndSequence, rank=${_playerGameEndDto?.rank})');
       _phase = SessionPhase.end;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing player_game_end: $error');
       onEventError(error);
     }
   }
@@ -209,10 +219,12 @@ class SessionGamePhaseManager extends ChangeNotifier {
   ) {
     try {
       final event = SessionClosedEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: session_closed (reason=${event.reason}, message=${event.message})');
       _sessionClosedDto = event;
       _phase = SessionPhase.end;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing session_closed: $error');
       onEventError(error);
     }
   }

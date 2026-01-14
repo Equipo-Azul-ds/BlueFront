@@ -30,6 +30,7 @@ class SessionLobbyManager extends ChangeNotifier {
   PlayerLeftSessionEvent? _playerLeftDto;
   HostConnectedSuccessEvent? _hostConnectedSuccessDto;
   PlayerAnswerConfirmationEvent? _playerAnswerConfirmationDto;
+  PlayerConnectedEvent? _playerConnectedDto;
 
   StreamSubscription<dynamic>? _gameStateSubscription;
   StreamSubscription<dynamic>? _hostLobbySubscription;
@@ -51,6 +52,7 @@ class SessionLobbyManager extends ChangeNotifier {
   PlayerLeftSessionEvent? get playerLeftDto => _playerLeftDto;
   HostConnectedSuccessEvent? get hostConnectedSuccessDto => _hostConnectedSuccessDto;
   PlayerAnswerConfirmationEvent? get playerAnswerConfirmationDto => _playerAnswerConfirmationDto;
+  PlayerConnectedEvent? get playerConnectedDto => _playerConnectedDto;
 
   /// Establece la sesión del anfitrión y el PIN actual.
   void setHostSession(CreateSessionResponse session) {
@@ -177,10 +179,12 @@ class SessionLobbyManager extends ChangeNotifier {
     // Procesa actualizaciones de lobby del anfitrión (nuevos jugadores, cambios de estado)
     try {
       final event = HostLobbyUpdateEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: host_lobby_update (players=${event.players.length})');
       _latestGameStateDto = event;
       _applyPlayersFromPayload(event.players);
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing host_lobby_update: $error');
       onEventError(error);
     }
   }
@@ -192,11 +196,14 @@ class SessionLobbyManager extends ChangeNotifier {
     // Procesa confirmación de conexión del jugador, actualiza nickname local si es necesario
     try {
       final event = PlayerConnectedEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: player_connected (nickname=${event.nickname})');
+      _playerConnectedDto = event;
       if (event.nickname.isNotEmpty) {
         _currentNickname = event.nickname;
       }
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing player_connected: $error');
       onEventError(error);
     }
   }
@@ -222,6 +229,7 @@ class SessionLobbyManager extends ChangeNotifier {
     // Marca jugador como desconectado cuando abandona la sesión
     try {
       final event = PlayerLeftSessionEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: player_left_session (nickname=${event.nickname}, userId=${event.userId})');
       _playerLeftDto = event;
       final leavingId = event.userId;
       final leavingNick = event.nickname;
@@ -236,6 +244,7 @@ class SessionLobbyManager extends ChangeNotifier {
       }
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing player_left_session: $error');
       onEventError(error);
     }
   }
@@ -279,6 +288,7 @@ class SessionLobbyManager extends ChangeNotifier {
     _playerLeftDto = null;
     _hostConnectedSuccessDto = null;
     _playerAnswerConfirmationDto = null;
+    _playerConnectedDto = null;
     notifyListeners();
   }
 

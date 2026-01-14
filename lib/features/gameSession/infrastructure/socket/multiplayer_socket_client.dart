@@ -47,19 +47,18 @@ class MultiplayerSocketClient {
     }
 
     final target = _buildNamespaceUrl();
-    final authHeaderValue = 'Bearer $sanitizedToken';
-    final headers = {
+    // Socket.IO uses auth parameter for credentials that persist across all events
+    final auth = {
       MultiplayerConstants.headerPin: params.pin,
       MultiplayerConstants.headerRole: params.role.toHeaderValue(),
       MultiplayerConstants.headerJwt: sanitizedToken,
-      MultiplayerConstants.headerAuthorization: authHeaderValue,
-      MultiplayerConstants.headerAuthorizationLower: authHeaderValue,
     };
+    print('[SOCKET_CONNECT] Auth params to be sent: pin=${params.pin}, role=${params.role.toHeaderValue()}, jwt=$sanitizedToken');
     final options = io.OptionBuilder()
         .setTransports(MultiplayerConstants.socketTransports)
         .enableForceNew()
         .disableAutoConnect()
-        .setExtraHeaders(headers)
+        .setAuth(auth)
         .build();
 
     final socket = io.io(target, options);
@@ -84,19 +83,24 @@ class MultiplayerSocketClient {
     }
 
     socket.onConnect((_) {
+      print('[SOCKET] ✓ CONNECTED to multiplayer-sessions namespace');
       _statusController.add(MultiplayerSocketStatus.connected);
       completeSuccess();
     });
     socket.onDisconnect((_) {
+      print('[SOCKET] ✗ DISCONNECTED from multiplayer-sessions namespace');
       _statusController.add(MultiplayerSocketStatus.disconnected);
     });
     socket.onReconnect((_) {
+      print('[SOCKET] ↻ RECONNECTED to multiplayer-sessions namespace');
       _statusController.add(MultiplayerSocketStatus.connected);
     });
     socket.onReconnectAttempt((_) {
+      print('[SOCKET] ↻ RECONNECT ATTEMPT...');
       _statusController.add(MultiplayerSocketStatus.connecting);
     });
     void handleConnectError(dynamic error) {
+      print('[SOCKET] ✗ CONNECTION ERROR: $error');
       _handleError(error);
       try {
         socket.disconnect();
@@ -112,8 +116,12 @@ class MultiplayerSocketClient {
     socket.on('connect_timeout', (_) {
       handleConnectError(TimeoutException('Tiempo de conexión agotado.'));
     });
-    socket.onError(_handleError);
+    socket.onError((error) {
+      print('[SOCKET] ✗ SOCKET ERROR: $error');
+      _handleError(error);
+    });
     socket.onAny((event, data) {
+      print('[SOCKET] ← RECEIVED EVENT: "$event" with data: ${_sanitizeLogData(data)}');
       final controller = _eventControllers[event];
       if (controller != null && !controller.isClosed) {
         controller.add(_normalizePayload(data));
@@ -121,6 +129,7 @@ class MultiplayerSocketClient {
     });
 
     socket.connect();
+    print('[SOCKET] → CONNECTING to $_baseUrl/multiplayer-sessions with auth: {pin, role, jwt}');
     timeoutTimer = Timer(const Duration(seconds: 10), () {
       handleConnectError(TimeoutException('Tiempo de conexión agotado.'));
     });
@@ -155,8 +164,10 @@ class MultiplayerSocketClient {
   /// Emite un evento del cliente con payload opcional.
   void emit(String eventName, [dynamic payload]) {
     if (_socket == null) {
+      print('[SOCKET] ✗ CANNOT EMIT "$eventName": socket not connected');
       throw StateError('Socket is not connected. Unable to emit "$eventName".');
     }
+    print('[SOCKET] → EMIT EVENT: "$eventName" with payload: ${_sanitizeLogData(payload)}');
     _socket!.emit(eventName, payload);
   }
 
@@ -184,6 +195,21 @@ class MultiplayerSocketClient {
         ? _baseUrl.substring(0, _baseUrl.length - 1)
         : _baseUrl;
     return '$trimmedBase/multiplayer-sessions';
+  }
+
+  /// Sanitiza datos para logging (evita exponer tokens completos)
+  dynamic _sanitizeLogData(dynamic data) {
+    if (data is Map) {
+      final sanitized = Map.from(data);
+      if (sanitized.containsKey('jwt')) {
+        sanitized['jwt'] = '***REDACTED***';
+      }
+      if (sanitized.containsKey('token')) {
+        sanitized['token'] = '***REDACTED***';
+      }
+      return sanitized;
+    }
+    return data;
   }
 
   /// Convierte recursivamente payloads dinámicos a estructuras JSON cuando es

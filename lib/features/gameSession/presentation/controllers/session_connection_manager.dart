@@ -16,6 +16,7 @@ class SessionConnectionManager extends ChangeNotifier {
     required MultiplayerSessionRealtime realtime,
   }) : _realtime = realtime {
     _statusSubscription = _realtime.statusStream.listen((status) {
+      print('[CONNECTION_MANAGER] Socket status changed: ${_socketStatus.toString()} → ${status.toString()}');
       _socketStatus = status;
       if (status == MultiplayerSocketStatus.disconnected) {
         _shouldEmitClientReady = true;
@@ -27,6 +28,7 @@ class SessionConnectionManager extends ChangeNotifier {
     });
 
     _errorSubscription = _realtime.errors.listen((error) {
+      print('[CONNECTION_MANAGER] Socket error: $error');
       _lastError = error.toString();
       notifyListeners();
     });
@@ -142,18 +144,20 @@ class SessionConnectionManager extends ChangeNotifier {
     }
   }
 
-   /// Maneja evento de error de sincronización: cachea error, establece mensaje de error, desconecta socket.
+  /// Maneja evento de error de sincronización: cachea error, establece mensaje de error, desconecta socket.
   void _handleSyncError(
     Map<String, dynamic> payload,
     void Function(Object error) onEventError,
   ) {
     try {
       final event = SyncErrorEvent.fromJson(payload);
+      print('[EVENT] ✗ RECEIVED: sync_error with message=\"${event.message}\" - DISCONNECTING SOCKET');
       _syncErrorDto = event;
       _lastError = event.message ?? MultiplayerConstants.errorSyncDefault;
       _realtime.disconnect();
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing sync_error: $error');
       onEventError(error);
     }
   }
@@ -165,10 +169,12 @@ class SessionConnectionManager extends ChangeNotifier {
   ) {
     try {
       final event = ConnectionErrorEvent.fromJson(payload);
+      print('[EVENT] ✗ RECEIVED: connection_error with message=\"${event.message}\"');
       _connectionErrorDto = event;
       _lastError = event.message ?? MultiplayerConstants.errorConnectionDefault;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing connection_error: $error');
       onEventError(error);
     }
   }

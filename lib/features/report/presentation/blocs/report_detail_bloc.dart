@@ -43,6 +43,36 @@ class ReportDetailBloc extends ChangeNotifier {
     }
   }
 
+  Future<void> loadReport(GameType type, String gameId) async {
+    isLoading = true;
+    error = null;
+    notifyListeners();
+
+    try {
+      switch (type) {
+        case GameType.singleplayer:
+          personalResult = await getSingleplayerResultUseCase(gameId);
+          sessionReport = null;
+          break;
+        case GameType.multiplayer_player:
+          personalResult = await getMultiplayerResultUseCase(gameId);
+          sessionReport = null;
+          break;
+        case GameType.multiplayer_host:
+          sessionReport = await getSessionReportUseCase(gameId);
+          personalResult = null;
+          break;
+      }
+    } catch (e) {
+      error = e.toString();
+      personalResult = null;
+      sessionReport = null;
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> loadSessionReport(String sessionId) async {
     isLoading = true;
     error = null;

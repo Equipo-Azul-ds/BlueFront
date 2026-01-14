@@ -22,7 +22,7 @@ class ReportDetailPage extends StatelessWidget {
         getSessionReportUseCase: context.read<GetSessionReportUseCase>(),
         getMultiplayerResultUseCase: context.read<GetMultiplayerResultUseCase>(),
         getSingleplayerResultUseCase: context.read<GetSingleplayerResultUseCase>(),
-      )..loadFromSummary(summary),
+      )..loadReport(summary.gameType, summary.gameId),
       child: Consumer<ReportDetailBloc>(
         builder: (context, bloc, _) {
           return Scaffold(
@@ -47,7 +47,7 @@ class ReportDetailPage extends StatelessWidget {
       return _ErrorState(
         message: 'No se pudo cargar el informe',
         detail: bloc.error!,
-        onRetry: () => bloc.loadFromSummary(summary),
+        onRetry: () => bloc.loadReport(summary.gameType, summary.gameId),
       );
     }
 
@@ -127,7 +127,7 @@ class _PersonalResultViewState extends State<_PersonalResultView> {
                     children: [
                       Row(
                         children: [
-                          _Tag(label: widget.type == GameType.singleplayer ? 'Singleplayer' : 'Multiplayer', color: AppColor.primary),
+                          _Tag(label: _getGameTypeLabel(widget.type), color: AppColor.primary),
                           const SizedBox(width: 8),
                           _AnimatedScoreTag(score: widget.result.finalScore),
                           if (widget.result.rankingPosition != null) ...[
@@ -848,6 +848,17 @@ class _ErrorState extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+String _getGameTypeLabel(GameType type) {
+  switch (type) {
+    case GameType.singleplayer:
+      return 'Singleplayer';
+    case GameType.multiplayer_player:
+      return 'Multiplayer • Jugador';
+    case GameType.multiplayer_host:
+      return 'Multiplayer • Anfitrión';
   }
 }
 

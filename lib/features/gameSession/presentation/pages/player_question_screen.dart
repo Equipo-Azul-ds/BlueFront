@@ -32,6 +32,7 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
   bool _answerSubmitted = false;
   bool _currentIsMultiSelect = false;
   int? _currentMaxSelections;
+  bool _answerConfirmed = false;
   final RealtimeErrorHandler _errorHandler = RealtimeErrorHandler();
   final CountdownService _countdown = CountdownService();
 
@@ -43,6 +44,7 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
     _checkQuestionResults();
     _checkSessionTermination();
     _checkRealtimeErrors();
+    _checkAnswerConfirmation();
   }
 
   @override
@@ -53,6 +55,7 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
     _checkQuestionResults();
     _checkSessionTermination();
     _checkRealtimeErrors();
+    _checkAnswerConfirmation();
   }
 
   @override
@@ -75,6 +78,7 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
     _currentSlideId = slide.id;
     _selectedAnswerIds.clear();
     _answerSubmitted = question.hasAnswered == true;
+    _answerConfirmed = false;
 
     _currentIsMultiSelect = _resolveIsMultiSelect(slide);
     _currentMaxSelections = slide.maxSelections;
@@ -152,6 +156,20 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
     );
   }
 
+  /// Monitorea confirmación del servidor de que la respuesta fue recibida.
+  void _checkAnswerConfirmation() {
+    final controller = context.read<MultiplayerSessionController>();
+    final confirmation = controller.playerAnswerConfirmationDto;
+    if (confirmation != null && !_answerConfirmed && _answerSubmitted) {
+      _answerConfirmed = true;
+      if (mounted) {
+        setState(() {});
+        // Trigger success haptic feedback
+        HapticFeedback.lightImpact();
+      }
+    }
+  }
+
   void _exitToHome() {
     if (!mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
@@ -213,7 +231,10 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Respuesta enviada')));
+      ).showSnackBar(const SnackBar(
+        content: Text('Respuesta enviada... esperando confirmación'),
+        duration: Duration(seconds: 2),
+      ));
     } catch (error) {
       if (!mounted) return;
       setState(() => _answerSubmitted = false);
@@ -439,17 +460,36 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
                           horizontal: 18,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
+                          color: _answerConfirmed
+                              ? Colors.green.withValues(alpha: 0.15)
+                              : Colors.white.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: const Text(
-                          'Respuesta enviada. Espera los resultados del anfitrión.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                          border: Border.all(
+                            color: _answerConfirmed ? Colors.green[300]! : Colors.white24,
                           ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _answerConfirmed ? Icons.check_circle : Icons.hourglass_bottom,
+                              color: _answerConfirmed ? Colors.green[300] : Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _answerConfirmed
+                                    ? 'Respuesta confirmada ✓'
+                                    : 'Respuesta enviada. Esperando confirmación...',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _answerConfirmed ? Colors.green[300] : Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

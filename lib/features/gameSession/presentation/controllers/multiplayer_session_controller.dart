@@ -104,6 +104,7 @@ class MultiplayerSessionController extends ChangeNotifier {
   HostConnectedSuccessEvent? get hostConnectedSuccessDto => _lobbyManager.hostConnectedSuccessDto;
   PlayerAnswerConfirmationEvent? get playerAnswerConfirmationDto => _lobbyManager.playerAnswerConfirmationDto;
   GameErrorEvent? get gameErrorDto => _connectionManager.gameErrorDto;
+  PlayerConnectedEvent? get playerConnectedDto => _lobbyManager.playerConnectedDto;
   DateTime? get questionStartedAt => _gamePhaseManager.questionStartedAt;
   SessionPhase get phase => _gamePhaseManager.phase;
   int get questionSequence => _gamePhaseManager.questionSequence;
@@ -252,6 +253,24 @@ class MultiplayerSessionController extends ChangeNotifier {
     } finally {
       _lobbyManager.setIsJoiningSession(false);
       notifyListeners();
+    }
+  }
+
+  /// El jugador cambia su nickname emitiendo nuevo evento de unirse con nickname actualizado.
+  Future<void> joinLobbyWithNickname({required String nickname}) async {
+    String safeNickname;
+    try {
+      safeNickname = _validateNickname(nickname);
+    } catch (error) {
+      rethrow;
+    }
+    _lobbyManager.setCurrentNickname(safeNickname);
+    notifyListeners();
+    try {
+      _realtime.emitPlayerJoin(PlayerJoinPayload(nickname: safeNickname));
+    } catch (error) {
+      _lastError = error.toString();
+      rethrow;
     }
   }
 

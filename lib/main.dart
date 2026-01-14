@@ -104,12 +104,30 @@ import 'features/subscriptions/presentation/screens/subscription_management_scre
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
 
-  defaultValue: 'https://backcomun-gc5j.onrender.com',
+  defaultValue: 'https://quizzy-backend-1-zpvc.onrender.com',
 
 );
 
-// Token (UUID) usado mientras el backend mockea la verificación real.
-const String apiAuthToken = String.fromEnvironment('API_AUTH_TOKEN', defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333');
+// Token provider que obtiene el currentUserId del almacenamiento seguro
+// Si no hay usuario autenticado, devuelve un UUID por defecto
+Future<String?> _getAuthToken() async {
+  try {
+    final currentUserId = await SecureStorage.instance.read('currentUserId');
+    if (currentUserId != null && currentUserId.isNotEmpty) {
+      print('[TOKEN_PROVIDER] Using currentUserId from storage: $currentUserId');
+      return currentUserId;
+    }
+    print('[TOKEN_PROVIDER] No currentUserId found in storage, using default token');
+    const defaultToken = 'acde070d-8c4c-4f0d-9d8a-162843c10333';
+    print('[TOKEN_PROVIDER] Default token: $defaultToken');
+    return defaultToken;
+  } catch (e) {
+    print('[TOKEN_PROVIDER] Error reading token: $e');
+    const defaultToken = 'acde070d-8c4c-4f0d-9d8a-162843c10333';
+    print('[TOKEN_PROVIDER] Returning default token due to error: $defaultToken');
+    return defaultToken;
+  }
+}
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (!kUseFirebase) return;
@@ -145,11 +163,12 @@ class MyApp extends StatelessWidget {
             baseUrl: apiBaseUrl,
             client: context.read<http.Client>(),
             headersProvider: () async {
-              final token = await SecureStorage.instance.read('userId');
+              // Use the actual user UUID as the token for Authorization
+              final userId = await SecureStorage.instance.read('currentUserId');
               return {
                 'Content-Type': 'application/json',
-                if (token != null && token.isNotEmpty)
-                  'Authorization': 'Bearer $token',
+                if (userId != null && userId.isNotEmpty)
+                  'Authorization': 'Bearer $userId',
               };
             },
           ),
@@ -269,7 +288,7 @@ class MyApp extends StatelessWidget {
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
             baseUrl: apiBaseUrl,
-            mockAuthToken: apiAuthToken,
+            mockAuthToken: 'acde070d-8c4c-4f0d-9d8a-162843c10333',
           ),
         ),
         Provider<SinglePlayerGameRepository>(
@@ -362,13 +381,13 @@ class MyApp extends StatelessWidget {
         Provider<MultiplayerSessionRemoteDataSource>(
           create: (context) => MultiplayerSessionRemoteDataSourceImpl(
             dio: context.read<Dio>(),
-            tokenProvider: () async => apiAuthToken,
+            tokenProvider: _getAuthToken,
           ),
         ),
         Provider<MultiplayerSocketClient>(
           create: (_) => MultiplayerSocketClient(
             baseUrl: apiBaseUrl,
-            defaultTokenProvider: () async => apiAuthToken,
+            defaultTokenProvider: _getAuthToken,
           ),
         ),
         Provider<MultiplayerSessionRepository>(
