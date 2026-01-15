@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import './../../../../local/secure_storage.dart';
 import '../../domain/entities/Quiz.dart';
 import '../../domain/repositories/QuizRepository.dart';
 
@@ -21,7 +22,7 @@ class QuizRepositoryImpl implements QuizRepository {
   String _mapQuestionType(String raw) {
     final t = raw.trim().toLowerCase();
     if (t == 'quiz' || t == 'single') return 'single';
-    if (t == 'multiple') return 'multiple';
+    if (t == 'multiple' ) return 'multiple';
     if (t == 'true_false' || t == 'true-false' || t == 'truefalse') return 'true_false';
     return raw; // deja pasar valores inesperados para que el backend falle explícitamente
   }
@@ -43,15 +44,21 @@ class QuizRepositoryImpl implements QuizRepository {
   }
 
   // Construye headers según contrato: Content-Type y x-debug-user-id.
-  Map<String, String> _headers({required String userId, bool json = false}) {
-    final id = userId.trim();
+  Future<Map<String, String>> _headers({required String userId, bool json = false}) async {
     final h = <String, String>{
       'Accept': 'application/json',
     };
     if (json) h['Content-Type'] = 'application/json';
-    if (id.isNotEmpty) {
-      h['x-debug-user-id'] = id;
+
+    // Agregar solo el BearerToken del usuario autenticado
+    final token = await _getBearerToken();
+    print('[DEBUG] BearerToken obtenido: $token');
+    if (token != null && token.isNotEmpty) {
+      h['Authorization'] = 'Bearer $token';
+    } else {
+      print('[ERROR] No se obtuvo BearerToken, el header Authorization no será enviado');
     }
+    print('[DEBUG] Headers finales: $h');
     return h;
   }
 
@@ -94,7 +101,7 @@ class QuizRepositoryImpl implements QuizRepository {
     if (!_isUuidV4(quiz.authorId)) {
       print('QuizRepositoryImpl.save -> authorId no parece UUID v4: "${quiz.authorId}"');
     }
-    final headers = _headers(userId: _currentUserId ?? quiz.authorId, json: true);
+    final headers = await _headers(userId: _currentUserId ?? quiz.authorId, json: true);
 
     // Debug logs: imprimir URL, método, headers y body para ayudar a reproducir errores 500 del servidor.
     try {
@@ -203,10 +210,11 @@ class QuizRepositoryImpl implements QuizRepository {
 
     // Acepta UUID o URL; el backend usa 'mediaId' pero almacenaremos el URL cuando sea disponible.
     String? _mediaIdAllowingUrl(String? v) {
-      if (v == null) return null;
-      final s = v.trim();
-      if (s.isEmpty) return null;
-      return s; // no restringir a UUID, permitir URL
+      if (v == null || v.trim().isEmpty) return null;
+      final trimmed = v.trim();
+      if (_isUuidV4(trimmed)) return trimmed;
+      if (Uri.tryParse(trimmed)?.hasAbsolutePath == true) return trimmed;
+      throw Exception('Formato inválido para mediaId: $v');
     }
 
     // Normaliza a los valores que el backend muestra en el contrato: "Public" / "Private".
@@ -256,76 +264,66 @@ class QuizRepositoryImpl implements QuizRepository {
     final payload = <String, dynamic>{
       'title': _safeString(quiz.title),
       'description': _safeString(quiz.description),
-        // Enviar URL en coverImageId según contrato
-        'coverImageId': _safeString(quiz.coverImageUrl).trim().isNotEmpty
-          ? _safeString(quiz.coverImageUrl).trim()
+      'coverImageId': quiz.coverImageUrl?.trim().isNotEmpty == true
+          ? _mediaIdAllowingUrl(quiz.coverImageUrl)
           : null,
       'visibility': vis,
-      // Usar los valores del quiz si existen, de lo contrario dejar valores por defecto
       'status': statusValue,
-      'category': _safeString(quiz.category ?? 'Tecnología'),
+      'category': _safeString(quiz.category),
       'themeId': safeThemeId,
-      'questions': quiz.questions.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final q = entry.value;
+      'questions': quiz.questions.map((q) {
         final answersList = q.answers.map((a) {
           final mediaId = _mediaIdAllowingUrl(a.mediaUrl);
           final textRaw = _safeString(a.text).trim();
           final text = textRaw.isEmpty ? null : textRaw;
           _assertAnswerValid(text ?? '', mediaId);
-          final answerMap = <String, dynamic>{
+          return <String, dynamic>{
             'text': text,
-            // Guardar URL en mediaId según contrato
-            'mediaId': _safeString(a.mediaUrl).trim().isNotEmpty
-                ? _safeString(a.mediaUrl).trim()
-                : null,
+            'mediaId': mediaId,
             'isCorrect': a.isCorrect,
           };
-          if (includeIds) answerMap['id'] = _sanitizeId(a.answerId);
-          return answerMap;
         }).toList();
 
-        final qText = _safeString(q.text);
-        if (!(allowEmptyAnswers && answersList.isEmpty)) {
-          _assertQuestionValid(qText, answersList);
-        }
+        _assertQuestionValid(q.text, answersList);
 
-        final questionMap = <String, dynamic>{
-          'text': qText.trim(),
-          // Guardar URL en mediaId según contrato
-          'mediaId': _safeString(q.mediaUrl).trim().isNotEmpty
-              ? _safeString(q.mediaUrl).trim()
-              : null,
+        return <String, dynamic>{
+          'text': _safeString(q.text).trim(),
+          'mediaId': _mediaIdAllowingUrl(q.mediaUrl),
           'type': _mapQuestionType(_safeString(q.type)),
-          'timeLimit': q.timeLimit,
-          'points': q.points,
-          'position': idx,
-          'answers': answersList.isEmpty && allowEmptyAnswers ? null : answersList,
+          'timeLimit': _validateTimeLimit(q.timeLimit, q.type),
+          'points': _validatePoints(q.points, q.type),
+          'answers': answersList,
         };
-
-        if (includeIds) {
-          questionMap['id'] = _sanitizeId(q.questionId);
-        }
-
-        return questionMap;
       }).toList(),
     };
 
-    payload['authorId'] = authorId;
-
-    if (includeIds) {
-      // Algunos backends solo esperan id en la ruta; se omite aquí para evitar 400.
-      // Si llegara a ser requerido, se puede reactivar.
-      // payload['id'] = quiz.quizId;
-    }
-
     return payload;
+  }
+
+  int _validateTimeLimit(int timeLimit, String type) {
+    const validTimeLimits = [5, 10, 20, 30, 45, 60, 90, 120, 180, 240];
+    if (!validTimeLimits.contains(timeLimit)) {
+      throw Exception('Invalid time limit: $timeLimit');
+    }
+    return timeLimit;
+  }
+
+  int _validatePoints(int points, String type) {
+    final validPoints = {
+      'multiple': [0, 500, 1000],
+      'true_false': [0, 1000, 2000],
+      'single': [0, 1000, 2000],
+    };
+    if (!validPoints.containsKey(type) || !validPoints[type]!.contains(points)) {
+      throw Exception('Invalid points: $points for type: $type');
+    }
+    return points;
   }
 
   @override 
   Future<Quiz?> find(String id) async {
     final url = '$baseUrl/kahoots/$id';
-    final headers = _headers(userId: _currentUserId ?? '', json: false);
+    final headers = await _headers(userId: _currentUserId ?? '', json: false);
     try {
       print('QuizRepositoryImpl.find -> GET $url');
       print('Request headers: $headers');
@@ -354,7 +352,7 @@ class QuizRepositoryImpl implements QuizRepository {
     }
 
     final url = '$baseUrl/kahoots/$id';
-    final headers = _headers(userId: _currentUserId ?? '', json: false);
+    final headers = await _headers(userId: _currentUserId ?? '', json: false);
     try {
       print('QuizRepositoryImpl.delete -> DELETE $url');
       print('Request headers: $headers');
@@ -378,7 +376,7 @@ class QuizRepositoryImpl implements QuizRepository {
     // Los errores 5xx se tratan como transitorios y devuelven lista vacía; los 4xx se propagan.
     final url = '$baseUrl/kahoots/user/$authorId';
     _currentUserId = authorId.trim();
-    final headers = _headers(userId: authorId, json: false);
+    final headers = await _headers(userId: authorId, json: false);
     try {
       print('QuizRepositoryImpl.searchByAuthor -> GET $url');
       print('Request headers: $headers');
@@ -406,6 +404,13 @@ class QuizRepositoryImpl implements QuizRepository {
 
       throw Exception(msg);
     }
+  }
+
+  Future<String?> _getBearerToken() async {
+    // Recupera el token usando SecureStorage
+    // Asegúrate de importar correctamente SecureStorage si no está importado
+    // import 'package:BlueFront/local/secure_storage.dart';
+    return await SecureStorage.instance.read('token');
   }
 }
 
