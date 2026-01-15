@@ -49,10 +49,13 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
           uri,
           headers: {
             'Content-Type': 'application/json',
-            'userId': adminId ?? '',
+            //'authorization': token ?? '',
+            'Authorization': 'Bearer $token',
           }
       );
 
+      print('URL: PATCH $uri');
+      print('HEADERS: {"Content-Type": "application/json", "authorization": "$token"}');
       print('--- HTTP RESPONSE ---');
       print('STATUS: ${response.statusCode}');
       print('BODY: ${response.body}');
@@ -90,7 +93,8 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? '',
+        //'authorization': token ?? '',
+        'Authorization': 'Bearer $token',
       },
     );
     print('--- HTTP RESPONSE ---');
@@ -123,7 +127,7 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? '',
+        'Authorization': 'Bearer $token',
       },
     );
     print('--- HTTP RESPONSE ---');
@@ -156,7 +160,7 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? ''
+        'Authorization': 'Bearer $token',
       },
     );
     print('--- HTTP RESPONSE ---');

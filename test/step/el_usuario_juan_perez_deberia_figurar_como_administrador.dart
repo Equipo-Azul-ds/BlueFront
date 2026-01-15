@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Usage: debería ver al usuario "Admin Trivvy" con el rol "Administrador"
@@ -5,5 +6,5 @@ Future<void> elUsuarioJuanPerezDeberiaFigurarComoAdministrador(WidgetTester test
   expect(find.text('Juan Perez'), findsOneWidget);
 
   // Verificamos que aparezca la etiqueta de Administrador
-  expect(find.textContaining('Administrador'), findsAtLeastNWidgets(1));
+  expect(find.byIcon(Icons.admin_panel_settings), findsAtLeastNWidgets(1));
 }

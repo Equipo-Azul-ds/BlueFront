@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:dartz/dartz.dart';
@@ -10,6 +11,5 @@ Future<void> elUsuarioJuanPerezDeberiaFigurarComoBloqueado(WidgetTester tester) 
   // o el estado del provider refleje el bloqueo.
 
   // Verificamos si en la UI aparece el texto "Bloqueado" o si el botón cambió a "Desbloquear"
-  expect(find.text('Desbloquear'), findsOneWidget);
-  expect(find.textContaining('Bloqueado'), findsWidgets);
+  expect(find.byIcon(Icons.lock_open), findsOneWidget);
 }

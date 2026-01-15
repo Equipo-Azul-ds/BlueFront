@@ -5,16 +5,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'step/UserManagament/que_el_administrador_ha_iniciado_sesion.dart';
-import 'step/UserManagament/existen_usuarios_registrados_en_el_sistema.dart';
-import 'step/UserManagament/abro_la_pagina_de_gestion_de_usuarios.dart';
-import 'step/UserManagament/deberia_ver_al_usuario_juan_perez_con_el_rol_usuario.dart';
-import 'step/UserManagament/deberia_ver_al_usuario_admin_trivvy_con_el_rol_administrador.dart';
-import 'step/UserManagament/presiono_el_boton_dar_privilegios_del_usuario_juan_perez.dart';
-import 'step/UserManagament/confirmo_el_cambio_en_el_dialogo.dart';
-import 'step/UserManagament/el_usuario_juan_perez_deberia_figurar_como_administrador.dart' hide deberiaVerAlUsuarioAdminTrivvyConElRolAdministrador;
-import 'step/UserManagament/presiono_el_boton_bloquear_del_usuario_juan_perez.dart';
-import 'step/UserManagament/el_usuario_juan_perez_deberia_figurar_como_bloqueado.dart';
+import './step/que_el_administrador_ha_iniciado_sesion.dart';
+import './step/existen_usuarios_registrados_en_el_sistema.dart';
+import './step/abro_la_pagina_de_gestion_de_usuarios.dart';
+import './step/deberia_ver_al_usuario_juan_perez_con_el_rol_usuario.dart';
+import './step/deberia_ver_al_usuario_admin_trivvy_con_el_rol_administrador.dart';
+import './step/presiono_el_boton_dar_privilegios_del_usuario_juan_perez.dart';
+import './step/confirmo_el_cambio_en_el_dialogo.dart';
+import './step/el_usuario_juan_perez_deberia_figurar_como_administrador.dart';
+import './step/presiono_el_boton_bloquear_del_usuario_juan_perez.dart';
+import './step/el_usuario_juan_perez_deberia_figurar_como_bloqueado.dart';
 
 void main() {
   group('''Gestión de Usuarios por el Administrador''', () {

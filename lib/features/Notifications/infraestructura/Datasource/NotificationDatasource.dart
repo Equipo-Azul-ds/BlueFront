@@ -151,7 +151,7 @@ class NotificationRemoteDataSource implements INotificationDataSource {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? '',
+        'Authorization': 'Bearer $token',
       },
       body: jsonEncode({
         "title": title,
@@ -199,7 +199,7 @@ class NotificationRemoteDataSource implements INotificationDataSource {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? '',
+        'Authorization': 'Bearer $token',
       },
     );
     print('URL: PATCH $uri');

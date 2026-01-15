@@ -24,7 +24,7 @@ class _AvatarPickerPageState extends State<AvatarPickerPage> {
   }
 
   void _select(String seed) {
-    Navigator.of(context).pop<String>(_urlForSeed(seed));
+    Navigator.of(context).pop<String>(seed); // Devuelve solo el seed
   }
 
   void _randomSelect() {

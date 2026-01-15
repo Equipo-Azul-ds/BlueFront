@@ -2,30 +2,35 @@ import '../domain/entities/User.dart';
 import '../domain/repositories/UserRepository.dart';
 
 class UpdateUserSettingsParams {
-  final String? id;
   final String? userName;
   final String? email;
   final String? name;
   final String? description;
   final String? avatarUrl;
+  final String? avatarAssetId; // Nuevo campo para el ID del avatar
   final String? userType;
-  final String? hashedPassword;
   final String? theme;
   final String? language;
   final int? gameStreak;
+  // Campos específicos para cambio de contraseña según contrato PATCH /user/profile/
+  final String? currentPassword;
+  final String? newPassword;
+  final String? confirmNewPassword;
 
   const UpdateUserSettingsParams({
-    this.id,
     this.userName,
     this.email,
     this.name,
     this.description,
     this.avatarUrl,
+    this.avatarAssetId, // Agregado el nuevo campo
     this.userType,
-    this.hashedPassword,
     this.theme,
     this.language,
     this.gameStreak,
+    this.currentPassword,
+    this.newPassword,
+    this.confirmNewPassword,
   });
 }
 
@@ -35,17 +40,19 @@ class UpdateUserSettingsUseCase {
 
   Future<User> call(UpdateUserSettingsParams params) {
     return repository.updateSettings(
-      id: params.id,
       userName: params.userName,
       email: params.email,
       name: params.name,
       description: params.description,
       avatarUrl: params.avatarUrl,
+      avatarAssetId: params.avatarAssetId, // Agregado el nuevo campo
       userType: params.userType,
-      hashedPassword: params.hashedPassword,
       theme: params.theme,
       language: params.language,
       gameStreak: params.gameStreak,
+      currentPassword: params.currentPassword,
+      newPassword: params.newPassword,
+      confirmNewPassword: params.confirmNewPassword,
     );
   }
 }
