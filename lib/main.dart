@@ -87,6 +87,7 @@ import 'features/user/presentation/widgets/session_expiry_listener.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'config/use_firebase.dart';
+import 'core/config/api_config.dart';
 
 import 'features/subscriptions/domain/repositories/subscription_repository.dart';
 import 'features/subscriptions/application/usecases/subscribe_user_usecase.dart';
@@ -100,8 +101,8 @@ import 'features/subscriptions/presentation/screens/subscription_management_scre
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Render
-// API base 1: 'https://backcomun-gc5j.onrender.com' -- https://backcomun-mzvy.onrender.com 
-// API base 2: https://quizzy-backend-0wh2.onrender.com/api
+// API base 1: https://backcomun-mzvy.onrender.com 
+// API base 2: https://quizzy-backend-1-zpvc.onrender.com
 // https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
@@ -120,8 +121,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
+  // Initialize API configuration based on environment
+  _initializeApiConfig();
+
   // Mostrar en consola la URL base que la app está usando (útil para depuración)
   print('API_BASE_URL = $apiBaseUrl');
+  print('HTTP Base URL = ${ApiConfigManager.httpBaseUrl}');
+  print('WebSocket Base URL = ${ApiConfigManager.websocketBaseUrl}');
+
   WidgetsFlutterBinding.ensureInitialized();
   if (kUseFirebase) {
     await Firebase.initializeApp();
@@ -130,6 +137,24 @@ Future<void> main() async {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
   runApp(MyApp());
+}
+
+/// Initializes the API configuration based on the API_BASE_URL environment variable.
+/// Supports both quizzybackend and backcomun backends.
+void _initializeApiConfig() {
+  // Extract domain from the full URL
+  final url = Uri.parse(apiBaseUrl);
+  final domain = '${url.host}${url.hasPort ? ':${url.port}' : ''}';
+
+  // Determine backend type based on domain
+  if (domain.contains('quizzy-backend')) {
+    ApiConfigManager.setConfig(BackendType.quizzyBackend, domain);
+  } else if (domain.contains('backcomun')) {
+    ApiConfigManager.setConfig(BackendType.backcomun, domain);
+  } else {
+    // Default to backcomun if unrecognized
+    ApiConfigManager.setConfig(BackendType.backcomun, domain);
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -144,7 +169,7 @@ class MyApp extends StatelessWidget {
         // Reportes: repo + casos de uso + BLoC (ChangeNotifier)
         Provider<ReportsRepository>(
           create: (context) => ReportsRepositoryImpl(
-            baseUrl: apiBaseUrl,
+            baseUrl: ApiConfigManager.httpBaseUrl,
             client: context.read<http.Client>(),
             headersProvider: () async {
               final token = await SecureStorage.instance.read('userId');
@@ -184,7 +209,7 @@ class MyApp extends StatelessWidget {
 
         Provider<IUserDataSource>(
           create: (context) => UserRemoteDataSourceImpl(
-            baseUrl: apiBaseUrl,
+            baseUrl: ApiConfigManager.httpBaseUrl,
             cliente: context
                 .read<
                   http.Client
@@ -225,13 +250,13 @@ class MyApp extends StatelessWidget {
 
         Provider<KahootRemoteDataSource>(
           create: (context) => KahootRemoteDataSource(
-            baseUrl: apiBaseUrl,
+            baseUrl: ApiConfigManager.httpBaseUrl,
             cliente: context.read<http.Client>(),
           ),
         ),
         Provider<ThemeRemoteDataSource>(
           create: (context) => ThemeRemoteDataSource(
-            baseUrl: apiBaseUrl,
+            baseUrl: ApiConfigManager.httpBaseUrl,
             cliente: context.read<http.Client>(),
           ),
         ),
@@ -256,7 +281,7 @@ class MyApp extends StatelessWidget {
             final provider = NotificationProvider(
               repository: NotificationRepository(
                 dataSource: NotificationRemoteDataSource(
-                  baseUrl: apiBaseUrl,
+                  baseUrl: ApiConfigManager.httpBaseUrl,
                   client: context.read<http.Client>(),
                 ),
               ),
@@ -269,7 +294,7 @@ class MyApp extends StatelessWidget {
         ),
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
-            baseUrl: apiBaseUrl,
+            baseUrl: ApiConfigManager.httpBaseUrl,
             mockAuthToken: apiAuthToken,
           ),
         ),
@@ -342,7 +367,7 @@ class MyApp extends StatelessWidget {
         Provider<Dio>(
           create: (_) => Dio(
             BaseOptions(
-              baseUrl: apiBaseUrl,
+              baseUrl: ApiConfigManager.httpBaseUrl,
               connectTimeout: const Duration(seconds: 10),
               receiveTimeout: const Duration(seconds: 10),
               sendTimeout: const Duration(seconds: 10),
@@ -352,13 +377,13 @@ class MyApp extends StatelessWidget {
         //Estos son los proveedores para los repositorios (inyeccion de dependencias)
         // Repositorios con configuración mínima (ajusta baseUrl según tu entorno)
         Provider<QuizRepository>(
-          create: (_) => QuizRepositoryImpl(baseUrl: apiBaseUrl),
+          create: (_) => QuizRepositoryImpl(baseUrl: ApiConfigManager.httpBaseUrl),
         ),
         Provider<MediaRepository>(
-          create: (_) => MediaRepositoryImpl(baseUrl: apiBaseUrl),
+          create: (_) => MediaRepositoryImpl(baseUrl: ApiConfigManager.httpBaseUrl),
         ),
         Provider<StorageProviderRepository>(
-          create: (_) => StorageProviderRepositoryImpl(baseUrl: apiBaseUrl),
+          create: (_) => StorageProviderRepositoryImpl(baseUrl: ApiConfigManager.httpBaseUrl),
         ),
         Provider<MultiplayerSessionRemoteDataSource>(
           create: (context) => MultiplayerSessionRemoteDataSourceImpl(
@@ -368,7 +393,7 @@ class MyApp extends StatelessWidget {
         ),
         Provider<MultiplayerSocketClient>(
           create: (_) => MultiplayerSocketClient(
-            baseUrl: apiBaseUrl,
+            baseUrl: ApiConfigManager.websocketBaseUrl,
             defaultTokenProvider: () async => apiAuthToken,
           ),
         ),
@@ -459,7 +484,7 @@ class MyApp extends StatelessWidget {
         ),
         Provider<LibraryRepository>(
           create: (context) => LibraryRepositoryImpl(
-            baseUrl: apiBaseUrl,
+            baseUrl: ApiConfigManager.httpBaseUrl,
             client: context.read<http.Client>(),
           ),
         ),
@@ -533,7 +558,6 @@ class MyApp extends StatelessWidget {
       ],
 
       child: UserProviders(
-        baseUrl: apiBaseUrl,
         child: Builder(
           builder: (context) {
             return SessionExpiryListener(

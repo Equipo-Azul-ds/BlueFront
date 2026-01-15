@@ -99,7 +99,7 @@ class UserRepositoryImpl implements UserRepository {
 
   @override
   Future<void> create(User user) async {
-    final uri = Uri.parse('$baseUrl/user');
+    final uri = Uri.parse('$baseUrl/user/register');
     if (user.hashedPassword.isEmpty) {
       throw Exception('password requerido para crear usuario');
     }

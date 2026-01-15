@@ -126,29 +126,37 @@ class AuthBloc extends ChangeNotifier {
           name: safeName,
         ),
       );
-      // Luego busca al usuario recién creado (mock) para setear currentUser
-      final createdUser = await getUserByName(userName);
-      currentUser = createdUser;
-      await storage.write('currentUserId', createdUser.id);
-      await storage.write('hashedPassword', plainPassword);
+      User? createdUser;
+      try {
+        createdUser = await getUserByName(userName);
+      } catch (_) {
+        // Si el backend no permite leer sin autenticación, continuamos sin lanzar error.
+        createdUser = null;
+      }
 
-      // Si por alguna razón el backend devolvió name vacío, fuerza un PATCH inmediato con name e invariantes.
-      if (createdUser.name.trim().isEmpty && safeName.isNotEmpty) {
-        // ignore: avoid_print
-        print('[auth] signup detected empty name, patching with safeName="$safeName"');
-        currentUser = await updateSettings(
-          UpdateUserSettingsParams(
-            userName: createdUser.userName,
-            email: createdUser.email,
-            name: safeName,
-            description: createdUser.description,
-            avatarUrl: createdUser.avatarUrl,
-            userType: createdUser.userType,
-            theme: createdUser.theme,
-            language: createdUser.language,
-            gameStreak: createdUser.gameStreak,
-          ),
-        );
+      if (createdUser != null) {
+        currentUser = createdUser;
+        await storage.write('currentUserId', createdUser.id);
+        await storage.write('hashedPassword', plainPassword);
+
+        // Si por alguna razón el backend devolvió name vacío, fuerza un PATCH inmediato con name e invariantes.
+        if (createdUser.name.trim().isEmpty && safeName.isNotEmpty) {
+          // ignore: avoid_print
+          print('[auth] signup detected empty name, patching with safeName="$safeName"');
+          currentUser = await updateSettings(
+            UpdateUserSettingsParams(
+              userName: createdUser.userName,
+              email: createdUser.email,
+              name: safeName,
+              description: createdUser.description,
+              avatarUrl: createdUser.avatarUrl,
+              userType: createdUser.userType,
+              theme: createdUser.theme,
+              language: createdUser.language,
+              gameStreak: createdUser.gameStreak,
+            ),
+          );
+        }
       }
 
       return currentUser;
