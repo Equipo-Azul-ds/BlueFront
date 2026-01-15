@@ -188,6 +188,22 @@ class AuthBloc extends ChangeNotifier {
       // Debug: imprime los campos que se enviarán
       // ignore: avoid_print
       print('[auth] updateProfile id=${user.id} sending fields=$fields');
+      if (avatarUrl != null && avatarUrl.isNotEmpty) {
+        try {
+          final u = Uri.parse(avatarUrl);
+          final seed = u.queryParameters['seed'];
+          if (seed != null && seed.isNotEmpty) {
+            fields['avatarAssetId'] = seed; // Use the seed as the ID
+          } else if (!avatarUrl.contains('://')) {
+            // If it doesn't look like a URL, assume it's already a valid ID
+            fields['avatarAssetId'] = avatarUrl;
+          }
+        } catch (_) {
+          // If it's not a valid URL, it might already be an ID
+          if (!avatarUrl.contains('://')) fields['avatarAssetId'] = avatarUrl;
+        }
+      }
+
       currentUser = await updateSettings(
         UpdateUserSettingsParams(
           userName: fields['userName'],
@@ -195,6 +211,7 @@ class AuthBloc extends ChangeNotifier {
           name: fields['name'],
           description: fields['description'],
           avatarUrl: fields['avatarUrl'],
+          avatarAssetId: fields['avatarAssetId'],
           userType: fields['userType'],
           theme: fields['theme'],
           language: fields['language'],

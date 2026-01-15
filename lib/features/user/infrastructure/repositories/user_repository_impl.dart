@@ -234,6 +234,7 @@ class UserRepositoryImpl implements UserRepository {
     String? currentPassword,
     String? newPassword,
     String? confirmNewPassword,
+    String? avatarAssetId, // Nuevo campo para el ID del avatar
   }) async {
     // PATCH del perfil autenticado usando token: /user/profile/
     final uri = Uri.parse('$baseUrl/user/profile/');

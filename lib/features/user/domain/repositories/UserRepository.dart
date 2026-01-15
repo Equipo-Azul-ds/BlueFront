@@ -34,6 +34,7 @@ abstract class UserRepository {
     String? currentPassword,
     String? newPassword,
     String? confirmNewPassword,
+    String? avatarAssetId, // Nuevo campo para el ID del avatar
   });
 
   Future<User> setMembershipPremium(bool enabled);
