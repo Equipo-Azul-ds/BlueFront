@@ -146,7 +146,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             children: [
                               const Text(
                                 'Ingresa tu contraseña actual',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               const SizedBox(height: 12),
                               TextField(
@@ -165,7 +168,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                   final p = passCtrl.text.trim();
                                   if (p.length < 6) {
                                     ScaffoldMessenger.of(ctx).showSnackBar(
-                                      const SnackBar(content: Text('Min. 6 caracteres')),
+                                      const SnackBar(
+                                        content: Text('Min. 6 caracteres'),
+                                      ),
                                     );
                                     return;
                                   }
@@ -180,7 +185,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     );
                     if (current == null) return;
                     try {
-                      await auth.changePassword(currentPassword: current, newPassword: newP, confirmNewPassword: conf);
+                      await auth.changePassword(
+                        currentPassword: current,
+                        newPassword: newP,
+                        confirmNewPassword: conf,
+                      );
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Contraseña actualizada')),
@@ -289,9 +298,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ReportsListPage(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ReportsListPage()),
                   );
                 },
                 icon: const Icon(Icons.assessment),
@@ -301,7 +308,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   textStyle: const TextStyle(fontSize: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
 
@@ -333,7 +342,9 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final nameVal = _nameCtrl.text.trim();
       final descVal = _descCtrl.text.trim();
-      final avatarChanged = _avatarUrl.isNotEmpty && _avatarUrl != (auth.currentUser?.avatarUrl ?? widget.user.avatarUrl);
+      final avatarChanged =
+          _avatarUrl.isNotEmpty &&
+          _avatarUrl != (auth.currentUser?.avatarUrl ?? widget.user.avatarUrl);
       await auth.updateProfile(
         name: nameVal,
         description: descVal.isNotEmpty ? descVal : '',
@@ -433,7 +444,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 4),
                 Text(u.email, style: const TextStyle(color: Colors.black54)),
                 const SizedBox(height: 12),
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -619,13 +631,16 @@ class _ProfilePageState extends State<ProfilePage> {
             builder: (ctx) {
               final nameChanged = _nameCtrl.text.trim() != user.name;
               final descChanged = _descCtrl.text.trim() != user.description;
-              final avatarChanged = _avatarUrl.isNotEmpty && _avatarUrl != user.avatarUrl;
+              final avatarChanged =
+                  _avatarUrl.isNotEmpty && _avatarUrl != user.avatarUrl;
               return ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColor.primary,
                   foregroundColor: Colors.white,
                 ),
-                onPressed: (auth.isLoading || (!nameChanged && !descChanged && !avatarChanged))
+                onPressed:
+                    (auth.isLoading ||
+                        (!nameChanged && !descChanged && !avatarChanged))
                     ? null
                     : () => _save(auth),
                 child: auth.isLoading

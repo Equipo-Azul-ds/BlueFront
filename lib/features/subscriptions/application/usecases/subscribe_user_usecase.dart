@@ -3,20 +3,10 @@ import '../../domain/repositories/subscription_repository.dart';
 
 class SubscribeUserUseCase {
   final ISubscriptionRepository repository;
-
   SubscribeUserUseCase(this.repository);
 
-  Future<Subscription> execute(String userId, String planId) async {
-    if (userId.trim().isEmpty) {
-      throw ArgumentError(
-        'El ID de usuario es obligatorio para la suscripción',
-      );
-    }
-
-    if (planId.trim().isEmpty) {
-      throw ArgumentError('Debe seleccionar un plan válido');
-    }
-
-    return await repository.createSubscription(userId: userId, planId: planId);
+  Future<Subscription> execute(String token, String planId) async {
+    if (token.isEmpty) throw ArgumentError('Token de sesión requerido');
+    return await repository.createSubscription(token: token, planId: planId);
   }
 }
