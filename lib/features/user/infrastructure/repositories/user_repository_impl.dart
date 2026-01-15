@@ -270,17 +270,25 @@ class UserRepositoryImpl implements UserRepository {
         : null;
 
     final payload = <String, dynamic>{
-      if (mappedUsername != null) 'username': mappedUsername,
-      if (mappedEmail != null) 'email': mappedEmail,
-      if (mappedName != null) 'name': mappedName,
-      if (mappedDescription != null) 'description': mappedDescription,
-      if (mappedAvatarId != null) 'avatarAssetId': mappedAvatarId,
-      if (mappedThemePref != null) 'themePreference': mappedThemePref,
-      if (mappedType != null) 'type': mappedType,
-      if (currentPassword != null) 'currentPassword': currentPassword,
-      if (newPassword != null) 'newPassword': newPassword,
-      if (confirmNewPassword != null) 'confirmNewPassword': confirmNewPassword,
+      'username': mappedUsername,
+      'email': mappedEmail,
+      'currentPassword': currentPassword,
+      // No incluir newPassword ni confirmNewPassword si están vacíos
+      if (newPassword != null && newPassword.isNotEmpty) 'newPassword': newPassword,
+      if (confirmNewPassword != null && confirmNewPassword.isNotEmpty) 'confirmNewPassword': confirmNewPassword,
+      'name': mappedName,
+      'description': mappedDescription,
+      'avatarAssetId': mappedAvatarId,
+      'themePreference': mappedThemePref,
     };
+
+    // Asegurar que la contraseña original no se elimine si no se envían nuevas contraseñas
+    if (newPassword == null || newPassword.isEmpty) {
+      payload.remove('newPassword');
+    }
+    if (confirmNewPassword == null || confirmNewPassword.isEmpty) {
+      payload.remove('confirmNewPassword');
+    }
 
     // Debug: imprime payload y URL
     // ignore: avoid_print
