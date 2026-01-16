@@ -214,6 +214,22 @@ class GroupsBloc extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> assignQuiz({
+    required String groupId,
+    required String quizId,
+    required DateTime availableFrom,
+    required DateTime availableUntil,
+  }) async {
+    await repository.assignQuizToGroup(
+      groupId: groupId,
+      quizId: quizId,
+      availableFrom: availableFrom,
+      availableUntil: availableUntil,
+    );
+    // Recargar asignaciones para actualizar la lista en UI
+    await loadGroupAssignments(groupId);
+  }
+
   List<Group> joinedGroups() {
     final userId = _currentUserId;
     if (userId == null) return []; 

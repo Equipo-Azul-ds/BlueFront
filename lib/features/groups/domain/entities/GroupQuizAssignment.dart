@@ -30,7 +30,7 @@ class GroupQuizAssignment {
 
   factory GroupQuizAssignment.fromJson(Map<String, dynamic> json) {
     final availableFromRaw = json['availableFrom'] ?? json['available_from'];
-    final availableUntilRaw = json['availableUntil'] ?? json['available_until'];
+    final availableUntilRaw = json['availableUntil'] ?? json['available_until'] ?? json['availableTo'];
     final createdRaw = json['createdAt'] ?? json['created_at'];
     final nestedQuiz = json['quiz'];
     String parsedTitle = '';

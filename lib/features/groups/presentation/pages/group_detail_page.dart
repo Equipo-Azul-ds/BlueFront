@@ -176,7 +176,7 @@ class _GroupDetailPageState extends State<GroupDetailPage>
         ),
       ),
       body: _buildBody(bloc),
-      floatingActionButton: (group != null && _isCurrentUserMember(context, group))
+      floatingActionButton: (group != null && isAdmin)
           ? FloatingActionButton.extended(
               onPressed: () => _showAssignQuizDialog(bloc, group),
               icon: const Icon(Icons.assignment_add),
@@ -540,7 +540,7 @@ class _GroupDetailPageState extends State<GroupDetailPage>
                   icon: Icons.task_outlined,
                 ),
                 const SizedBox(height: 12),
-                if (_isCurrentUserMember(context, group))
+                if (_isCurrentUserAdmin(context, group))
                   ElevatedButton.icon(
                     onPressed: () => _showAssignQuizDialog(context.read<GroupsBloc>(), group),
                     icon: const Icon(Icons.assignment_add),
@@ -655,9 +655,11 @@ class _GroupDetailPageState extends State<GroupDetailPage>
       return;
     }
 
-    Quiz? selected;
-    DateTime? selectedDate;
-    TimeOfDay? selectedTime;
+    Quiz? selectedQuiz;
+    DateTime? startDate;
+    TimeOfDay? startTime;
+    DateTime? endDate;
+    TimeOfDay? endTime;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -691,46 +693,88 @@ class _GroupDetailPageState extends State<GroupDetailPage>
                                 ),
                               ))
                           .toList(),
-                      onChanged: (q) => setState(() => selected = q),
-                      value: selected,
+                      onChanged: (val) { 
+                        setState(() {
+                          selectedQuiz = val;
+                        });
+                      },
+                      value: selectedQuiz,
                     ),
                     const SizedBox(height: 14),
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                      leading: const Icon(Icons.calendar_today),
-                      title: Text(
-                        selectedDate == null
-                            ? 'Elegir fecha límite'
-                            : 'Fecha: ${selectedDate!.toLocal().toString().split(' ').first}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: const Text('Hasta cuándo estará disponible'),
-                      onTap: () async {
-                        final now = DateTime.now();
-                        final picked = await showDatePicker(
-                          context: ctx,
-                          initialDate: selectedDate ?? now,
-                          firstDate: now,
-                          lastDate: DateTime(now.year + 5),
-                        );
-                        if (picked != null) setState(() => selectedDate = picked);
-                      },
+                    const Text('Disponible desde:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                initialDate: startDate ?? now,
+                                firstDate: now,
+                                lastDate: DateTime(now.year + 5),
+                              );
+                              if (picked != null) setState(() => startDate = picked);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Fecha Inicio'),
+                              child: Text(startDate == null ? '-' : startDate!.toLocal().toString().split(' ').first),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final now = TimeOfDay.now();
+                              final picked = await showTimePicker(context: ctx, initialTime: startTime ?? now);
+                              if (picked != null) setState(() => startTime = picked);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Hora Inicio'),
+                              child: Text(startTime == null ? '-' : startTime!.format(ctx)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                      leading: const Icon(Icons.access_time),
-                      title: Text(
-                        selectedTime == null
-                            ? 'Elegir hora límite'
-                            : 'Hora: ${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: const Text('Hora exacta de cierre'),
-                      onTap: () async {
-                        final now = TimeOfDay.now();
-                        final picked = await showTimePicker(context: ctx, initialTime: selectedTime ?? now);
-                        if (picked != null) setState(() => selectedTime = picked);
-                      },
+                    const SizedBox(height: 12),
+                    const Text('Disponible hasta:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                initialDate: endDate ?? now,
+                                firstDate: now,
+                                lastDate: DateTime(now.year + 5),
+                              );
+                              if (picked != null) setState(() => endDate = picked);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Fecha Fin'),
+                              child: Text(endDate == null ? '-' : endDate!.toLocal().toString().split(' ').first),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final now = TimeOfDay.now();
+                              final picked = await showTimePicker(context: ctx, initialTime: endTime ?? now);
+                              if (picked != null) setState(() => endTime = picked);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Hora Fin'),
+                              child: Text(endTime == null ? '-' : endTime!.format(ctx)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -747,40 +791,50 @@ class _GroupDetailPageState extends State<GroupDetailPage>
 
     if (confirmed != true) return;
 
-    if (selected == null || selectedDate == null || selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona quiz, fecha y hora')));
+    if (selectedQuiz == null || startDate == null || startTime == null || endDate == null || endTime == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor completa todos los campos de fecha y hora.')));
+      }
       return;
     }
 
-    final availableUntilLocal = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-      selectedTime!.hour,
-      selectedTime!.minute,
+    final startDateTime = DateTime(
+      startDate!.year, startDate!.month, startDate!.day,
+      startTime!.hour, startTime!.minute,
     );
-    final availableUntilUtc = availableUntilLocal.toUtc();
+    
+    final endDateTime = DateTime(
+      endDate!.year, endDate!.month, endDate!.day,
+      endTime!.hour, endTime!.minute,
+    );
+
+    if (endDateTime.isBefore(startDateTime)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La fecha de fin debe ser posterior a la de inicio.')));
+      }
+      return;
+    }
 
     try {
-      final assignment = await bloc.repository.assignQuizToGroup(
+      await bloc.assignQuiz(
         groupId: group.id,
-        quizId: selected!.quizId,
-        availableUntil: availableUntilUtc,
+        quizId: selectedQuiz!.quizId,
+        availableFrom: startDateTime.toUtc(),
+        availableUntil: endDateTime.toUtc(),
       );
-      // Refrescar grupo para ver la asignación
-      final refreshed = await bloc.refreshGroup(group.id);
-      setState(() {
-        final currentAssignments = (refreshed ?? _group)?.quizAssignments ?? [];
-        final merged = [...currentAssignments, assignment];
-        _group = (refreshed ?? _group)?.copyWith(quizAssignments: merged) ?? _group;
-        _assignmentsFetched = false; // allow future reload if needed
-        _assignmentsFuture = null;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Quiz asignado hasta ${assignment.availableUntil.toLocal()}')),
-      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz asignado exitosamente')));
+        // Forzar recarga de asignaciones
+        await _ensureAssignmentsLoaded(bloc); 
+        setState(() {
+          _assignmentsFetched = false;
+        });
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo asignar: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo asignar: $e')));
+      }
     }
   }
 

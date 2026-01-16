@@ -237,18 +237,20 @@ class GroupRepositoryImpl implements GroupRepository {
   Future<GroupQuizAssignment> assignQuizToGroup({
     required String groupId,
     required String quizId,
+    required DateTime availableFrom,
     required DateTime availableUntil,
   }) async {
     final uri = Uri.parse('$_base/groups/$groupId/quizzes');
     final res = await _post(uri, {
       'quizId': quizId,
+      'availableFrom': availableFrom.toIso8601String(),
       'availableUntil': availableUntil.toIso8601String(),
     });
     try {
       // ignore: avoid_print
       print('[groups] assignQuizToGroup <- status=${res.statusCode} body=${res.body}');
     } catch (_) {}
-    _ensureSuccess(res, {201});
+    _ensureSuccess(res, {200, 201});
     return GroupQuizAssignment.fromJson(_asMap(res.body));
   }
 
