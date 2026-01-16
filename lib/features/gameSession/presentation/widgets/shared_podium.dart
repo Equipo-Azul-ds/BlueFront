@@ -144,7 +144,7 @@ class PodiumColumn extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Rank icon
+                // Icono de rango
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(

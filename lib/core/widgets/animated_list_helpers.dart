@@ -74,12 +74,19 @@ class _StaggeredFadeSlideState extends State<StaggeredFadeSlide>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: widget.child,
-      ),
+    return AnimatedBuilder(
+      animation: _fadeAnimation,
+      builder: (context, child) {
+        final opacity = _fadeAnimation.value.clamp(0.0, 1.0);
+        return Opacity(
+          opacity: opacity,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: child,
+          ),
+        );
+      },
+      child: widget.child,
     );
   }
 }

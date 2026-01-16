@@ -192,8 +192,12 @@ class _SinglePlayerChallengeResultsScreenState
                           const SizedBox(height: 20),
                           Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                          child: FadeTransition(
-                            opacity: _fade,
+                          child: AnimatedBuilder(
+                            animation: _fade,
+                            builder: (context, child) {
+                              final opacity = _fade.value.clamp(0.0, 1.0);
+                              return Opacity(opacity: opacity, child: child);
+                            },
                             child: ScaleTransition(
                               scale: _scale,
                               child: SurfaceCard(

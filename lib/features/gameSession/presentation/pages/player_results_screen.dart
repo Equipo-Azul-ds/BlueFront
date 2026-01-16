@@ -126,7 +126,7 @@ class _PlayerResultsScreenState extends State<PlayerResultsScreen>
                           ),
                         ),
                         const SizedBox(height: 16),
-                        // Toggle between personal stats and podium view
+                        // Alternar entre estadísticas personales y vista de podio
                         if (summary.finalPodium.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -136,7 +136,7 @@ class _PlayerResultsScreenState extends State<PlayerResultsScreen>
                             ),
                           ),
                         const SizedBox(height: 20),
-                        // Podium view or personal stats based on toggle
+                        // Vista de podio o estadísticas personales según el alternador
                         if (_showingPodium && summary.finalPodium.isNotEmpty)
                           _FullPodiumView(
                             entries: summary.finalPodium,
@@ -145,12 +145,16 @@ class _PlayerResultsScreenState extends State<PlayerResultsScreen>
                             scaleAnimation: _scale,
                           )
                         else ...[
-                          // Podium badge for top 3 players
+                          // Insignia de podio para los 3 primeros jugadores
                           if (summary.isPodium || summary.rank <= 3)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 16),
-                              child: FadeTransition(
-                                opacity: _fade,
+                            child: AnimatedBuilder(
+                              animation: _fade,
+                              builder: (context, child) {
+                                final opacity = _fade.value.clamp(0.0, 1.0);
+                                return Opacity(opacity: opacity, child: child);
+                              },
                                 child: ScaleTransition(
                                   scale: _scale,
                                   child: _PodiumBadge(
@@ -162,8 +166,12 @@ class _PlayerResultsScreenState extends State<PlayerResultsScreen>
                             ),
                           Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                          child: FadeTransition(
-                            opacity: _fade,
+                          child: AnimatedBuilder(
+                            animation: _fade,
+                            builder: (context, child) {
+                              final opacity = _fade.value.clamp(0.0, 1.0);
+                              return Opacity(opacity: opacity, child: child);
+                            },
                             child: ScaleTransition(
                               scale: _scale,
                               child: Container(
@@ -316,7 +324,7 @@ class _PlayerResultsScreenState extends State<PlayerResultsScreen>
                             ),
                           ),
                         ),
-                        ], // Close the else block
+                        ], // Cierra el bloque else
                         const SizedBox(height: 28),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -474,17 +482,17 @@ class _PodiumBadge extends StatelessWidget {
     
     switch (rank) {
       case 1:
-        medalColor = const Color(0xFFFFD700); // Gold
+        medalColor = const Color(0xFFFFD700); // Oro
         medalEmoji = '🥇';
         positionText = '¡Primer lugar!';
         break;
       case 2:
-        medalColor = const Color(0xFFC0C0C0); // Silver
+        medalColor = const Color(0xFFC0C0C0); // Plata
         medalEmoji = '🥈';
         positionText = '¡Segundo lugar!';
         break;
       case 3:
-        medalColor = const Color(0xFFCD7F32); // Bronze
+        medalColor = const Color(0xFFCD7F32); // Bronce
         medalEmoji = '🥉';
         positionText = '¡Tercer lugar!';
         break;
@@ -549,7 +557,7 @@ class _PodiumBadge extends StatelessWidget {
   }
 }
 
-/// Toggle button to switch between personal stats and podium view.
+/// Botón alternador para cambiar entre estadísticas personales y vista del podio.
 class _ViewToggle extends StatelessWidget {
   const _ViewToggle({required this.showingPodium, required this.onToggle});
 
@@ -633,7 +641,7 @@ class _ToggleOption extends StatelessWidget {
   }
 }
 
-/// Full podium view showing top 3 players like in host results.
+/// Vista completa del podio mostrando los 3 primeros jugadores, como en los resultados del anfitrión.
 class _FullPodiumView extends StatelessWidget {
   const _FullPodiumView({
     required this.entries,
@@ -656,8 +664,12 @@ class _FullPodiumView extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          FadeTransition(
-            opacity: fadeAnimation,
+          AnimatedBuilder(
+            animation: fadeAnimation,
+            builder: (context, child) {
+              final opacity = fadeAnimation.value.clamp(0.0, 1.0);
+              return Opacity(opacity: opacity, child: child);
+            },
             child: ScaleTransition(
               scale: scaleAnimation,
               child: SharedPodium(
@@ -668,8 +680,12 @@ class _FullPodiumView extends StatelessWidget {
           ),
           if (rest.isNotEmpty) ...[
             const SizedBox(height: 20),
-            FadeTransition(
-              opacity: fadeAnimation,
+            AnimatedBuilder(
+              animation: fadeAnimation,
+              builder: (context, child) {
+                final opacity = fadeAnimation.value.clamp(0.0, 1.0);
+                return Opacity(opacity: opacity, child: child);
+              },
               child: RestOfLeaderboard(
                 entries: rest,
                 currentPlayerRank: currentPlayerRank,

@@ -99,7 +99,20 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
       },
       onElapsed: () {
         if (_answerSubmitted) return;
-        _submitAnswers(const <String>[]);
+        // Evitar enviar un arreglo vacío (el backend puede rechazarlo).
+        // Si el usuario ya seleccionó opciones, enviarlas automáticamente;
+        // si no hay selecciones, marcar como expirado localmente y no emitir.
+        if (_selectedAnswerIds.isEmpty) {
+          if (!mounted) return;
+          setState(() => _answerSubmitted = true);
+          _countdown.cancel();
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Tiempo agotado — no se envió ninguna respuesta'),
+            duration: Duration(seconds: 2),
+          ));
+          return;
+        }
+        _submitAnswers(_selectedAnswerIds.toList());
       },
     );
   }
@@ -164,7 +177,7 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
       _answerConfirmed = true;
       if (mounted) {
         setState(() {});
-        // Trigger success haptic feedback
+        // Activar retroalimentación háptica de éxito
         HapticFeedback.lightImpact();
       }
     }
@@ -189,7 +202,7 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
         final maxSelections = _currentMaxSelections;
         if (maxSelections != null && maxSelections > 0) {
           if (_selectedAnswerIds.length >= maxSelections) {
-            // Show feedback that max selections reached
+            // Mostrar aviso de que se alcanzó el máximo de selecciones
             HapticFeedback.heavyImpact();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -276,7 +289,9 @@ class _PlayerQuestionScreenState extends State<PlayerQuestionScreen> {
     final maxSelections = slide.maxSelections ?? _currentMaxSelections;
     final quizTitle = controller.quizTitle ?? 'Trivvy!';
     final questionIndex = question.slide.position;
-    final questionLabel = 'Pregunta ${questionIndex + 1}';
+    final currentSequence = controller.questionSequence;
+    final current = currentSequence > 0 ? currentSequence : (questionIndex + 1);
+    final questionLabel = 'Pregunta $current';
 
     return Scaffold(
       body: Container(

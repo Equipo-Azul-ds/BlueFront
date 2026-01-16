@@ -164,8 +164,13 @@ class JoinGameScreenState extends State<JoinGameScreen> {
           onPinResolved: (pin) {
             setState(() => _pinController.text = pin);
             Navigator.of(sheetContext).pop();
-            _showSnack('PIN detectado automáticamente');
-          },
+            _showSnack('PIN detectado automáticamente');            // Try to auto-submit once the UI state has applied the new PIN value
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              if (_isValidPin(pin) && !_isJoining) {
+                onEnterPinPressed();
+              }
+            });          },
         ),
       ),
     );
@@ -238,7 +243,7 @@ class JoinGameScreenState extends State<JoinGameScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Boton Cerrar: close the modal/page
+                        // Botón Cerrar: cerrar el modal/página
                         IconButton(
                           icon: const Icon(
                             Icons.close,
@@ -304,11 +309,18 @@ class JoinGameScreenState extends State<JoinGameScreen> {
                   ),
 
                   const SizedBox(height: 12),
-                  Text(
-                    'Ingresa el PIN que aparece en la pantalla del anfitrión (6-10 dígitos).',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 14,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Text(
+                        'Ingresa el PIN que aparece en la pantalla del anfitrión (6-10 dígitos).',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ),
 

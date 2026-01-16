@@ -76,7 +76,49 @@ class PhaseNavigator {
     final closed = controller.sessionClosedDto;
     final hostLeft = controller.hostLeftDto;
     if (closed == null && hostLeft == null) return false;
+
     final message = closed?.message ?? hostLeft?.message ?? 'La sesión ha sido cerrada.';
+
+    // If the session closed very soon after we joined OR the host appears
+    // present (race condition / stale event from server), treat it as
+    // transient: show a temporary message and re-evaluate after 2s before
+    // forcing the user out. This avoids false-positive ejections when the
+    // server sends a late/duplicate close event while the host is still active.
+
+    final joinedAt = controller.sessionJoinedAt;
+
+    final hostPresent = controller.hostLeftDto == null && (
+      controller.hostConnectedSuccessDto != null ||
+      controller.hostReturnedDto != null ||
+      controller.lobbyPlayers.isNotEmpty
+    );
+
+    final shouldDelayBecauseRecentJoin = closed != null && joinedAt != null
+        ? DateTime.now().difference(joinedAt) < const Duration(seconds: 2)
+        : false;
+
+    if (closed != null && (shouldDelayBecauseRecentJoin || hostPresent)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$message — esperando confirmación...')),
+        );
+      });
+      // Re-evaluate after 2s: if the event remains, force the exit.
+      Future.delayed(const Duration(seconds: 2), () {
+        final stillClosed = controller.sessionClosedDto;
+        final hostStillPresent = controller.hostLeftDto == null && controller.lobbyPlayers.isNotEmpty;
+        if (stillClosed != null && !hostStillPresent) {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(stillClosed.message ?? 'La sesión ha sido cerrada.')),
+          );
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+      return false;
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

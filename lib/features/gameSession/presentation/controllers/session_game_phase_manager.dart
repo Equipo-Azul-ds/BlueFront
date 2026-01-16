@@ -1,20 +1,17 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../application/dtos/multiplayer_socket_events.dart';
 import '../../domain/constants/multiplayer_events.dart';
 import '../../domain/repositories/multiplayer_session_realtime.dart';
 import '../state/multiplayer_session_state.dart';
-
+import 'base_session_manager.dart';
 
 /// Gestiona el estado de fase del juego y transiciones.
 /// Responsabilidades: flujo de preguntas, resultados, fin de juego, transiciones de fase.
-class SessionGamePhaseManager extends ChangeNotifier {
+class SessionGamePhaseManager extends BaseSessionManager {
   SessionGamePhaseManager({
     required MultiplayerSessionRealtime realtime,
-  }) : _realtime = realtime;
-
-  final MultiplayerSessionRealtime _realtime;
+  }) : super(realtime: realtime);
 
   SessionPhase _phase = SessionPhase.lobby;
   QuestionStartedEvent? _currentQuestionDto;
@@ -28,14 +25,6 @@ class SessionGamePhaseManager extends ChangeNotifier {
   int _hostGameEndSequence = 0;
   int _playerGameEndSequence = 0;
   int? _hostAnswerSubmissions;
-
-  StreamSubscription<dynamic>? _questionStartedSubscription;
-  StreamSubscription<dynamic>? _hostResultsSubscription;
-  StreamSubscription<dynamic>? _playerResultsSubscription;
-  StreamSubscription<dynamic>? _hostGameEndSubscription;
-  StreamSubscription<dynamic>? _playerGameEndSubscription;
-  StreamSubscription<dynamic>? _sessionClosedSubscription;
-  StreamSubscription<dynamic>? _hostAnswerUpdateSubscription;
 
   // Getters
   SessionPhase get phase => _phase;
@@ -62,211 +51,163 @@ class SessionGamePhaseManager extends ChangeNotifier {
     _hostAnswerSubmissions = count;
     notifyListeners();
   }
-
-
-  /// Registra oyentes para eventos de fase de juego (pregunta iniciada, resultados, fin de juego, sesión cerrada).
+  /// Registra oyentes para eventos de fase de juego.
   void registerGamePhaseListeners(
     void Function(Object error) onEventError,
   ) {
-    _questionStartedSubscription?.cancel();
-    _questionStartedSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(
-            MultiplayerEvents.questionStarted)
-        .listen(
-          (payload) => _handleQuestionStarted(payload, onEventError),
-          onError: onEventError,
-        );
+    registerEventListener<QuestionStartedEvent>(
+      eventName: MultiplayerEvents.questionStarted,
+      parser: (payload) => QuestionStartedEvent.fromJson(payload),
+      handler: _handleQuestionStarted,
+      onError: onEventError,
+    );
 
-    _hostResultsSubscription?.cancel();
-    _hostResultsSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostResults)
-        .listen(
-          (payload) => _handleHostResults(payload, onEventError),
-          onError: onEventError,
-        );
+    registerEventListener<HostResultsEvent>(
+      eventName: MultiplayerEvents.hostResults,
+      parser: (payload) => HostResultsEvent.fromJson(payload),
+      handler: _handleHostResults,
+      onError: onEventError,
+    );
 
-    _playerResultsSubscription?.cancel();
-    _playerResultsSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(
-            MultiplayerEvents.playerResults)
-        .listen(
-          (payload) => _handlePlayerResults(payload, onEventError),
-          onError: onEventError,
-        );
+    registerEventListener<PlayerResultsEvent>(
+      eventName: MultiplayerEvents.playerResults,
+      parser: (payload) => PlayerResultsEvent.fromJson(payload),
+      handler: _handlePlayerResults,
+      onError: onEventError,
+    );
 
-    _hostGameEndSubscription?.cancel();
-    _hostGameEndSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(MultiplayerEvents.hostGameEnd)
-        .listen(
-          (payload) => _handleHostGameEnd(payload, onEventError),
-          onError: onEventError,
-        );
+    registerEventListener<HostGameEndEvent>(
+      eventName: MultiplayerEvents.hostGameEnd,
+      parser: (payload) => HostGameEndEvent.fromJson(payload),
+      handler: _handleHostGameEnd,
+      onError: onEventError,
+    );
 
-    _playerGameEndSubscription?.cancel();
-    _playerGameEndSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(
-            MultiplayerEvents.playerGameEnd)
-        .listen(
-          (payload) => _handlePlayerGameEnd(payload, onEventError),
-          onError: onEventError,
-        );
+    registerEventListener<PlayerGameEndEvent>(
+      eventName: MultiplayerEvents.playerGameEnd,
+      parser: (payload) => PlayerGameEndEvent.fromJson(payload),
+      handler: _handlePlayerGameEnd,
+      onError: onEventError,
+    );
 
-    _sessionClosedSubscription?.cancel();
-    _sessionClosedSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(
-            MultiplayerEvents.sessionClosed)
-        .listen(
-          (payload) => _handleSessionClosed(payload, onEventError),
-          onError: onEventError,
-        );
+    registerEventListener<SessionClosedEvent>(
+      eventName: MultiplayerEvents.sessionClosed,
+      parser: (payload) => SessionClosedEvent.fromJson(payload),
+      handler: _handleSessionClosed,
+      onError: onEventError,
+    );
 
-    _hostAnswerUpdateSubscription?.cancel();
-    _hostAnswerUpdateSubscription = _realtime
-        .listenToServerEvent<Map<String, dynamic>>(
-            MultiplayerEvents.hostAnswerUpdate)
-        .listen(
-          (payload) => _handleHostAnswerUpdate(payload, onEventError),
-          onError: onEventError,
-        );
+    registerEventListener<HostAnswerUpdateEvent>(
+      eventName: MultiplayerEvents.hostAnswerUpdate,
+      parser: (payload) => HostAnswerUpdateEvent.fromJson(payload),
+      handler: _handleHostAnswerUpdate,
+      onError: onEventError,
+    );
+
+    // Some servers send the pluralized event name 'host_answers_update'. Listen
+    // to both forms to be robust against backend naming variations.
+    registerEventListener<HostAnswerUpdateEvent>(
+      eventName: 'host_answers_update',
+      parser: (payload) => HostAnswerUpdateEvent.fromJson(payload),
+      handler: _handleHostAnswerUpdate,
+      onError: onEventError,
+    );
+
+    // Also listen to player answer confirmations to update the submissions counter
+    registerEventListener<PlayerAnswerConfirmationEvent>(
+      eventName: MultiplayerEvents.playerAnswerConfirmation,
+      parser: (payload) => PlayerAnswerConfirmationEvent.fromJson(payload),
+      handler: _handlePlayerAnswerConfirmation,
+      onError: onEventError,
+    );
   }
 
-  /// Maneja evento de pregunta iniciada: incrementa secuencia, actualiza fase, cachea datos de pregunta y limpia resultados obsoletos.
-  void _handleQuestionStarted(
-    Map<String, dynamic> payload,
-    void Function(Object error) onEventError,
-  ) {
-    try {
-      final event = QuestionStartedEvent.fromJson(payload);
-      _questionSequence++;
-      print('[EVENT] ← RECEIVED: question_started (seq=$_questionSequence, questionId=${event.slide.id}, timeLimit=${event.slide.timeLimitSeconds}s)');
-      _phase = SessionPhase.question;
-      _currentQuestionDto = event;
-      _questionStartedAt =
-          _resolveQuestionIssuedAt(event.timeRemainingMs, event.slide.timeLimitSeconds);
-      // Limpia cachés de otras fases para evitar renderizaciones obsoletas.
-      _hostResultsDto = null;
-      _playerResultsDto = null;
-      _hostGameEndDto = null;
-      _playerGameEndDto = null;
-      _hostAnswerSubmissions = null;
-      notifyListeners();
-    } catch (error) {
-      print('[EVENT] ✗ ERROR parsing question_started: $error');
-      onEventError(error);
-    }
+  /// Maneja evento de pregunta iniciada.
+  void _handleQuestionStarted(QuestionStartedEvent event) {
+    _questionSequence++;
+    print('[EVENT] ← RECEIVED: question_started (seq=$_questionSequence, questionId=${event.slide.id}, timeLimit=${event.slide.timeLimitSeconds}s)');
+    _phase = SessionPhase.question;
+    _currentQuestionDto = event;
+    _questionStartedAt =
+        _resolveQuestionIssuedAt(event.timeRemainingMs, event.slide.timeLimitSeconds);
+    _hostResultsDto = null;
+    _playerResultsDto = null;
+    _hostGameEndDto = null;
+    _playerGameEndDto = null;
+    _hostAnswerSubmissions = null;
   }
 
-  /// Maneja evento de resultados del anfitrión: cachea datos de resultados y transiciona a fase de resultados.
-  void _handleHostResults(
-    Map<String, dynamic> payload,
-    void Function(Object error) onEventError,
-  ) {
-    try {
-      _hostResultsDto = HostResultsEvent.fromJson(payload);
-      print('[EVENT] ← RECEIVED: host_results (state=${_hostResultsDto?.state}, players=${_hostResultsDto?.leaderboard.length})');
-      _phase = SessionPhase.results;
-      notifyListeners();
-    } catch (error) {
-      print('[EVENT] ✗ ERROR parsing host_results: $error');
-      onEventError(error);
-    }
+  /// Maneja evento de resultados del anfitrión.
+  void _handleHostResults(HostResultsEvent event) {
+    _hostResultsDto = event;
+    print('[EVENT] ← RECEIVED: host_results (state=${_hostResultsDto?.state}, players=${_hostResultsDto?.leaderboard.length})');
+    _phase = SessionPhase.results;
   }
 
-  /// Maneja evento de resultados del jugador: cachea datos de resultados y transiciona a fase de resultados.
-  void _handlePlayerResults(
-    Map<String, dynamic> payload,
-    void Function(Object error) onEventError,
-  ) {
-    try {
-      _playerResultsDto = PlayerResultsEvent.fromJson(payload);
-      print('[EVENT] ← RECEIVED: player_results (rank=${_playerResultsDto?.rank}, correct=${_playerResultsDto?.isCorrect})');
-      _phase = SessionPhase.results;
-      notifyListeners();
-    } catch (error) {
-      print('[EVENT] ✗ ERROR parsing player_results: $error');
-      onEventError(error);
-    }
+  /// Maneja evento de resultados del jugador.
+  void _handlePlayerResults(PlayerResultsEvent event) {
+    _playerResultsDto = event;
+    print('[EVENT] ← RECEIVED: player_results (rank=${_playerResultsDto?.rank}, correct=${_playerResultsDto?.isCorrect})');
+    _phase = SessionPhase.results;
   }
 
-  /// Maneja evento de fin de juego del anfitrión: incrementa secuencia de fin, cachea datos de fin y transiciona a fase de fin.
-  void _handleHostGameEnd(
-    Map<String, dynamic> payload,
-    void Function(Object error) onEventError,
-  ) {
-    try {
-      _hostGameEndDto = HostGameEndEvent.fromJson(payload);
-      _hostGameEndSequence++;
-      print('[EVENT] ← RECEIVED: host_game_end (seq=$_hostGameEndSequence, podium=${_hostGameEndDto?.finalPodium.length})');
-      _phase = SessionPhase.end;
-      notifyListeners();
-    } catch (error) {
-      print('[EVENT] ✗ ERROR parsing host_game_end: $error');
-      onEventError(error);
-    }
+  /// Maneja evento de fin de juego del anfitrión.
+  void _handleHostGameEnd(HostGameEndEvent event) {
+    _hostGameEndDto = event;
+    _hostGameEndSequence++;
+    print('[EVENT] ← RECEIVED: host_game_end (seq=$_hostGameEndSequence, podium=${_hostGameEndDto?.finalPodium.length})');
+    _phase = SessionPhase.end;
   }
 
-  /// Maneja evento de fin de juego del jugador: incrementa secuencia de fin, cachea datos de fin y transiciona a fase de fin.
-  void _handlePlayerGameEnd(
-    Map<String, dynamic> payload,
-    void Function(Object error) onEventError,
-  ) {
-    try {
-      _playerGameEndDto = PlayerGameEndEvent.fromJson(payload);
-      _playerGameEndSequence++;
-      print('[EVENT] ← RECEIVED: player_game_end (seq=$_playerGameEndSequence, rank=${_playerGameEndDto?.rank})');
-      _phase = SessionPhase.end;
-      notifyListeners();
-    } catch (error) {
-      print('[EVENT] ✗ ERROR parsing player_game_end: $error');
-      onEventError(error);
-    }
+  /// Maneja evento de fin de juego del jugador.
+  void _handlePlayerGameEnd(PlayerGameEndEvent event) {
+    _playerGameEndDto = event;
+    _playerGameEndSequence++;
+    print('[EVENT] ← RECEIVED: player_game_end (seq=$_playerGameEndSequence, rank=${_playerGameEndDto?.rank})');
+    _phase = SessionPhase.end;
   }
 
-  /// Maneja evento de sesión cerrada: cachea datos de cierre y transiciona a fase de fin.
-  void _handleSessionClosed(
-    Map<String, dynamic> payload,
-    void Function(Object error) onEventError,
-  ) {
-    try {
-      final event = SessionClosedEvent.fromJson(payload);
-      print('[EVENT] ← RECEIVED: session_closed (reason=${event.reason}, message=${event.message})');
-      _sessionClosedDto = event;
-      _phase = SessionPhase.end;
-      notifyListeners();
-    } catch (error) {
-      print('[EVENT] ✗ ERROR parsing session_closed: $error');
-      onEventError(error);
-    }
+  /// Maneja evento de sesión cerrada.
+  void _handleSessionClosed(SessionClosedEvent event) {
+    print('[EVENT] ← RECEIVED: session_closed (reason=${event.reason}, message=${event.message})');
+    _sessionClosedDto = event;
+    _phase = SessionPhase.end;
   }
 
-  /// Maneja evento de actualización de respuestas del host: actualiza contador de respuestas enviadas.
-  void _handleHostAnswerUpdate(
-    Map<String, dynamic> payload,
-    void Function(Object error) onEventError,
-  ) {
-    try {
-      final event = HostAnswerUpdateEvent.fromJson(payload);
-      print('[EVENT] ← RECEIVED: host_answer_update (numberOfSubmissions=${event.numberOfSubmissions})');
-      _hostAnswerSubmissions = event.numberOfSubmissions;
-      notifyListeners();
-    } catch (error) {
-      print('[EVENT] ✗ ERROR parsing host_answer_update: $error');
-      onEventError(error);
-    }
+  /// Maneja evento de actualización de respuestas del host.
+  void _handleHostAnswerUpdate(HostAnswerUpdateEvent event) {
+    print('[EVENT] ← RECEIVED: host_answer_update (numberOfSubmissions=${event.numberOfSubmissions})');
+    // Use setter to ensure listeners are notified and UI updates accordingly
+    setHostAnswerSubmissions(event.numberOfSubmissions);
+    // Extra debug: dump current question and socket state for correlation
+    print('[EVENT]    currentQuestionId=${_currentQuestionDto?.slide.id}, socketConnected=${realtime.isConnected}');
   }
 
- /// Deduce la marca de tiempo de la pregunta basándose en el tiempo restante y el límite de tiempo.
+  /// Maneja evento de confirmación de respuesta de un jugador (emitted when a single
+  /// player's answer is received). We increment the host submissions counter
+  /// optimistically to reflect incoming answers quickly in the UI.
+  void _handlePlayerAnswerConfirmation(PlayerAnswerConfirmationEvent event) {
+    print('[EVENT] ← RECEIVED: player_answer_confirmation (received=${event.received}, message=${event.message})');
+    final current = _hostAnswerSubmissions ?? 0;
+    setHostAnswerSubmissions(current + 1);
+  }
+
+  /// Resuelve la hora en que se emitió la pregunta basada en el tiempo restante.
+  ///
+  /// Nota: `timeRemainingMs` es opcional en la API y **si no está presente**
+  /// asumimos que la pregunta fue emitida ahora (evita que el temporizador quede a 0)
+  /// y que no se dispare una autocaptura de respuesta por timeout inmediatamente.
   DateTime _resolveQuestionIssuedAt(int? timeRemainingMs, int timeLimitSeconds) {
-    if (timeRemainingMs != null && timeLimitSeconds > 0) {
-      final totalMs = timeLimitSeconds * 1000;
-      final elapsedMs = totalMs - timeRemainingMs;
-      final clampedElapsed = elapsedMs.clamp(0, totalMs);
-      return DateTime.now().subtract(Duration(milliseconds: clampedElapsed));
+    if (timeRemainingMs == null) {
+      print('[EVENT] ⚠ RECEIVED: question_started without timeRemainingMs — assuming just-issued (no elapsed).');
+      return DateTime.now();
     }
-    return DateTime.now();
+
+    final elapsedMs = (timeLimitSeconds * 1000) - timeRemainingMs;
+    return DateTime.now().subtract(Duration(milliseconds: elapsedMs));
   }
 
- /// Reinicia el estado de la fase del juego a lobby, limpiando todos los datos de pregunta, resultados y fin del juego.
+  /// Reinicia el estado de la fase del juego.
   void resetGamePhaseState() {
     _phase = SessionPhase.lobby;
     _currentQuestionDto = null;
@@ -283,31 +224,31 @@ class SessionGamePhaseManager extends ChangeNotifier {
     notifyListeners();
   }
 
- /// Limpia datos de resultados del anfitrión cacheados y notifica a los oyentes.
+  /// Limpia datos de resultados del anfitrión.
   void clearHostResults() {
     _hostResultsDto = null;
     notifyListeners();
   }
 
- /// Limpia datos de resultados del jugador cacheados y notifica a los oyentes.
+  /// Limpia datos de resultados del jugador.
   void clearPlayerResults() {
     _playerResultsDto = null;
     notifyListeners();
   }
 
-  /// Limpia datos de fin de juego del anfitrión cacheados y notifica a los oyentes.
+  /// Limpia datos de fin de juego del anfitrión.
   void clearHostGameEnd() {
     _hostGameEndDto = null;
     notifyListeners();
   }
 
-   /// Limpia datos de fin de juego del jugador cacheados y notifica a los oyentes.
+  /// Limpia datos de fin de juego del jugador.
   void clearPlayerGameEnd() {
     _playerGameEndDto = null;
     notifyListeners();
   }
 
-  /// Limpia datos de sesión cerrada cacheados y notifica a los oyentes.
+  /// Limpia datos de sesión cerrada.
   void clearSessionClosed() {
     _sessionClosedDto = null;
     notifyListeners();
@@ -315,13 +256,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
 
   @override
   void dispose() {
-    _questionStartedSubscription?.cancel();
-    _hostResultsSubscription?.cancel();
-    _playerResultsSubscription?.cancel();
-    _hostGameEndSubscription?.cancel();
-    _playerGameEndSubscription?.cancel();
-    _sessionClosedSubscription?.cancel();
-    _hostAnswerUpdateSubscription?.cancel();
+    cancelAllEventListeners();
     super.dispose();
   }
 }

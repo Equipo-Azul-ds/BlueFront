@@ -74,14 +74,12 @@ class _AnswerOptionCardState extends State<AnswerOptionCard>
     final background = widget.selected 
         ? widget.color 
         : widget.color.withValues(alpha: 0.9);
-    final resolvedPadding = widget.padding ??
-        (widget.layout == Axis.vertical
-            ? const EdgeInsets.all(16)
-            : const EdgeInsets.symmetric(vertical: 16, horizontal: 12));
 
-    Widget buildContent() {
+    Widget buildContent(BoxConstraints constraints) {
+      // Limita el número de líneas para evitar overflow en celdas pequeñas.
       if (widget.layout == Axis.vertical) {
         return Column(
+          mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(widget.icon, size: 28),
@@ -89,6 +87,8 @@ class _AnswerOptionCardState extends State<AnswerOptionCard>
             Text(
               widget.text,
               textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             if (widget.trailing != null) ...[
@@ -111,6 +111,8 @@ class _AnswerOptionCardState extends State<AnswerOptionCard>
           Expanded(
             child: Text(
               widget.text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -128,6 +130,16 @@ class _AnswerOptionCardState extends State<AnswerOptionCard>
           ],
         ],
       );
+    }
+
+    // Determina padding dinámico en base al alto disponible para evitar overflow
+    EdgeInsets _paddingForHeight(double maxHeight) {
+      if (widget.padding != null) return widget.padding!;
+      if (widget.layout != Axis.vertical) return const EdgeInsets.symmetric(vertical: 16, horizontal: 12);
+      if (maxHeight <= 0) return const EdgeInsets.all(16);
+      if (maxHeight < 100) return const EdgeInsets.symmetric(vertical: 8, horizontal: 12);
+      if (maxHeight < 140) return const EdgeInsets.symmetric(vertical: 12, horizontal: 14);
+      return const EdgeInsets.all(16);
     }
 
     return GestureDetector(
@@ -150,20 +162,22 @@ class _AnswerOptionCardState extends State<AnswerOptionCard>
               ),
             ],
           ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: widget.disabled ? null : widget.onTap,
-              borderRadius: BorderRadius.circular(14),
-              splashColor: Colors.white.withValues(alpha: 0.2),
-              highlightColor: Colors.white.withValues(alpha: 0.1),
-              child: Padding(
-                padding: resolvedPadding,
-                child: DefaultTextStyle(
-                  style: const TextStyle(color: Colors.white),
-                  child: IconTheme(
-                    data: const IconThemeData(color: Colors.white),
-                    child: buildContent(),
+          child: LayoutBuilder(
+            builder: (context, constraints) => Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.disabled ? null : widget.onTap,
+                borderRadius: BorderRadius.circular(14),
+                splashColor: Colors.white.withValues(alpha: 0.2),
+                highlightColor: Colors.white.withValues(alpha: 0.1),
+                child: Padding(
+                  padding: _paddingForHeight(constraints.maxHeight),
+                  child: DefaultTextStyle(
+                    style: const TextStyle(color: Colors.white),
+                    child: IconTheme(
+                      data: const IconThemeData(color: Colors.white),
+                      child: buildContent(constraints),
+                    ),
                   ),
                 ),
               ),

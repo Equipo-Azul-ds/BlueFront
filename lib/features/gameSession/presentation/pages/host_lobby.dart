@@ -89,6 +89,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
               constraints: const BoxConstraints(maxWidth: 1000),
               child: Padding(
                 padding: const EdgeInsets.all(20),
+                child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -279,8 +280,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Expanded(
-                      child: Builder(
+                    Builder(
                         builder: (context) {
                           // Estados: error recuperable, vacío o lista de jugadores.
                           if (stateError != null && players.isEmpty) {
@@ -303,6 +303,8 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                                   : 0.95;
                               return GridView.builder(
                                 padding: const EdgeInsets.only(top: 4),
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
                                 gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: crossAxisCount,
@@ -321,7 +323,6 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
                           );
                         },
                       ),
-                    ),
                     const SizedBox(height: 16),
                     PrimaryButton(
                       label: 'Iniciar partida',
@@ -345,7 +346,7 @@ class _HostLobbyScreenState extends State<HostLobbyScreen> {
           ),
         ),
       ),
-    );
+    ),);
   }
 
   void _exitToHome() {

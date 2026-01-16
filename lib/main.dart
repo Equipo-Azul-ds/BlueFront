@@ -60,12 +60,10 @@ import 'features/report/domain/repositories/reports_repository.dart';
 import 'features/report/infrastructure/repositories/reports_repository_impl.dart';
 import 'features/report/application/use_cases/report_usecases.dart';
 import 'features/report/presentation/blocs/reports_list_bloc.dart';
-import 'features/gameSession/domain/repositories/multiplayer_session_repository.dart';
 import 'features/gameSession/domain/repositories/multiplayer_session_realtime.dart';
 import 'features/gameSession/application/use_cases/multiplayer_session_usecases.dart';
 import 'features/gameSession/infrastructure/datasources/multiplayer_session_remote_data_source.dart';
 import 'features/gameSession/infrastructure/realtime/multiplayer_session_realtime_impl.dart';
-import 'features/gameSession/infrastructure/repositories/multiplayer_session_repository_impl.dart';
 import 'features/gameSession/infrastructure/socket/multiplayer_socket_client.dart';
 import 'features/gameSession/presentation/controllers/multiplayer_session_controller.dart';
 
@@ -429,12 +427,6 @@ class _MyAppState extends State<MyApp> {
             defaultTokenProvider: _getAuthToken,
           ),
         ),
-        Provider<MultiplayerSessionRepository>(
-          create: (context) => MultiplayerSessionRepositoryImpl(
-            remoteDataSource: context
-                .read<MultiplayerSessionRemoteDataSource>(),
-          ),
-        ),
         Provider<MultiplayerSessionRealtime>(
           create: (context) => MultiplayerSessionRealtimeImpl(
             socketClient: context.read<MultiplayerSocketClient>(),
@@ -442,13 +434,15 @@ class _MyAppState extends State<MyApp> {
         ),
         Provider<InitializeHostLobbyUseCase>(
           create: (context) => InitializeHostLobbyUseCase(
-            repository: context.read<MultiplayerSessionRepository>(),
+            dataSource: context
+                .read<MultiplayerSessionRemoteDataSource>(),
             realtime: context.read<MultiplayerSessionRealtime>(),
           ),
         ),
         Provider<ResolvePinFromQrTokenUseCase>(
           create: (context) => ResolvePinFromQrTokenUseCase(
-            repository: context.read<MultiplayerSessionRepository>(),
+            dataSource: context
+                .read<MultiplayerSessionRemoteDataSource>(),
           ),
         ),
         Provider<JoinLobbyUseCase>(

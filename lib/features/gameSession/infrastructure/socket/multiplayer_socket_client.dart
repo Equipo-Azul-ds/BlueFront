@@ -49,21 +49,11 @@ class MultiplayerSocketClient {
     final target = _buildNamespaceUrl();
     
     print('[SOCKET_AUTH_SETUP] ========== AUTH SETUP PHASE =========');
-    print('[SOCKET_AUTH_SETUP] Auth params to be sent: pin=${params.pin}, role=${params.role.toHeaderValue()}, jwt=${sanitizedToken.substring(0, (sanitizedToken.length / 4).toInt())}...***REDACTED***');
+    print('[SOCKET_AUTH_SETUP] Auth params to be sent as EXTRA HEADERS: pin=${params.pin}, role=${params.role.toHeaderValue()}, jwt=${sanitizedToken.substring(0, (sanitizedToken.length / 4).toInt())}...***REDACTED***');
     print('[SOCKET_AUTH_SETUP] Base URL: $_baseUrl');
     print('[SOCKET_AUTH_SETUP] Target namespace: $target');
     
-    // Auth params: socket.io preserves query params through WebSocket upgrade
-    final authUri = Uri.parse(target).replace(
-      queryParameters: {
-        'pin': params.pin,
-        'role': params.role.toHeaderValue(),
-        'jwt': sanitizedToken,
-      },
-    );
-    
-    // Also set auth for socket.io handshake auth frame
-    final auth = {
+    final extraHeaders = {
       'pin': params.pin,
       'role': params.role.toHeaderValue(),
       'jwt': sanitizedToken,
@@ -73,14 +63,14 @@ class MultiplayerSocketClient {
         .setTransports(MultiplayerConstants.socketTransports)
         .enableForceNew()
         .disableAutoConnect()
-        .setAuth(auth)
+        .setExtraHeaders(extraHeaders)
         .setReconnectionDelay(1000)
         .setReconnectionDelayMax(5000)
         .setReconnectionAttempts(5)
         .build();
 
-    print('[SOCKET_AUTH_SETUP] Socket.IO options configured with auth + query params');
-    final socket = io.io(authUri.toString(), options);
+    print('[SOCKET_AUTH_SETUP] Socket.IO options configured with EXTRA HEADERS for WebSocket upgrade');
+    final socket = io.io(target, options);
     _socket = socket;
 
     final completer = Completer<void>();
@@ -109,8 +99,9 @@ class MultiplayerSocketClient {
       _statusController.add(MultiplayerSocketStatus.connected);
       completeSuccess();
     });
-    socket.onDisconnect((_) {
+    socket.onDisconnect((reason) {
       print('[SOCKET_LIFECYCLE] ✗ DISCONNECTED from multiplayer-sessions namespace at ${DateTime.now()}');
+      print('[SOCKET_LIFECYCLE]    Reason: $reason');
       _statusController.add(MultiplayerSocketStatus.disconnected);
     });
     socket.onReconnect((_) {
@@ -125,7 +116,7 @@ class MultiplayerSocketClient {
     void handleConnectError(dynamic error) {
       print('[SOCKET_ERROR] Connection failed: $error');
       
-      // Detect specific error patterns
+      // Detecta patrones de error específicos
       final errorStr = error.toString().toLowerCase();
       if (errorStr.contains('websocket error') && errorStr.contains('transport')) {
         print('[SOCKET_ERROR] → WebSocket transport error (backend may not be running)');
@@ -148,12 +139,19 @@ class MultiplayerSocketClient {
       handleConnectError(TimeoutException('Tiempo de conexión agotado.'));
     });
     socket.onError((error) {
+      print('[SOCKET_ERROR_HANDLER] onError called with: $error');
       _handleError(error);
     });
     socket.onAny((event, data) {
+      print('[SOCKET_EVENT_DEBUG] ⚡ RECEIVED EVENT: "$event" at ${DateTime.now()}');
+      print('[SOCKET_EVENT_DEBUG]    Data: ${_sanitizeLogData(data)}');
+      print('[SOCKET_EVENT_DEBUG]    Socket.connected: ${socket.connected}, Socket.id: ${socket.id}');
+      
       final controller = _eventControllers[event];
       if (controller != null && !controller.isClosed) {
         controller.add(_normalizePayload(data));
+      } else {
+        print('[SOCKET_EVENT_DEBUG]    ℹ Event "$event" has no registered listener (unhandled)');
       }
     });
 
@@ -173,7 +171,7 @@ class MultiplayerSocketClient {
       _socket!.disconnect();
       _socket!.close();
     } catch (_) {
-      // ignore errors on close
+      // ignorar errores al cerrar
     }
     _socket = null;
     _statusController.add(MultiplayerSocketStatus.disconnected);
@@ -204,8 +202,9 @@ class MultiplayerSocketClient {
     print('[SOCKET_EMIT]    Socket.connected = ${_socket!.connected}, Socket.id = ${_socket!.id}');
     print('[SOCKET_EMIT]    Payload: ${_sanitizeLogData(payload)}');
     print('[SOCKET_EMIT]    Auth should persist from handshake - server should have cached credentials');
+        
     _socket!.emit(eventName, payload);
-    print('[SOCKET_EMIT]    Emission complete');
+    print('[SOCKET_EMIT]    Emission complete - waiting for server response or events...');
   }
 
   /// Libera todos los controllers y desconecta el socket subyacente.
@@ -232,7 +231,7 @@ class MultiplayerSocketClient {
         ? _baseUrl.substring(0, _baseUrl.length - 1)
         : _baseUrl;
     
-    // Validate base URL format
+    // Validar formato de la URL base
     if (!trimmedBase.startsWith('http://') && !trimmedBase.startsWith('https://') && 
         !trimmedBase.startsWith('ws://') && !trimmedBase.startsWith('wss://')) {
       print('[SOCKET_ERROR] ⚠️ WARNING: Base URL does not have a scheme: $trimmedBase');

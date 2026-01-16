@@ -89,7 +89,7 @@ class _HostResultsScreenState extends State<HostResultsScreen>
     final top3 = standings.take(3).toList();
     final rest = standings.skip(3).toList();
 
-    // Trigger confetti on first build with standings
+    // Disparar confeti en el primer render cuando haya clasificación
     if (standings.isNotEmpty) {
       _triggerConfetti();
     }
@@ -115,8 +115,12 @@ class _HostResultsScreenState extends State<HostResultsScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        FadeTransition(
-                          opacity: _fadeAnimation,
+                        AnimatedBuilder(
+                          animation: _fadeAnimation,
+                          builder: (context, child) {
+                            final opacity = _fadeAnimation.value.clamp(0.0, 1.0);
+                            return Opacity(opacity: opacity, child: child);
+                          },
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,8 +184,12 @@ class _HostResultsScreenState extends State<HostResultsScreen>
                                 )
                               : Column(
                                   children: [
-                                    FadeTransition(
-                                      opacity: _fadeAnimation,
+                                    AnimatedBuilder(
+                                      animation: _fadeAnimation,
+                                      builder: (context, child) {
+                                        final opacity = _fadeAnimation.value.clamp(0.0, 1.0);
+                                        return Opacity(opacity: opacity, child: child);
+                                      },
                                       child: ScaleTransition(
                                         scale: _scaleAnimation,
                                         child: SharedPodium(top3: top3),
@@ -189,8 +197,12 @@ class _HostResultsScreenState extends State<HostResultsScreen>
                                     ),
                                     const SizedBox(height: 20),
                                     Expanded(
-                                      child: FadeTransition(
-                                        opacity: _fadeAnimation,
+                                      child: AnimatedBuilder(
+                                        animation: _fadeAnimation,
+                                        builder: (context, child) {
+                                          final opacity = _fadeAnimation.value.clamp(0.0, 1.0);
+                                          return Opacity(opacity: opacity, child: child);
+                                        },
                                         child: Container(
                                           width: double.infinity,
                                           padding: const EdgeInsets.all(16),
@@ -233,9 +245,9 @@ class _HostResultsScreenState extends State<HostResultsScreen>
                   AppColor.primary,
                   AppColor.secundary,
                   AppColor.accent,
-                  Color(0xFFFFCC00), // Gold
-                  Color(0xFFC0C0C0), // Silver
-                  Color(0xFFCD7F32), // Bronze
+                  Color(0xFFFFCC00), // Oro
+                  Color(0xFFC0C0C0), // Plata
+                  Color(0xFFCD7F32), // Bronce
                 ],
               ),
             ),

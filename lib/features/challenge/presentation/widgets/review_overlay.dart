@@ -116,7 +116,8 @@ class _ReviewOverlayState extends State<ReviewOverlay>
       child: AnimatedBuilder(
         animation: _fadeAnimation,
         builder: (context, child) => Container(
-          color: Colors.black.withValues(alpha: 0.5 * _fadeAnimation.value),
+          color: Colors.black.withValues(alpha: (0.5 * _fadeAnimation.value).clamp(0.0, 1.0)),
+
           child: Center(
             child: ScaleTransition(
               scale: _scaleAnimation,
