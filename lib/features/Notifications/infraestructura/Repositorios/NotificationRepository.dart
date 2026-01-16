@@ -44,7 +44,7 @@ class NotificationRepository implements INotificationRepository {
     required bool toAdmins,
     required bool toRegularUsers,
   }) async {
-    // Llama al endpoint POST /backoffice/massNotification
+    print('repo esta mandando la notificacion $title');
     await dataSource.sendMassNotification(
       title: title,
       message: message,

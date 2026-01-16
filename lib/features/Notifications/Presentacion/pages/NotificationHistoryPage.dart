@@ -73,7 +73,7 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                       child: Icon(Icons.notifications_active, color: Colors.white, size: 20),
                     ),
                     title: Text(
-                      notification.message,
+                      notification.title,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         color: AppColor.primary,
@@ -82,7 +82,7 @@ class _NotificationsHistoryPageState extends State<NotificationsHistoryPage> {
                     subtitle: Padding(
                       padding: const EdgeInsets.only(top: 4.0),
                       child: Text(
-                        'Tipo: ${notification.type}',
+                        notification.message,
                         style: TextStyle(color: AppColor.secundary.withOpacity(0.8)),
                       ),
                     ),

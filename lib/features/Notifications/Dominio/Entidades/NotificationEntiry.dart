@@ -3,14 +3,16 @@
 class NotificationEntity {
   final String id;
   final String type;
+  final String title;
   final String message;
   final bool isRead;
   final DateTime createdAt;
-  final String? resourceId; // Campo opcional mencionado en el DTO
+  final String? resourceId;
 
   NotificationEntity({
     required this.id,
     required this.type,
+    required this.title,
     required this.message,
     required this.isRead,
     required this.createdAt,
@@ -19,13 +21,13 @@ class NotificationEntity {
 
   factory NotificationEntity.fromJson(Map<String, dynamic> json) {
     return NotificationEntity(
-      id: json['id'] as String, //
-      type: json['type'] as String, //
-      message: json['message'] as String, //
-      isRead: json['isRead'] as bool, //
-      // Convertimos el string de la API (ISO 8601) a DateTime
-      createdAt: DateTime.parse(json['createdAt'] as String), //
-      resourceId: json['resourceId'] as String?, //
+      id: json['id'] as String,
+      type: json['type'] as String,
+      title: json['title'] as String? ?? '',
+      message: json['body'] as String? ?? '',
+      isRead: json['isRead'] as bool? ?? false,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      resourceId: json['resourceId'] as String?,
     );
   }
 
@@ -43,6 +45,7 @@ class NotificationEntity {
   NotificationEntity copyWith({
     String? id,
     String? type,
+    String? title,
     String? message,
     bool? isRead,
     DateTime? createdAt,
@@ -51,10 +54,13 @@ class NotificationEntity {
     return NotificationEntity(
       id: id ?? this.id,
       type: type ?? this.type,
+      title: title ?? this.title,
       message: message ?? this.message,
       isRead: isRead ?? this.isRead,
       createdAt: createdAt ?? this.createdAt,
       resourceId: resourceId ?? this.resourceId,
     );
   }
+
+
 }
