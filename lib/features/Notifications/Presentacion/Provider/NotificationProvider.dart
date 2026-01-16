@@ -223,6 +223,7 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      print('prov esta mandando la notificacion $title');
       await repository.sendMassNotification(
         title: title,
         message: message,
