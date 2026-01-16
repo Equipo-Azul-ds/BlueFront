@@ -52,24 +52,35 @@ class _HomePageContentState extends State<HomePageContent> {
   @override
   void initState() {
     super.initState();
-    // Se cargan los quizzes del usuario al ingresar (usa un ID de autor de marcador de posición)
+    // Se cargan los quizzes del usuario al ingresar.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
       if (quizBloc.userQuizzes == null) {
-        // Se intenta cargar los quizzes del usuario. Si no hay un authorId en currentQuiz,
-        // utiliza un authorId de prueba por defecto para que el Dashboard muestre
-        // los quizzes creados durante el desarrollo o pruebas.
+        // Obtenemos el authBloc para recuperar el usuario actual o su ID
         final auth = Provider.of<AuthBloc>(context, listen: false);
-        const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
-        var authorIdCandidate =
-            auth.currentUser?.id ?? quizBloc.currentQuiz?.authorId ?? '';
-        if (authorIdCandidate.isEmpty) authorIdCandidate = defaultTestAuthorId;
+        
+        // Si no hay user en memoria, intentamos leer desde storage (por si hubo recarga)
+        // aunque idealmente AuthBloc ya debió inicializar eso. 
+        // Tomaremos el ID disponible.
+        String authorIdCandidate = auth.currentUser?.id ?? '';
+        
+        // Si sigue vacío, probamos leer el que guardamos en SecureStorage en el login.
+        // Esto es un 'fallback' por si AuthBloc aún no lo tenía listo.
+        if (authorIdCandidate.isEmpty) {
+           // Nota: recuperar de secure storage es asíncrono, pero AuthBloc lo deberia tener.
+           // Si authBloc no tiene usuario, puede que no estemos logueados.
+        }
 
+        // Ya NO usamos el defaultTestAuthorId hardcodeado, porque queremos ver MIS quizzes.
+        // Si no hay authorId, se enviará cadena vacía, pero el repositorio usa el token.
+        // Así que enviamos lo que tengamos.
+        
         setState(() => _loadingUserQuizzes = true);
         try {
+          // Llama al bloc, que llama al caso de uso, que llama al repo searchByAuthor
+          // El repo (modificado) usará el token en el header y la ruta /library/my-creations.
           await quizBloc.loadUserQuizzes(authorIdCandidate);
         } catch (e) {
-          // Registrar el error pero no bloqueaa la interfaz si el backend rechaza el authorId.
           print(
             '[dashboard] loadUserQuizzes error for author=$authorIdCandidate -> $e',
           );

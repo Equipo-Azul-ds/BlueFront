@@ -17,10 +17,10 @@ class Answer{
   factory Answer.fromJson(Map<String, dynamic> json) {
     return Answer(
       answerId: json['answerId'] ?? json['id'],
-      questionId: json['questionId'] ?? json['question_id'],
+      questionId: json['questionId'] ?? json['question_id'] ?? '', // Default to empty if missing
       isCorrect: json['isCorrect'],
       text: json['text'] ?? json['answerText'] ?? json['answer_text'],
-      mediaUrl: json['mediaUrl'] ?? json['mediaId'] ?? json['media_id'],
+      mediaUrl: json['mediaId'] ?? json['media_id'] ?? json['mediaUrl'],
     );
   }
 

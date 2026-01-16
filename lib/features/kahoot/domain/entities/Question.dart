@@ -41,9 +41,11 @@ class Question {
   factory Question.fromJson(Map<String, dynamic> json){
     return Question(
       questionId: json['questionId'] ?? json['id'],
-      quizId: json['quizId'] ?? json['quiz_id'] ?? json['quizId'],
+      quizId: json['quizId'] ?? json['quiz_id'] ?? '', // Default to empty if missing
       text: json['text'] ?? json['questionText'] ?? json['question_text'] ?? '',
-      mediaUrl: json['mediaUrl'] ?? json['mediaId'] ?? json['media_id'],
+      // Prioritize mediaId (UUID) over mediaUrl (Display URL) to ensure persistence of the Asset ID.
+      // The UI must resolve this ID to a URL for display if needed.
+      mediaUrl: json['mediaId'] ?? json['media_id'] ?? json['mediaUrl'],
       type: json['type'] ?? json['questionType'] ?? json['question_type'] ?? 'quiz',
       timeLimit: (json['timeLimit'] ?? json['time_limit'] ?? 30) as int,
       points: (json['points'] ?? json['points'] ?? 0) as int,

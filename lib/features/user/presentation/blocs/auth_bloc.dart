@@ -85,6 +85,11 @@ class AuthBloc extends ChangeNotifier {
       await _recordTokenIssuedAt();
       await _scheduleTokenRefresh();
       currentUser = user;
+
+      // Imprimir el token y el userId en la terminal
+      print('[auth] Token obtenido y guardado: $token');
+      print('[auth] UserId obtenido y guardado: ${user.id}');
+
       return user;
     });
   }
@@ -126,29 +131,37 @@ class AuthBloc extends ChangeNotifier {
           name: safeName,
         ),
       );
-      // Luego busca al usuario recién creado (mock) para setear currentUser
-      final createdUser = await getUserByName(userName);
-      currentUser = createdUser;
-      await storage.write('currentUserId', createdUser.id);
-      await storage.write('hashedPassword', plainPassword);
+      User? createdUser;
+      try {
+        createdUser = await getUserByName(userName);
+      } catch (_) {
+        // Si el backend no permite leer sin autenticación, continuamos sin lanzar error.
+        createdUser = null;
+      }
 
-      // Si por alguna razón el backend devolvió name vacío, fuerza un PATCH inmediato con name e invariantes.
-      if (createdUser.name.trim().isEmpty && safeName.isNotEmpty) {
-        // ignore: avoid_print
-        print('[auth] signup detected empty name, patching with safeName="$safeName"');
-        currentUser = await updateSettings(
-          UpdateUserSettingsParams(
-            userName: createdUser.userName,
-            email: createdUser.email,
-            name: safeName,
-            description: createdUser.description,
-            avatarUrl: createdUser.avatarUrl,
-            userType: createdUser.userType,
-            theme: createdUser.theme,
-            language: createdUser.language,
-            gameStreak: createdUser.gameStreak,
-          ),
-        );
+      if (createdUser != null) {
+        currentUser = createdUser;
+        await storage.write('currentUserId', createdUser.id);
+        await storage.write('hashedPassword', plainPassword);
+
+        // Si por alguna razón el backend devolvió name vacío, fuerza un PATCH inmediato con name e invariantes.
+        if (createdUser.name.trim().isEmpty && safeName.isNotEmpty) {
+          // ignore: avoid_print
+          print('[auth] signup detected empty name, patching with safeName="$safeName"');
+          currentUser = await updateSettings(
+            UpdateUserSettingsParams(
+              userName: createdUser.userName,
+              email: createdUser.email,
+              name: safeName,
+              description: createdUser.description,
+              avatarUrl: createdUser.avatarUrl,
+              userType: createdUser.userType,
+              theme: createdUser.theme,
+              language: createdUser.language,
+              gameStreak: createdUser.gameStreak,
+            ),
+          );
+        }
       }
 
       return currentUser;
@@ -180,6 +193,22 @@ class AuthBloc extends ChangeNotifier {
       // Debug: imprime los campos que se enviarán
       // ignore: avoid_print
       print('[auth] updateProfile id=${user.id} sending fields=$fields');
+      if (avatarUrl != null && avatarUrl.isNotEmpty) {
+        try {
+          final u = Uri.parse(avatarUrl);
+          final seed = u.queryParameters['seed'];
+          if (seed != null && seed.isNotEmpty) {
+            fields['avatarAssetId'] = seed; // Use the seed as the ID
+          } else if (!avatarUrl.contains('://')) {
+            // If it doesn't look like a URL, assume it's already a valid ID
+            fields['avatarAssetId'] = avatarUrl;
+          }
+        } catch (_) {
+          // If it's not a valid URL, it might already be an ID
+          if (!avatarUrl.contains('://')) fields['avatarAssetId'] = avatarUrl;
+        }
+      }
+
       currentUser = await updateSettings(
         UpdateUserSettingsParams(
           userName: fields['userName'],
@@ -187,6 +216,7 @@ class AuthBloc extends ChangeNotifier {
           name: fields['name'],
           description: fields['description'],
           avatarUrl: fields['avatarUrl'],
+          avatarAssetId: fields['avatarAssetId'],
           userType: fields['userType'],
           theme: fields['theme'],
           language: fields['language'],
