@@ -1,3 +1,4 @@
+import 'package:Trivvy/features/AI/AIQuizGeneratorPage.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:Trivvy/features/Administrador/Presentacion/pages/NotificationAdminPage.dart';
@@ -654,6 +655,7 @@ class MyApp extends StatelessWidget {
                 '/admin/notifications': (context) =>
                     const NotificationAdminPage(),
                 '/admin/dashboard': (context) => const AdminDashboardPage(),
+                '/ai': (context) => const AiQuizGeneratorPage(),
                 '/notifications-history': (context) =>
                     const NotificationsHistoryPage(),
               },

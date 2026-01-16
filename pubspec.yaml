@@ -17,6 +17,9 @@ dependencies:
   mockito: ^5.0.0
   build_runner: ^2.0.0
 
+  # ai
+  google_mlkit_smart_reply: ^0.10.0
+
   # Firebase
   firebase_core: ^3.0.0
   firebase_messaging: ^15.0.0

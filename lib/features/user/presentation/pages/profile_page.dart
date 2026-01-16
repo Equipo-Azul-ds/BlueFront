@@ -30,6 +30,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String _avatarUrl = '';
   static const String adminRoute = '/admin';
   static const String notificationsHistoryRoute = '/notifications-history';
+  static const String aiRoute = '/ai';
 
   @override
   void initState() {
@@ -318,6 +319,20 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 child: const Text('Ir a Página de Administrador'),
+              ),
+
+              const SizedBox(height: 30),ElevatedButton(
+                onPressed: () => Navigator.of(context).pushNamed(aiRoute),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColor.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  textStyle: const TextStyle(fontSize: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Ir a Página de crear con IA'),
               ),
 
               const SizedBox(height: 30),
