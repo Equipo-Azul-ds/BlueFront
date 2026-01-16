@@ -1,5 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../../core/constants/colors.dart';
 import '../../domain/entities/kahoot.dart';
+import 'package:Trivvy/features/challenge/infrastructure/storage/single_player_attempt_tracker.dart';
+import 'package:Trivvy/features/challenge/application/use_cases/single_player_usecases.dart';
+import 'package:Trivvy/features/challenge/presentation/pages/single_player_challenge.dart';
+import 'package:Trivvy/features/gameSession/presentation/pages/host_lobby.dart';
+import 'package:Trivvy/features/challenge/domain/entities/single_player_game.dart';
+import 'package:Trivvy/features/challenge/application/dtos/single_player_dtos.dart';
+import 'package:Trivvy/features/user/presentation/blocs/auth_bloc.dart';
 
 class DiscoveryDetailPage extends StatelessWidget {
   const DiscoveryDetailPage({super.key});
@@ -77,11 +87,11 @@ class DiscoveryDetailPage extends StatelessWidget {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _hostGame(context, kahoot),
+                onPressed: () async => await _hostGame(context, kahoot),
                 icon: const Icon(Icons.people, color: Colors.white),
                 label: const Text('HOST A GAME', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade700,
+                  backgroundColor: AppColor.primary,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -90,11 +100,11 @@ class DiscoveryDetailPage extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => _playGame(context, kahoot),
+                onPressed: () async => await _playGame(context, kahoot),
                 icon: const Icon(Icons.play_arrow, color: Colors.white),
                 label: const Text('JUGAR', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
+                  backgroundColor: AppColor.secundary,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
@@ -106,16 +116,73 @@ class DiscoveryDetailPage extends StatelessWidget {
     );
   }
 
-  void _hostGame(BuildContext context, Kahoot kahoot) {
-    print("Hosteando partida para el ID: ${kahoot.id}");
-    // Aquí navegarías a la lógica de crear sala/lobby
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Iniciando Lobby para: ${kahoot.title}')),
+  Future<void> _hostGame(BuildContext context, Kahoot kahoot) async {
+    final kahootId = (kahoot.id ?? '').trim();
+    if (kahootId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este kahoot no tiene un ID válido; sincronízalo antes de hostear.')),
+      );
+      return;
+    }
+
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HostLobbyScreen(kahootId: kahootId),
+      ),
     );
   }
 
-  void _playGame(BuildContext context, Kahoot kahoot) {
-    print("Iniciando juego solo para el ID: ${kahoot.id}");
-    // Aquí navegarías a la lógica de juego individual
+  Future<void> _playGame(BuildContext context, Kahoot kahoot) async {
+    final kahootId = (kahoot.id ?? '').trim();
+    if (kahootId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Este kahoot no tiene un ID válido; sincronízalo antes de jugar.')),
+      );
+      return;
+    }
+
+    try {
+      final tracker = context.read<SinglePlayerAttemptTracker>();
+      final attemptStateUseCase = context.read<GetAttemptStateUseCase>();
+      final authBloc = context.read<AuthBloc>();
+      final userId = authBloc.currentUser?.id ?? '';
+
+      final storedAttemptId = await tracker.readAttemptId(kahootId, userId);
+      SinglePlayerGame? resumeGame;
+      SlideDTO? resumeSlide;
+
+      if (storedAttemptId != null) {
+        try {
+          final attemptState = await attemptStateUseCase.execute(storedAttemptId);
+          resumeGame = attemptState.game;
+          if (resumeGame == null || resumeGame.gameProgress.state == GameProgressStatus.COMPLETED) {
+            await tracker.clearAttempt(kahootId, userId);
+            resumeGame = null;
+            resumeSlide = null;
+          } else {
+            resumeSlide = attemptState.nextSlide;
+          }
+        } catch (e) {
+          print('[discovery] Failed to resume attempt for kahoot=$kahootId -> $e');
+          await tracker.clearAttempt(kahootId, userId);
+        }
+      }
+
+      if (!context.mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SinglePlayerChallengeScreen(
+            quizId: kahootId,
+            initialGame: resumeGame,
+            initialSlide: resumeSlide,
+          ),
+        ),
+      );
+    } catch (e) {
+      print('[discovery] Error starting single player: $e');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error iniciando juego: $e')));
+    }
   }
 }
