@@ -28,9 +28,32 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
   void initState() {
     super.initState();
     _questionController = TextEditingController();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _fetchThemes();
-      Provider.of<QuizEditorBloc>(context, listen: false).loadThemes();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+       _fetchThemes();
+       final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
+       quizBloc.loadThemes();
+
+       // Si hay un quiz actual no local (modo edición), recargarlo completamente (GET /kahoots/:id)
+       if (widget.template == null && quizBloc.currentQuiz != null && !quizBloc.currentQuiz!.isLocal && quizBloc.currentQuiz!.quizId.isNotEmpty) {
+           print('[QuizEditorPage] Editing existing quiz ${quizBloc.currentQuiz!.quizId}. Fetching details...');
+           await quizBloc.loadQuiz(quizBloc.currentQuiz!.quizId);
+           if (!mounted) return;
+           if (quizBloc.currentQuiz != null) {
+              setState(() {
+                 _category = quizBloc.currentQuiz!.category ?? 'Tecnología';
+                 _status = quizBloc.currentQuiz!.status ?? 'Draft';
+                 _visibility = quizBloc.currentQuiz!.visibility;
+                 _coverImagePath = quizBloc.currentQuiz!.coverImageUrl;
+                 _selectedThemeId = quizBloc.currentQuiz!.themeId;
+              });
+              // Actualizar campos del formulario si ya se construyeron
+              _formKey.currentState?.fields['title']?.didChange(quizBloc.currentQuiz!.title);
+              _formKey.currentState?.fields['description']?.didChange(quizBloc.currentQuiz!.description);
+              
+              // Precargar imágenes
+              _preloadQuizMedia();
+           }
+       }
     });
     // Si se pasa una plantilla, inicializamos el quiz en el Bloc como una copia lista para edición
     if (widget.template != null) {
@@ -87,10 +110,10 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           // Inicializar controles UI con valores de la plantilla
-          setState(() {
+            setState(() {
             _coverImagePath = tpl.coverImageUrl;
             _visibility = tpl.visibility;
-            _status = tpl.status ?? 'draft';
+            _status = tpl.status ?? 'Draft';
             _category = tpl.category ?? 'Tecnología';
             _selectedThemeId = tpl.themeId;
           });
@@ -120,7 +143,7 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
           title: '',
           description: '',
           visibility: 'private',
-          status: 'draft',
+          status: 'Draft',
           category: 'Tecnología',
           themeId: _selectedThemeId ?? '',
           coverImageUrl: null,
@@ -159,7 +182,7 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
   Uint8List? _coverImageBytes;
   Uint8List? _currentQuestionPreviewBytes;
   String _visibility = 'private';
-  String _status = 'draft';
+  String _status = 'Draft';
   String _category = 'Tecnología';
   List<Map<String, dynamic>> _availableThemes = [];
   bool _themesLoading = false;
@@ -645,7 +668,13 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
   @override
   Widget build(BuildContext context) {
     final quizBloc = Provider.of<QuizEditorBloc>(context);
-
+    
+    if (quizBloc.isLoading) {
+       return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+       );
+    }
+    
     final quiz = quizBloc.currentQuiz;
     final slides = quiz?.questions ?? [];
     final selectedQuestion =
@@ -944,19 +973,18 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _status,
-                            items: ['draft', 'published']
+                            value: ['Draft', 'Publish'].contains(_status) ? _status : 'Draft',
+                            items: ['Draft', 'Publish']
                                 .map(
                                   (s) => DropdownMenuItem(
                                     value: s,
-                                    child: Text(s),
+                                    child: Text(s == 'Draft' ? 'Borrador' : 'Publicado'),
                                   ),
                                 )
                                 .toList(),
                             onChanged: (v) {
-                              final val = v ?? 'draft';
+                              final val = v ?? 'Draft';
                               setState(() => _status = val);
-                              // Propagar al BLoC para que saveCurrentQuiz use el valor seleccionado
                               if (quizBloc.currentQuiz != null) {
                                 quizBloc.currentQuiz!.status = _status;
                                 quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);

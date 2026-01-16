@@ -163,6 +163,12 @@ class QuizRepositoryImpl implements QuizRepository {
         return Quiz.fromJson(Map<String, dynamic>.from(jsonResponse));
       }
 
+      // Fallback para PUT/200 OK con body vacio (aunque el spec dice que retorna recurso, por si acaso)
+      if (method != 'POST') { 
+         // En updates, si body ests vacio, retornamos el mismo objeto quiz que enviamos (asumiendo que se guardo)
+         // o tramos de hacer un 'find' si preferimos consistencia.
+      }
+
       // Fallback: si no hay cuerpo pero hay un encabezado Location, intenta obtener el
       // recurso creado desde esa ubicación para que los llamadores reciban un `Quiz` completo.
       final locationHeader = response.headers['location'] ?? response.headers['Location'];
@@ -385,34 +391,47 @@ class QuizRepositoryImpl implements QuizRepository {
 
   @override
   Future<List<Quiz>> searchByAuthor(String authorId) async {
-    // El backend expone: GET /kahoots/user/:userId
-    // Devuelve un array JSON con los kahoots del autor (200 -> lista de quizzes).
-    // Los errores 5xx se tratan como transitorios y devuelven lista vacía; los 4xx se propagan.
-    final url = '$baseUrl/kahoots/user/$authorId';
+    // Se utiliza el endpoint dedicado para obtener las creaciones del usuario autenticado:
+    // GET /library/my-creations
+    // Este endpoint requiere autenticación Bearer y devuelve solo los quizzes del usuario.
+    final url = '$baseUrl/library/my-creations';
+    
+    // Aunque el método recibe 'authorId', el endpoint se basa en el token del usuario.
+    // Nos aseguramos de actualizar el _currentUserId para los headers.
     _currentUserId = authorId.trim();
     final headers = await _headers(userId: authorId, json: false);
+    
     try {
       print('QuizRepositoryImpl.searchByAuthor -> GET $url');
       print('Request headers: $headers');
     } catch (_) {}
+    
     final response = await cliente.get(Uri.parse(url), headers: headers);
 
     try { print('QuizRepositoryImpl.searchByAuthor -> Response status: ${response.statusCode}'); } catch (_) {}
 
     if (response.statusCode == 200) {
-      final List<dynamic> jsonResponse = jsonDecode(response.body);
-      try { print('QuizRepositoryImpl.searchByAuthor -> Fetched ${jsonResponse.length} quizzes'); } catch (_) {}
-      return jsonResponse.map((json) => Quiz.fromJson(Map<String, dynamic>.from(json as Map))).toList();
+      final decoded = jsonDecode(response.body);
+      // El backend puede devolver { "data": [ ... ] } o directamente [ ... ]
+      // Ajustamos para soportar ambas estructuras, aunque /library/my-creations suele devolver un array directo o paginado dentro de data.
+      List<dynamic> list;
+      if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+         list = decoded['data'];
+      } else if (decoded is List) {
+         list = decoded;
+      } else {
+         // Formato desconocido, devolver vacío
+         return <Quiz>[];
+      }
+      
+      try { print('QuizRepositoryImpl.searchByAuthor -> Fetched ${list.length} quizzes from my-creations'); } catch (_) {}
+      return list.map((json) => Quiz.fromJson(Map<String, dynamic>.from(json as Map))).toList();
     } else {
-      final msg = 'Error al buscar quizzes por autor: ${response.statusCode} - ${response.body}';
+      final msg = 'Error al buscar quizzes por autor (my-creations): ${response.statusCode} - ${response.body}';
       try { print('QuizRepositoryImpl.searchByAuthor -> $msg'); } catch (_) {}
 
-      // Si el servidor devolvió un 5xx, lo trato como un error transitorio del backend
-      // y devuelvo una lista vacía para que la UI pueda seguir funcionando con
-      // posibles elementos en caché local. Para errores 4xx propagamos la excepción
-      // para que los llamadores puedan mostrar problemas de autenticación/validación.
       if (response.statusCode >= 500 && response.statusCode < 600) {
-        try { print('QuizRepositoryImpl.searchByAuthor -> Backend 5xx detected, returning empty list as fallback'); } catch (_) {}
+        try { print('QuizRepositoryImpl.searchByAuthor -> Backend 5xx, returning empty list'); } catch (_) {}
         return <Quiz>[];
       }
 

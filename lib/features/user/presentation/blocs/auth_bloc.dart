@@ -86,8 +86,9 @@ class AuthBloc extends ChangeNotifier {
       await _scheduleTokenRefresh();
       currentUser = user;
 
-      // Imprimir el token en la terminal
+      // Imprimir el token y el userId en la terminal
       print('[auth] Token obtenido y guardado: $token');
+      print('[auth] UserId obtenido y guardado: ${user.id}');
 
       return user;
     });
