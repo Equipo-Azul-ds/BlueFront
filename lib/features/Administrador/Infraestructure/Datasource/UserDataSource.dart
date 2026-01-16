@@ -169,7 +169,11 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonBody = json.decode(response.body);
-      return UserDto.fromJson(jsonBody['user']).toEntity();
+      final userData = (jsonBody is Map<String, dynamic> && jsonBody.containsKey('user'))
+          ? jsonBody['user']
+          : jsonBody;
+
+      return UserDto.fromJson(userData).toEntity();
     } else if (response.statusCode == 400) {
       throw ServerException(message: 'El usuario con el id dado no existe');
     } else if (response.statusCode == 401) {

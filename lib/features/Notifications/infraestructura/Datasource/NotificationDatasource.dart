@@ -18,15 +18,17 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
   @override
   Future<void> registerDevice(String token, String deviceType) async {
-    //final tokenid = await storage.read('token');
+    final tokenid = await storage.read('token');
     //final userId = await storage.read('userId');
     const String debugUserId = '123e4567-e89b-42d3-a456-426614174123';
 
     final response = await client.post(
       Uri.parse('$baseUrl/notifications/register-device'),
       headers: {'Content-Type': 'application/json',
-        'x-debug-user-id': debugUserId,},
-      body: jsonEncode({"token": token, "device": deviceType}),
+        //'x-debug-user-id': debugUserId,
+        'Authorization': 'Bearer $tokenid',
+      },
+      body: jsonEncode({"token": token, "deviceType": deviceType}),
     );
 
     print('--- HTTP RESPONSE ---');
@@ -41,13 +43,13 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
   @override
   Future<void> unregisterDevice(String token) async {
-    //final tokenid = await storage.read('token');
+    final tokenid = await storage.read('token');
     //final userId = await storage.read('userId');
     const String debugUserId = '123e4567-e89b-42d3-a456-426614174000';
     final response = await client.delete(
       Uri.parse('$baseUrl/notifications/unregister-device'),
       headers: {'Content-Type': 'application/json',
-        'x-debug-user-id': debugUserId,},
+         'Authorization': 'Bearer $tokenid',},
       body: jsonEncode({"token": token}),
     );
 
@@ -66,7 +68,7 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     int limit = 20,
     int page = 1,
   }) async {
-    //final tokenid = await storage.read('token');
+    final token = await storage.read('token');
     //final userId = await storage.read('userId');
     const String debugUserId = '123e4567-e89b-42d3-a456-426614174000';
     final uri = Uri.parse('$baseUrl/notifications').replace(
@@ -83,7 +85,8 @@ class NotificationRemoteDataSource implements INotificationDataSource {
       final response = await client.get(
         uri,
         headers: {'Content-Type': 'application/json',
-          'x-debug-user-id': debugUserId,},
+          //'x-debug-user-id': debugUserId,
+          'Authorization': 'Bearer $token',},
       );
 
       print('URL: PATCH $uri');
@@ -106,9 +109,11 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
   @override
   Future<Map<String, dynamic>> markAsRead(String id) async {
+    final token = await storage.read('token');
     final response = await client.patch(
       Uri.parse('$baseUrl/notifications/$id'), //
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',},
       body: jsonEncode({"isRead": true}), //
     );
 
