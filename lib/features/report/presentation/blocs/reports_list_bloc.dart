@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../application/dtos/report_dtos.dart';
 import '../../application/use_cases/report_usecases.dart';
 import '../../domain/entities/report_model.dart';
+import '../../infrastructure/repositories/reports_repository_impl.dart';
 
 /// BLoC para el listado de reportes personales.
 /// Gestiona carga, refresco y paginación siguiendo el patrón usado en
@@ -42,6 +43,7 @@ class ReportsListBloc extends ChangeNotifier {
   }
 
   Future<void> _load({required int page, required bool append}) async {
+    print('📄 [ReportsListBloc] Loading reports - page: $page, append: $append');
     _initialized = true;
     _isLoading = true;
     _error = null;
@@ -54,6 +56,8 @@ class ReportsListBloc extends ChangeNotifier {
       final response = await getMyResultsUseCase(
         MyResultsQueryDto(page: page),
       );
+      print('📄 [ReportsListBloc] Received ${response.results.length} items');
+      print('📄 [ReportsListBloc] Pagination: page ${response.meta.currentPage} of ${response.meta.totalPages}');
       _meta = response.meta;
       if (append) {
         _items.addAll(response.results);
@@ -62,10 +66,21 @@ class ReportsListBloc extends ChangeNotifier {
           ..clear()
           ..addAll(response.results);
       }
+      print('✅ [ReportsListBloc] Successfully loaded reports. Total items: ${_items.length}');
     } catch (e) {
-      _error = e.toString();
-      if (!append) {
-        _items.clear();
+      print('❌ [ReportsListBloc] Error loading reports: $e');
+      // If the API returns 404 it means the user has no results yet.
+      // Treat it as an empty state instead of surfacing an error.
+      if (e is ReportsApiException && e.statusCode == 404) {
+        _error = null;
+        if (!append) {
+          _items.clear();
+        }
+      } else {
+        _error = e.toString();
+        if (!append) {
+          _items.clear();
+        }
       }
     } finally {
       _isLoading = false;

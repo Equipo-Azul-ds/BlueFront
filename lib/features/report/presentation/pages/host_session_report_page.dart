@@ -809,16 +809,3 @@ class _ErrorState extends StatelessWidget {
     );
   }
 }
-
-extension on Color {
-  Color darken(double amount) {
-    assert(amount >= 0 && amount <= 1);
-    final f = 1 - amount;
-    return Color.fromRGBO(
-      (red * f).round(),
-      (green * f).round(),
-      (blue * f).round(),
-      1.0,
-    );
-  }
-}

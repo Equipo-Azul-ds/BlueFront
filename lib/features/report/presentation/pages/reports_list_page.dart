@@ -58,7 +58,6 @@ class _ReportsListPageState extends State<ReportsListPage> {
                     if (bloc.error != null && !bloc.hasData) {
                       return _ErrorState(
                         message: 'No se pudieron cargar los informes',
-                        detail: bloc.error!,
                         onRetry: _refresh,
                       );
                     }
@@ -159,7 +158,7 @@ class _HeroHeader extends StatelessWidget {
                 ),
               ),
               const Text(
-                'Informes de Estadísticas',
+                'Informes',
                 style: TextStyle(
                   color: AppColor.onPrimary,
                   fontSize: 22,
@@ -317,12 +316,25 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: const [
-        SizedBox(height: 32),
+      children: [
+        const SizedBox(height: 48),
         Center(
-          child: Text(
-            'No hay informes disponibles',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          child: Column(
+            children: [
+              Icon(Icons.sentiment_satisfied, size: 64, color: AppColor.primary),
+              const SizedBox(height: 16),
+              const Text(
+                'Aún no has jugado ningún Kahoot',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Cuando juegues partidas, aquí aparecerán tus informes y análisis.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ],
@@ -331,10 +343,9 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.detail, required this.onRetry});
+  const _ErrorState({required this.message, required this.onRetry});
 
   final String message;
-  final String detail;
   final VoidCallback onRetry;
 
   @override
@@ -355,7 +366,11 @@ class _ErrorState extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                Text(detail, textAlign: TextAlign.center),
+                const Text(
+                  'Por favor, inténtalo de nuevo más tarde.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: onRetry,

@@ -110,25 +110,19 @@ const String apiBaseUrl = String.fromEnvironment(
 
 );
 
-// Token provider que obtiene el currentUserId del almacenamiento seguro
-// Si no hay usuario autenticado, devuelve un UUID por defecto
+// Token provider que obtiene el JWT token del almacenamiento seguro
 Future<String?> _getAuthToken() async {
   try {
-    final currentUserId = await SecureStorage.instance.read('currentUserId');
-    if (currentUserId != null && currentUserId.isNotEmpty) {
-      print('[TOKEN_PROVIDER] Using currentUserId from storage: $currentUserId');
-      return currentUserId;
+    final token = await SecureStorage.instance.read('token');
+    if (token != null && token.isNotEmpty) {
+      final preview = token.length > 20 ? '${token.substring(0, 20)}...' : token;
+      print('[TOKEN_PROVIDER] Using JWT token from storage: $preview');
+      return token;
     }
-    print('[TOKEN_PROVIDER] No currentUserId found in storage, using default token');
-    const defaultToken = 'acde070d-8c4c-4f0d-9d8a-162843c10333';
-    print('[TOKEN_PROVIDER] Default token: $defaultToken');
-    return defaultToken;
   } catch (e) {
-    print('[TOKEN_PROVIDER] Error reading token: $e');
-    const defaultToken = 'acde070d-8c4c-4f0d-9d8a-162843c10333';
-    print('[TOKEN_PROVIDER] Returning default token due to error: $defaultToken');
-    return defaultToken;
+    print('[TOKEN_PROVIDER] Error reading token from storage: $e');
   }
+  return null;
 }
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -158,21 +152,11 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<http.Client>(create: (_) => http.Client()),
-
-        // Reportes: repo + casos de uso + BLoC (ChangeNotifier)
         Provider<ReportsRepository>(
           create: (context) => ReportsRepositoryImpl(
             baseUrl: apiBaseUrl,
             client: context.read<http.Client>(),
-            headersProvider: () async {
-              // Use the actual user UUID as the token for Authorization
-              final userId = await SecureStorage.instance.read('currentUserId');
-              return {
-                'Content-Type': 'application/json',
-                if (userId != null && userId.isNotEmpty)
-                  'Authorization': 'Bearer $userId',
-              };
-            },
+            tokenProvider: _getAuthToken,
           ),
         ),
         Provider<GetMyResultsUseCase>(
@@ -289,7 +273,7 @@ class MyApp extends StatelessWidget {
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
             baseUrl: apiBaseUrl,
-            mockAuthToken: 'acde070d-8c4c-4f0d-9d8a-162843c10333',
+            tokenProvider: _getAuthToken,
           ),
         ),
         Provider<SinglePlayerGameRepository>(

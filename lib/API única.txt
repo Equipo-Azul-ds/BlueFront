@@ -1,0 +1,3456 @@
+﻿API ÚNICA 
+(Proyecto Kahoot)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+27   de septiembre de 2025
+_=
+Indice
+Orientaciones Generales        4
+1. Nomenclatura y Endpoints (Rutas)        4
+2. Métodos HTTP        5
+3. Forma de los Parámetros y Casing        6
+4. Códigos de Estado y Respuestas        7
+5. Protocolo de Comunicación en Tiempo Real (WebSockets)        9
+5.1 Convención de Eventos y Nomenclaturas        10
+5.2 Códigos de estado y Nomenclaturas        11
+5.3 Implementación en NestJS        11
+Plantilla para la documentación de los endpoints        12
+1.1 GET Collection (Obtener Múltiples Recursos)        12
+1.2. GET Single (Obtener un Recurso por ID)        13
+2. POST (Creación)        14
+3. PATCH (Actualización Parcial)        15
+4. PUT (Reemplazo Completo)        16
+5. DELETE (Eliminación)        17
+6. Eventos WebSockets        18
+6.1 Namespace/Canal        18
+6.2 Entrada / Input - Eventos Enviados por el Cliente        19
+6.3 Salida / Output - Eventos enviados por el Servidor        19
+Grandes funcionalidades identificadas        20
+Epicas y mención de historias de usuario identificadas        22
+Épica 1: Gestión de Cuentas y Perfil        22
+Épica 2: Creación y Edición de Quices        22
+Épica 3: Gestión de contenido Multimedia        23
+Épica 4: Motor de Juego en Vivo (Síncrono)        23
+Épica 5: Modos de Juego Asíncrono y Solitario        23
+Épica 6: Exploración, Búsqueda y Descubrimiento        24
+Épica 7: Biblioteca y Gestión de Contenido Personal        24
+Épica 8: Gestión de Grupos y Roles        24
+Épica 9: Sistema de Notificaciones        24
+Épica 10: Informes, Estadísticas y Feedback        24
+Épica 11: Panel de Administración (Backoffice)        25
+Especificación de endpoints por épica        26
+Gestión de Cuentas y Perfil        26
+Creación y Edición de Quices        34
+Gestión de contenido Multimedia        41
+Motor de Juego en Vivo (Síncrono)        45
+Modos de Juego Asíncrono y Solitario        55
+Exploración, Búsqueda y Descubrimiento        60
+Biblioteca y Gestión de Contenido Personal (sujeto a cambios, en proceso)        65
+Gestión de Grupos y Roles        79
+Sistema de Notificaciones        93
+Informes, Estadísticas y Feedback        98
+Panel de Administración (Backoffice)        101
+Simulación de Pagos y Kahoot Premium (Backoffice)        112
+________________
+
+
+
+
+Orientaciones Generales
+1. Nomenclatura y Endpoints (Rutas)
+Los endpoints deben ser consistentes y enfocarse en los recursos (sustantivos), no en las acciones (verbos).
+Aspecto
+	Regla Estándar
+	Ejemplos (Inglés Requerido)
+	Recursos
+	Utilizar sustantivos en plural para las colecciones.
+	/users, /products, /orders
+	Recurso Individual
+	Identificar el recurso individual usando su ID.
+	/users/:id, /products/:id
+	
+
+
+
+Nota: La palabra idempotente en el contexto de las APIs web significa que aplicar una operación múltiples veces produce el mismo resultado que aplicarla una sola vez. En el contexto de una API, un método o una solicitud HTTP se considera idempotente si su ejecución repetida no causa efectos secundarios adicionales después de la primera ejecución exitosa.
+Ejemplo de un método no idempotente:
+POST: Este método no es idempotente porque su uso principal es crear un nuevo recurso. Cada vez que se envía la misma solicitud POST, la API generalmente crea un recurso nuevo con un ID único.
+________________
+
+
+2. Métodos HTTP
+El método HTTP (verbo) define la acción a realizar sobre el recurso identificado por la ruta.
+
+
+Método HTTP
+	Acción / Propósito
+	URI Típica
+	GET
+	Obtener (leer) uno o varios recursos. Idempotente y seguro.
+	/resources o /resources/:id
+	POST
+	Crear un nuevo recurso en la colección.
+	/resources
+	PUT
+	Reemplazar completamente un recurso existente (actualización total). Idempotente.
+	/resources/:id
+	PATCH
+	Actualizar parcialmente un recurso (modificar campos específicos).
+	/resources/:id
+	DELETE
+	Eliminar un recurso específico. Idempotente.
+	/resources/:id
+	
+
+
+
+
+
+3. Forma de los Parámetros y Casing
+
+
+El estándar de nomenclatura (casing) debe aplicarse consistentemente a todos los datos que viajan en la API.
+
+
+Tipo de Parámetro
+	Uso
+	Casing Recomendado (Inglés)
+	Query Parameters
+	Opciones para filtrar, ordenar o paginar una colección. Identificadores únicos de recursos en la URI.
+	camelCase (limit, orderBy, productId)
+	Body / Request Payload
+	Atributos dentro del cuerpo JSON de la solicitud (POST, PUT, PATCH).
+	camelCase (userName, firstName)
+	Headers
+	Metadatos y autorización.
+	kebab-case (content-type, authorization)
+	________________
+
+
+4. Códigos de Estado y Respuestas
+El uso correcto de los códigos de estado HTTP es esencial para la comunicación del AP
+
+
+Código de Estado
+	Categoría
+	Descripción
+	Método Típico
+	200 OK
+	Éxito
+	La solicitud fue exitosa.
+	GET, PUT, PATCH
+	201 Created
+	Éxito
+	Un nuevo recurso ha sido creado.
+	POST
+	204 No Content
+	Éxito
+	La solicitud fue exitosa pero no hay contenido para devolver (ej. eliminación).
+	DELETE
+	400 Bad Request
+	Error Cliente
+	La solicitud tiene una sintaxis inválida o datos mal formados.
+	POST, PUT, PATCH
+	401 Unauthorized
+	Error Cliente
+	No autenticado (el cliente debe identificarse).
+	Cualquiera
+	403 Forbidden
+	Error Cliente
+	Autenticado, pero no tiene permiso para acceder al recurso.
+	Cualquiera
+	404 Not Found
+	Error Cliente
+	El recurso solicitado no existe.
+	Cualquiera
+	500 Internal Server Error
+	Error Servidor
+	Error inesperado en el servidor.
+	Cualquiera
+	
+
+
+
+Nota: todas las respuestas de error (4xx y 5xx) deben devolver un cuerpo de respuesta JSON consistente en nuestro caso, el formato predeterminado de NestJS: 
+
+
+{
+"statusCode": 404, 
+"message": "Not Found", 
+"error": "..." 
+}.
+________________
+
+
+5. Protocolo de Comunicación en Tiempo Real (WebSockets)
+La Épica 4 (Motor de Juego Síncrono) requiere baja latencia y comunicación bidireccional, se utilizará el protocolo WebSocket (WS/WSS), el cual opera de manera fundamentalmente distinta a los métodos HTTP/REST definidos anteriormente:
+
+
+Aspecto
+	Comunicación HTTP/REST (GET, POST, etc.)
+	Comunicación WebSocket (WS)
+	Protocolo
+	HTTP/1.1 o HTTP/2.0
+	WS (WebSocket)
+	Conexión
+	Sin estado (Stateless), termina después de cada solicitud/respuesta.
+	Persistente (Stateful), conexión full-duplex (bidireccional) mantenida.
+	Transmisión
+	Unidireccional (Cliente → Servidor, Servidor → Cliente).
+	Bidireccional (Ambas partes pueden enviar datos al mismo tiempo).
+	Concepto
+	Recursos (sustantivos), gestionados por Métodos (verbos).
+	Eventos o Mensajes, que se envían y reciben a través del socket abierto.
+	________________
+5.1 Convención de Eventos y Nomenclaturas
+En lugar de rutas y métodos HTTP, la comunicación en WebSockets se basa en la emisión (emit) y escucha (on) de Eventos.
+
+
+Elemento
+	Regla Estándar
+	Ejemplos
+	Canales (Namespaces) / Rutas
+	Utilizar sustantivos en plural para identificar el recurso principal, es decir el namespace del Gateway de NestJS.
+	/game-sessions, /notifications, /chats
+	Nombres de Eventos
+	Utilizar verbos en snake_case que describan la acción (verbo + recurso) y especificar la dirección (ej. to_host, to_player).
+	player_join, host_start_question, player_submit_answer, game_state_update
+	Payload (Cuerpo del Mensaje)
+	Todos los datos dentro del cuerpo JSON del mensaje deben usar camelCase
+	{ "gameId": "uuid-1", "playerId": "uuid-2", "answerIndex": 3 }
+	________________
+5.2 Códigos de estado y Nomenclaturas
+El protocolo WebSocket no utiliza los códigos de estado HTTP (200, 404, etc.) para las comunicaciones posteriores al establecimiento de la conexión.
+* Conexión Exitosa: La conexión inicial (el handshake) debe devolver el código HTTP 101 Switching Protocols.
+* Errores en el Mensaje: Los errores de validación de negocio (ej. un jugador intenta unirse a una partida inexistente) deben enviarse como un evento de error específico del canal.
+
+
+Tipo de Error
+	Convención de Evento
+	Estructura de Payload
+	Error
+	Un evento genérico de error para la sesión.
+	game_error
+	Mensaje de Respuesta
+	Retornar la estructura estándar de error de NestJS.
+	JSON { 
+  "statusCode": number, 
+  "message": string (ej: pin inv.), 
+  "error": string (ej: Bad Request), 
+  "errorId": string (uuid) (opcional)
+}
+	5.3 Implementación en NestJS
+El módulo del Motor de Juego debe implementar la lógica de WebSockets utilizando NestJS Gateways. Se recomienda usar la librería Socket.IO como capa de transporte sobre WebSockets, dada su robustez y soporte de fallback para entornos con restricciones de firewall.
+* Gestión de Salas (Rooms): El pin de la partida debe mapearse a una Room de Socket.IO, permitiendo que el Host o Anfitrión envíe mensajes eficientemente solo a los jugadores de esa partida.
+________________
+Plantilla para la documentación de los endpoints
+1.1 GET Collection (Obtener Múltiples Recursos)
+Elemento
+	Detalle
+	Propósito Específico
+	Recuperar la lista completa de recursos (items), permitiendo paginación, filtros y ordenamiento para evitar transferir grandes volúmenes de datos.
+	Método HTTP
+	GET
+	Request Path
+	/items
+	Query Params
+	Uso de camelCase (Ej: ?limit=10&page=1&orderBy=name)
+	Response Status
+	200 OK
+	Response Body
+	Retorna una matriz (array) del recurso.
+	Esqueleto JSON
+	json [ { "id": "uuid-1", "name": "string", "status": "active" }, { "id": "uuid-2", "name": "string", "status": "inactive" } ]
+	Error
+	404 Not Found (Si la ruta base /items no existe).
+	________________
+
+
+1.2. GET Single (Obtener un Recurso por ID)
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Recuperar los detalles completos de un recurso específico, identificado por su ID único.
+	Método HTTP
+	GET
+	Request Path
+	/items/:itemId (Usa el parámetro de ruta en camelCase)
+	Query Params
+	None (La identificación se realiza por el Path Param).
+	Response Status
+	200 OK
+	Response Body
+	Retorna un objeto individual del recurso.
+	Esqueleto JSON
+	json { "id": "uuid-1", "name": "string", "description": "string", "details": "string", "createdAt": "datetime" }
+	Error
+	404 Not Found (Si el :itemId no corresponde a un recurso existente).
+	
+
+
+
+________________
+2. POST (Creación)
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Crear y almacenar un nuevo recurso en la colección.
+	Método HTTP
+	POST
+	Request Path
+	/items
+	Request Body
+	Objeto JSON con datos del recurso (camelCase).
+	Response (201 Created)
+	Retorna el recurso completo recién creado (incluyendo el nuevo id).
+	Esqueleto JSON
+	json { "id": "uuid-nuevo", "name": "string", "description": "string", "createdAt": "datetime" }
+	Error
+	400 Bad Request (Errores de validación de datos).
+	
+
+________________
+
+
+3. PATCH (Actualización Parcial)
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Modificar uno o más campos del recurso especificado sin reemplazar todo el objeto.
+	Método HTTP
+	PATCH
+	Request Path
+	/items/:itemId
+	Request Body
+	Objeto JSON con solo los campos a modificar (camelCase).
+	Response (200 OK)
+	Retorna el recurso actualizado.
+	Esqueleto JSON
+	json { "id": "uuid-existente", "name": "string", "status": "nuevo-status", "updatedAt": "datetime" }
+	Error
+	404 Not Found (Si el :itemId no existe).
+	________________
+
+
+4. PUT (Reemplazo Completo)
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Reemplazar completamente el recurso especificado con la información del cuerpo. Todos los campos son obligatorios.
+	Método HTTP
+	PUT
+	Request Path
+	/items/:itemId
+	Request Body
+	Objeto JSON con todos los campos del recurso (camelCase).
+	Response (200 OK)
+	Retorna el recurso reemplazado.
+	Esqueleto JSON
+	json { "id": "uuid-existente", "name": "string-nuevo", "description": "nueva-descripción", "updatedAt": "datetime" }
+	Error
+	400 Bad Request (Si faltan campos obligatorios).
+	________________
+
+
+5. DELETE (Eliminación)
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Remover permanentemente el recurso identificado por el ID.
+	Método HTTP
+	DELETE
+	Request Path
+	/items/:itemId
+	Request Body
+	None
+	Response (204 No Content)
+	Indica éxito sin devolver un cuerpo de respuesta.
+	Esqueleto JSON
+	No aplica. La respuesta está vacía.
+	Error
+	404 Not Found (Si el :itemId no existe).
+	________________
+
+
+6. Eventos WebSockets
+6.1 Namespace/Canal
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	[Descripción de alto nivel de lo que permite este canal (Ej: Gestión de notificaciones en tiempo real, Intercambio de mensajes).]
+	Namespace/Ruta
+	[La ruta completa que el cliente utiliza para conectarse (Ej: /chats, /notifications).]
+	Dependencia (Autenticación)
+	[Especificar si el socket requiere un token de autenticación (Ej: JWT), o un Identificadores único que requiera la conexión (Ej: un gameId) y dónde debe ser enviado (Ej: query parameter o mensaje inicial).]
+	________________
+6.2 Entrada / Input - Eventos Enviados por el Cliente
+ 
+Evento de Entrada
+	[VERBO_EN_SNAKE_CASE_QUE_DESCRIBE_LA_ACCION]
+	Propósito
+	[Breve descripción de la funcionalidad del mensaje.]
+	Emisor
+	[Rol que inicia el evento (Ej: Jugador, Host, Usuario Genérico).]
+	Payload Requerido
+	JSON (Usando camelCase):
+
+
+{ [keyName]: "dataType", [anotherKey]: "dataType" }
+	Respuestas del Servidor
+	Éxito: [Especificar qué evento de salida se emite tras el éxito (Ej: [recurso]_update, Broadcast).]
+
+
+Error: [Evento genérico de error del canal (Ej: chat_error).]
+	6.3 Salida / Output - Eventos enviados por el Servidor
+Evento de Salida
+	[SUSTANTIVO _EN_SNAKE_CASE_QUE_DESCRIBE_EL_RECURSO]
+	Propósito
+	[Breve descripción del motivo por el cual el servidor está enviando la actualización.]
+	Receptores
+	[Roles que reciben el mensaje (Ej: Todos en la sala, Solo el Host, Solo el emisor original).]
+	Payload (Output)
+	JSON (Usando camelCase):
+
+
+{ [keyName]: "dataType", [anotherKey]: "dataType" }
+	________________
+Grandes funcionalidades identificadas
+#
+	Épica (Gran Funcionalidad)
+	Descripción y Alcance 
+(Basado en el análisis)
+	1
+	Gestión de Cuentas y Perfil
+	Permitir el registro, inicio de sesión y la gestión completa del perfil del usuario (datos, contraseña, tipo de usuario, avatares, temas de fondo, racha de juego, idiomas).
+	2
+	Creación y Edición de Quices
+	Funcionalidad central para crear Quices incluyendo la gestión de metadatos (título, descripción) herramientas del editor para manejar múltiples tipos de preguntas (quiz, V/F) y la inclusión de multimedia (imágenes, gifts) con la lógica de puntuación asociada (tiempo de respuesta).
+	3
+	Gestión de contenido Multimedia
+	Carga del contenido multimedia usado para Kahoots, preguntas y respuestas. Este módulo admite operaciones crud sobre image/jpeg, image/png, image/webp, image/gif
+	4
+	Motor de Juego en Vivo (Síncrono)
+	Implementación del sistema de juego Modo Clásico y Modo Equipo. Incluye la funcionalidad de unión con PIN, visualización del cronómetro y puntuaciones en vivo, y la gestión de la sesión por el anfitrión (Hostear).
+	5
+	Modos de Juego Asíncrono y Solitario
+	Implementación de todos los modos de juego no síncronos (por ejemplo: Desafío/Challenge, Aprendizaje, Tesoro, Torre, Arte). Permite el registro y guardado del progreso para completar fuera de sesiones en vivo.
+	6
+	Exploración, Búsqueda y Descubrimiento
+	Funcionalidad para explorar Quices, cursos y canales. Implementar la búsqueda avanzada por palabras clave, categorías, temas de aprendizaje y filtros (público/privado, modo de juego).
+	
+
+
+
+#
+	Épica (Gran Funcionalidad)
+	Descripción y Alcance 
+(Basado en el análisis)
+	7
+	Biblioteca y Gestión de Contenido Personal
+	Espacio del usuario para gestionar Quices propios y favoritos, cursos en curso/completados. Sirve como acceso rápido y centro de guardado de progreso de todo el contenido consumido.
+	8
+	Gestión de Grupos y Roles
+	Funcionalidad para crear, unirse y gestionar Grupos de estudio. Permite asignar actividades a los miembros y establecer un sistema de roles y permisos (admin, profesor, estudiante) dentro del grupo.
+	9
+	Sistema de Notificaciones
+	Funcionalidad para enviar alertas dentro y fuera de la app (tareas, invitaciones, actividad de grupos).
+	10
+	Informes, Estadísticas y Feedback
+	Generación de reportes de rendimiento (informes) de los Quices realizados o presentados, incluyendo estadísticas detalladas (puntuaciones, tiempo, desempeñó por pregunta) y retroalimentación de los participantes.
+	11
+	Panel de Administración (Backoffice)
+	Interfaz exclusiva para un rol de Administrador que permita la gestión de usuarios, Quices visibles (moderación), cursos, grupos, canales, configuraciones de presentación y un dashboard de uso general de la aplicación.
+	
+
+Epicas y mención de historias de usuario identificadas
+Épica 1: Gestión de Cuentas y Perfil
+H1.1: Pantalla de bienvenida y acceso (incluye Pantalla de carga y Error).
+H1.2: Como usuario, quiero poder registrarme con nombre de usuario/correo.
+H1.3: Como usuario, quiero poder iniciar sesión.
+H1.4: Como usuario, quiero poder restablecer mi contraseña.
+H1.5: Como usuario, quiero poder gestionar/modificar mi perfil(nombre, descripción).
+H1.6: Como usuario, quiero poder modificar mi tipo de usuario(profesor, estudiante).
+H1.7: Como usuario, quiero poder cerrar sesión.
+
+
+Épica 2: Creación y Edición de Quices
+H2.1: Como creador, quiero tener un botón "Crear" un nuevo Quizz.
+H2.2: Como creador, quiero poder crear un Quizz desde un lienzo en blanco.
+H2.3: Como creador, quiero poder crear un Quizz usando una plantilla predefinida.
+H2.4: Como creador, quiero poder añadir una imagen/miniatura a la portada del Quizz.
+H2.5: Como creador, quiero poder definir la visibilidad del Quizz (Público o Privado).
+H2.6: Como creador, quiero poder asignar un título y descripción al Quizz.
+H2.7: Como creador, quiero poder modificar mi kahoot 
+H2.8: Como creador, quiero poder seleccionar entre múltiples tipos de preguntas.
+H2.9: Como creador, quiero poder configurar la pregunta de selección múltiple.
+H2.10: Como creador, quiero poder definir la respuesta o respuestas correctas.
+H2.11: Como creador, quiero poder definir el tiempo límite de respuesta por pregunta.
+H2.12: Como creador, quiero poder cambiar la puntuación asignada a cada pregunta.
+H2.13: Como creador, quiero poder asociar contenido multimedia(imágenes, GIF) a la pregunta, la respuesta o el quiz.
+H2.14: Como creador, quiero poder duplicar una pregunta.
+H2.15: Como creador, quiero eliminar una pregunta.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Épica 3: Gestión de contenido Multimedia
+
+
+H3.1: Como creador, quiero poder subir un archivo (imagen) para adjuntarlo a mi contenido, de modo que quede almacenado y accesible.
+H3.2: Como consumidor, quiero descargar un archivo a partir del identificador.
+H3.3: Como creador, quiero borrar un archivo que ya no necesito.
+H3.4: Como creador, quiero que el sistema genere y almacene metadatos (id, path, mimeType, size, originalName, createdAt) para cada archivo subido.
+H3.5: Como creador, quiero obtener URLs públicas temporales (signed URLs) para compartir archivos externos sin exponer la ruta interna del storage.
+Épica 4: Motor de Juego en Vivo (Síncrono)
+H4.1: Como usuario, quiero ver una pantalla principal para unirse al juego(PIN, QR).
+H4.2: Como jugador, quiero poder unirme a un juego ingresando un PIN.
+H4.3: Como jugador, quiero poder unirme a un juego escaneando un código QR.
+H4.4: Como jugador, quiero poder seleccionar un nickname antes de unirse.
+H4.5: Como jugador, quiero ver una pantalla de lobby/espera.
+H4.6: Como anfitrión, quiero ver un lobby de espera con la lista de jugadores.
+H4.7: Como anfitrión, quiero poder presentar cada pregunta (Incluyendo temporizador, enunciado, opciones de respuesta completas, e imagen de la pregunta).
+H4.8: Como jugador, quiero ver los símbolos y colores de cada opción en mi dispositivo.
+H4.9: Como jugador, quiero ver mi posición parcial.
+H4.10: Como anfitrión, quiero ver el marcador acumulado.
+H4.11: Como anfitrión, quiero ver el podio final.
+H4.12: Como jugador, quiero ver el podio final.
+H4.13: Como anfitrión, quiero poder configurar la partida. 
+
+
+Épica 5: Modos de Juego Asíncrono y Solitario
+H5.1: Como usuario, quiero poder jugar un Quiz en modo solitario.
+H5.2: Como usuario, quiero que la aplicación guarde el progreso de mis quizes asíncronos no completados.
+H5.3: Como usuario, quiero poder continuar un quiz no completado desde donde lo deje
+H5.4 Como usuario quiero poder ver mi resultado final al completar un quiz solitario
+H5.5 Como usuario quiero ver feedback en vivo después de responder cada pregunta en un quiz solitario
+
+
+Épica 6: Exploración, Búsqueda y Descubrimiento
+H6.1: Como usuario, quiero poder buscar Quices por palabra, título o creador.
+H6.2: Como usuario, quiero poder ver Quices destacados.
+H6.3: Como usuario, quiero poder filtrar Quices por temas.
+
+
+Épica 7: Biblioteca y Gestión de Contenido Personal
+H7.1: Como usuario, quiero ver una lista de mis Quices creados y borradores.
+H7.2: Como usuario, quiero ver una lista de Quices marcados como Favoritos.
+H7.3: Como usuario, quiero poder marcar un quiz como favorito.
+H7.4: Como usuario, quiero poder desmarcar un quiz como favorito.
+H7.5: como usuario, quiero ver una lista de quizes en progreso.
+H7.6: Como usuario, quiero ver una lista de quizes completados.
+
+
+
+
+Épica 8: Gestión de Grupos y Roles
+H8.1: Como usuario, quiero ver una lista de mis Grupos de Estudio. 
+H8.2: Como usuario, quiero poder crear un nuevo Grupo de Estudio. 
+H8.3: Como administrador de grupo, quiero poder invitar y añadir miembros al grupo. 
+H8.4: Como administrador de grupo, quiero poder eliminar miembros del grupo.
+H8.5: Como administrador de grupo, quiero poder eliminar y editar la información del grupo. 
+H8.6: Como administrador de grupo, quiero poder añadir/asignar Quices al grupo. 
+H8.7: Como usuario, quiero ver una lista de quizes asignados al grupo.
+H8.8: Como usuario, quiero ver la lista de miembros y sus roles dentro del grupo. 
+H8.9: Como usuario de un grupo, quiero ver un Ranking específico del Grupo (Cantidad de kahoots asignados completados por cada miembro). 
+
+
+Épica 9: Sistema de Notificaciones 
+H9.1: Como usuario, quiero recibir notificaciones cuando se me asigna un Quizz o curso. 
+H9.2: Como usuario, quiero recibir alertas de la aplicación sobre novedades.
+
+
+Épica 10: Informes, Estadísticas y Feedback
+H10.1: Como anfitrión, quiero ver un informe ordenado de resultados de una sesión (ejecución de una partida).
+H10.2: Como anfitrión, quiero ver un análisis del desempeño por pregunta en un informe. 
+H10.3: Como jugador, quiero poder ver mis resultados personales(puntuación, aciertos, tiempo) de un Quiz completado. 
+
+
+Épica 11: Panel de Administración (Backoffice)
+H11.1: Como administrador, quiero ver un Dashboard con métricas clave de la aplicación.
+H11.2: Como administrador, quiero poder gestionar y moderar usuarios (bloquear, eliminar).
+H11.3: Como administrador, quiero poder gestionar y moderar los Quices publicados.
+H11.4: Como administrador, quiero poder enviar/administrar notificaciones masivas a los usuarios.
+H11.5 Como administrador, quiero poder agregar/eliminar/modificar los temas disponibles para los quizes. 
+
+
+Nota: La funcionalidad que aparece en el segundo listado (el de diego) y no está explícitamente cubierta por una Épica propia (aunque se podría englobar) es:
+
+
+Manejo de Membresías y Pagos
+	"El sistema debe incluir una simulación del sistema de pagos de membresía. Normal, Premium."
+	Recomendación: Pendiente por respuesta de profesor para saber si debe ser implementada
+	
+
+
+
+
+
+________________
+
+
+Especificación de endpoints por épica
+Gestión de Cuentas y Perfil
+Elemento
+	Detalle
+	Propósito Específico
+	Crear una nueva cuenta de usuario.
+	Método HTTP
+	POST
+	Request Path
+	/user/register
+	Request Body
+	Objeto JSON con datos del user.
+	Response (201 Created)
+	Retorna el usuario con sus datos.
+	Esqueleto JSON (Request)
+	{
+  "email": "string",
+  "username": "string",
+  "password": "string",
+  "name": "string",
+  "type": "string"
+}
+	Esqueleto JSON (Response)
+	{
+    "user": {
+        "id": "string",
+        "email": "string",
+        "username": "string",
+        "type": "string",
+        "state": "string",
+        "preferences": {
+            "theme": "string"
+        },
+        "userProfileDetails": {
+            "name": "string",
+            "description": "string",
+            "avatarAssetUrl": "string"
+        },
+        "isPremium": bool
+    }
+}
+	Error
+	400 Bad Request (Datos incorrectos)
+	
+
+Elemento
+	Detalle
+	Propósito Específico
+	Crear una nueva sesión (autenticar) para un usuario existente y devolver un token.
+	Método HTTP
+	POST
+	Request Path
+	/auth/login
+	Request Body
+	Objeto JSON con credenciales.
+	Response (200 OK)
+	Retorna el token de acceso para la sesión.
+	Esqueleto JSON (Request)
+	{
+    "username": string
+    "password": string
+}
+
+
+	Esqueleto JSON (Response)
+	{
+    "token": string,
+    "user": {
+        "id": "string",
+        "email": "string",
+        "username": "string",
+        "type": "string",
+        "state": "string",
+        "preferences": {
+            "theme": "string"
+        },
+        "userProfileDetails": {
+            "name": "string",
+            "description": "string",
+            "avatarAssetUrl": "string"
+        },
+        "isPremium": bool
+    }
+}
+	Error
+	400 Bad Request (Datos incorrectos)
+401 Unauthorized (Credenciales inválidas).
+	
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Verificar la validez del token actual. Requiere Header Authorization (Bearer).
+	Método HTTP
+	POST
+	Request Path
+	/auth/check-status
+	Request Body
+	None
+	Response (200 OK)
+	Confirma que el token es válido y retorna información del usuario.
+	Esqueleto JSON (Response)
+	{
+    "token": string,
+    "user": {
+        "id": "string",
+        "email": "string",
+        "username": "string",
+        "type": "string",
+        "state": "string",
+        "preferences": {
+            "theme": "string"
+        },
+        "userProfileDetails": {
+            "name": "string",
+            "description": "string",
+            "avatarAssetUrl": "string"
+        },
+        "isPremium": bool
+    }
+}
+	Error
+	401 Unauthorized (Token inválido).
+	
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Listar todos los usuarios registrados en el sistema.
+	Método HTTP
+	GET
+	Request Path
+	/user/
+	Request Body
+	None
+	Response (200 OK)
+	Retorna un array de objetos de usuario.
+	Esqueleto JSON (Response)
+	[
+  {
+     "id": "string",
+      "email": "string",
+      "username": "string",
+      "type": "string",
+      "state": "string",
+      "userProfileDetails": {
+          "name": "string",
+          "description": "string",
+          "avatarAssetUrl": "string"
+      },
+      "isPremium": bool
+  }, 
+  { … 
+  }
+]
+	Error
+	500 Internal Server Error. (No se pudieron recuperar los usuarios)
+	
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Recuperar los detalles completos del perfil del usuario autenticado.
+	Método HTTP
+	GET
+	Request Path
+	/user/profile/
+	Request Body
+	None
+	Headers
+	Authorization: Bearer <token>
+	Response (200 OK)
+	Retorna el objeto del perfil propio.
+	Esqueleto JSON (Response)
+	{    
+  "user": {
+      "id": "string",
+      "email": "string",
+      "username": "string",
+      "type": "string",
+      "state": "string",
+      "isPremium": bool
+      "preferences": {
+          "theme": "string"
+      },
+      "userProfileDetails": {
+          "name": "string",
+          "description": "string",
+          "avatarAssetUrl": "string"
+      }
+  }
+}
+	Error
+	401 Unauthorized (Credenciales inválidas).
+	
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Recuperar detalles de un usuario específico mediante su UUID.
+	Método HTTP
+	GET
+	Request Path
+	/user/profile/id/{id}
+	Request Body
+	None
+	Response (200 OK)
+	Retorna el objeto del usuario solicitado.
+	Esqueleto JSON (Response)
+	{    
+  "user": {
+      "id": "string",
+      "email": "string",
+      "username": "string",
+      "type": "string",
+      "state": "string",
+      "isPremium": bool
+      "userProfileDetails": {
+          "name": "string",
+          "description": "string",
+          "avatarAssetUrl": "string"
+      }
+   }
+}
+	Error
+	404 Not Found (Usuario no existe).
+	
+
+Elemento
+	Detalle
+	Propósito Específico
+	Recuperar detalles de un usuario específico mediante su username.
+	Método HTTP
+	GET
+	Request Path
+	/user/profile/username/{username}
+	Request Body
+	None
+	Response (200 OK)
+	Retorna el objeto del usuario solicitado.
+	Esqueleto JSON (Response)
+	{    
+  "user": {
+      "id": "string",
+      "email": "string",
+      "username": "string",
+      "type": "string",
+      "state": "string",
+      "isPremium": bool
+      "userProfileDetails": {
+          "name": "string",
+          "description": "string",
+          "avatarAssetUrl": "string"
+      }
+   }
+}
+	Error
+	404 Not Found (Usuario no existe).
+	
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Modificar campos del perfil y/o cambiar la contraseña del usuario autenticado.
+	Método HTTP
+	PATCH
+	Request Path
+	/user/profile/
+	Headers
+	Authorization: Bearer <token>
+	Request Body
+	Objeto JSON con campos a modificar (incluyendo passwords).
+	Esqueleto JSON (Request)
+	{    
+  "username": string, 
+  “email”: string,
+  "currentPassword": string,
+  "newPassword": string,
+  "confirmNewPassword": string,
+  "name": string,
+  "description": string,
+  "avatarAssetId": string,
+  "themePreference": string,
+}
+	Response (200 OK)
+	Retorna el recurso actualizado.
+	Esqueleto JSON (Response)
+	{    
+  "user": {
+      "id": "string",
+      "email": "string",
+      "username": "string",
+      "type": "string",
+      "state": "string",
+      "isPremium": bool,
+      "preferences": {
+          "theme": string
+      "userProfileDetails": {
+          "name": "string",
+          "description": "string",
+          "avatarAssetUrl": "string"
+      }
+   }
+}
+	Error
+	400 Bad Request (Datos incorrectos)
+401 Unauthorized (Credenciales inválidas).
+	________________
+Creación y Edición de Quices (Revisado Backend Alpha 12/01/2026 - 
+Elemento
+	Detalle
+	Propósito Específico
+	Crea un nuevo Kahoot (H2.1) desde lienzo (H2.2). Define título (H2.7), visibilidad (H2.6) e imagen (H2.5). Preguntas y respuestas.
+	Método HTTP
+	POST
+	Request Path
+	/kahoots
+	Headers
+	Authorization: Bearer <JWT>
+	Request Body
+	Objeto JSON con datos del kahoot (camelCase).
+	Response (201 Created)
+	Retorna el recurso (kahoot) recién creado (incluyendo su nuevo id)
+	Esqueleto JSON (Request)
+	  
+
+  
+
+
+
+Regla de uso #1: todo lo que es opcional si no se manda debe ser null.
+
+Regla de uso #2:  para replicar las invarianzas de kahoot, el backend alpha. Tiene estas invariantes para los campos Points y Time limit 
+
+
+
+Time Limit
+  
+
+Points
+  
+
+Regla de uso #3: Adicionalmente, considerar que un slide de tipo:
+
+- múltiple: Sólo puede tener 0, 500 y 1000 puntos.
+- true_false: Sólo puede tener 0, 1000 y 2000 puntos.
+- single: Sólo puede tener 0, 1000 y 2000 puntos.
+	Esqueleto JSON (Response)
+	  
+
+Regla de uso: todo lo que es opcional si no se manda debe ser null
+	Error
+	400 Bad Request: Datos de entrada inválidos
+401 Bad Request: No se proporciona el BearerToken
+500 Internal Server Error
+	________________
+Elemento
+	Detalle
+	Propósito Específico
+	Actualizar todo lo relacionado con un kahoot
+	Método HTTP
+	PUT
+	Request Path
+	/kahoots/:kahootId     
+	Headers
+	Authorization: Bearer <JWT>
+	Request Body
+	Objeto JSON con los campos a modificar (camelCase).
+	Response (200 OK)
+	Retorna el recurso (kahoot) actualizado.
+	Esqueleto JSON (Request)
+	  
+
+
+  
+
+
+
+Regla de uso #1: todo lo que es opcional si no se manda debe ser null.
+
+Regla de uso #2:  para replicar las invarianzas de kahoot, el backend alpha. Tiene estas invariantes para los campos Points y Time limit. 
+
+
+Time Limit
+  
+
+Points
+  
+
+Regla de uso #3: Adicionalmente, considerar que un slide de tipo:
+
+- múltiple: Sólo puede tener 0, 500 y 1000 puntos.
+- true_false: Sólo puede tener 0, 1000 y 2000 puntos.
+- single: Sólo puede tener 0, 1000 y 2000 puntos.
+	Esqueleto JSON (Response)
+	  
+
+Regla de uso: todo lo que es opcional si no se manda debe ser nul
+	Error
+	400 Bad Request: Datos de entrada inválidos
+401 Unauthorized: No se proporciona el BearerToken
+403 Forbidden: El que trata de editar el kahoot no es el owner
+404 Not Found: El Kahoot a editar no existe.
+500 Internal Server Error
+	________________
+Elemento
+	Detalle
+	Propósito Específico
+	Recuperar los detalles completos de un Kahoot específico para la vista de edición (H2.9). Retorna un único resutado
+	Método HTTP
+	GET
+	Request Path
+	/kahoots/:kahootId
+	Headers
+	Authorization: Bearer <JWT>
+	Request Body
+	None.
+	Response (200 OK)
+	Retorna el recurso (kahoot) solicitado.
+	Esqueleto JSON (Request)
+	No aplica.
+	Esqueleto JSON (Response)
+	  
+
+	Error
+	400 Bad Request: Datos de entrada inválidos
+401 Unauthorized: No se proporciona el BearerToken
+403 Forbidden: El que trata de obtener el kahoot no es el owner si el kahoot es draft o la visibilidad es privada
+404 Not Found: El Kahoot a obtener no existe.
+500 Internal Server Error
+	________________
+Elemento
+	Detalle
+	Propósito Específico
+	Obtener un kahoot de un usuario junto con todos los datos asociados al mismo, incluyendo un “state” que carga el progreso del usuario si deja el kahoot sin terminar. Se utiliza cuando el usuario clickea un kahoot y se necesita previsualizar toda su información (progreso).
+	Método HTTP
+	GET
+	Request Path
+	/kahoots/inspect/:idKahoot
+	Headers
+	Authorization: Bearer <JWT>
+	Response Status
+	200 OK
+	Response Body
+	Retorna el objeto de kahoot con sus datos globales + datos personales como isFavorite, datos de progreso como isCompleted isInprogress y un gameState. 
+	Esqueleto JSON (Response)
+	
+
+    {
+      "id": UUID (kahoot Id),
+      "title": string | null (opcional),
+      "description": string | null (opcional),
+      “coverImageId”: string | null (URL opcional), 
+      “visibility”: “public” | “private”,
+      "themeId": UUID-> Aquí si es UUID si quieren URL avisen, no hay problema pero avisen (creo q el front no la usa pero por si acaso),
+       "author": { "id": uuid-author, 
+                         "name": string },
+      “createdAt”: Date (formato ISO 8601 DATE),
+      “playCount”: number,
+      “category”: String (“Matematica”, “Castellano”, etc ),
+      “Status”: “published”, 
+      “isInProgress”: (true/false)
+      “isCompleted”: (true/false)
+      “isFavorite”: (true/false)
+      “gameState”: {
+                 “attemptId”: UUID, 
+                  “currentScore”: number,
+                  “currentSlide”: number,
+                  “totalSlides”: number,
+                  “lastPlayedAt”: Date (formato ISO 8601 DATE)
+    }
+}
+
+
+Nota: En esta previsualización solo se muestra el datos básicos del progreso del último intento singleplayer. Para ver más detalles, ver progreso de otros intentos, y ver resultados de partidas multiplayer, usar endpoints de la épica de reportes (Épica 10). 
+
+
+Nota 2: Si el kahoot no está ni en progreso ni ha sido completado, ambos atributos serán falsos y no se devolverá gameState 
+
+
+Nota 3: Se devuelve currentSlide y totalSlides para libertad de cómo representar el progreso, pero preferiblemente se debería representar en porcentaje/barra.  
+
+
+	Error 
+	400 Bad Request: Datos de entrada inválidos
+401 Unauthorized: No se proporciona el BearerToken
+403 Forbidden: El que trata de obtener el kahoot no es el owner si el kahoot es draft o la visibilidad es privada
+404 Not Found: El Kahoot a obtener no existe.
+500 Internal Server Error
+	
+
+Elemento
+	Detalle
+	Propósito Específico
+	Borra un Kahoot completo
+	Método HTTP
+	Delete
+	Request Path
+	/kahoots/:kahootId
+	Headers
+	Authorization: Bearer <JWT>
+	Request Body
+	None.
+	Response (204 No content)
+	Exito sin respuesta
+	Esqueleto JSON (Request)
+	No aplica.
+	Esqueleto JSON (Response)
+	No aplica
+	Error
+	400 Bad Request: Datos de entrada inválidos
+401 Unauthorized: No se proporciona el BearerToken
+403 Forbidden: El que trata de borrar el kahoot no es el owner
+404 Not Found: El Kahoot a obtener no existe.
+500 Internal Server Error
+	________________
+Gestión de contenido Multimedia (Revisado Backend Alpha 12/01/2026 - 
+Elemento
+	Detalle
+	Propósito Específico
+	Permite subir archivos multimedia de tipo gif, webp, png y jpg
+	Método HTTP
+	POST
+	Request Path
+	/media/upload
+	Headers
+	Authorization: Bearer <JWT>
+	Request Body
+	Form-data con atributo: file y archivo de imagen válido cargado 
+	Response (201 Created)
+	  
+
+	Esqueleto JSON (Request)
+	No aplica
+	Error
+	400 Bad Request: Datos de entrada inválidos
+401 Unauthorized: No se proporciona el BearerToken
+500 Internal Server Error
+	________________
+Elemento
+	Detalle
+	Propósito Específico
+	Obtener listado completo de archivos multimedia para los theme
+Al listar los themes (GET media/themes)
+
+
+El endpoint devuelve una lista de objetos JSON. Cada objeto contiene los metadatos y un campo con la imagen en formato data URI (Base64), lista para ser usada en una etiqueta <img src="..."> en un frontend.
+
+
+	Método HTTP
+	GET
+	Request Path
+	/media/themes
+	Request Body
+	None
+	Esqueleto JSON (Request)
+	No aplica.
+	Esqueleto JSON (Response)
+	  
+
+	Error
+	500 Internal Server Error
+	
+
+Motor de Juego en Vivo (Síncrono) - LISTO 90%, faltan eventos extra de UX, por favor no esperar al 100%, a lo mejor ni llego a poder meter esos eventos extra
+Endpoints solicitudes HTTP 
+Elemento
+	Detalle
+	Propósito Específico
+	El Anfitrión crea una nueva sala de juego (Lobby) a partir de un Kahoot existente. (H4.1). Le provee de todo lo necesario para disponer la sala de espera (lobby).
+	Método HTTP
+	POST
+	Request Path
+	/multiplayer-sessions
+	Headers
+	Authorization: Bearer <JWT> // Contiene el userId para crear la sesión
+	Request Body
+	Objeto JSON con el id del kahoot
+	Response (201 Created)
+	Se crea exitosamente la nueva sala de juego
+	Esqueleto JSON (Request)
+	JSON {
+  "kahootId": "uuid",
+}
+	Esqueleto JSON (Response)
+	JSON { 
+"sessionPin": "238972990", 
+"qrToken": "uuid",
+"quizTitle": string, 
+"coverImageUrl": string (url),
+"theme": {
+   "id": string (uuid),
+   "url": string (url) , 
+   "name": string
+}
+}
+NOTA: El pin de sesión es un número (como string) entre 6 y 10 dígitos, el qrToken es un uuid, el cual actúa como un identificador que permite obtener el pin de la sesión. Este uuid del qrToken es lo que el front debe convertir en un código QR, que al escanearlo permita obtener ese mismo uuid.
+
+
+El theme es la imagen del fondo de la partida, corresponde al theme del kahoot y se puede cambiar en cualquier momento de la partida por otro disponible en un set de temas predeterminados.
+	Error
+	404 Not Found: El Kahoot no existe
+401 Unauthorized: El usuario autenticado (Host) no tiene permisos para crear una sesión con el Kahoot solicitado.
+500 Internal Server Error: Fallo al generar número aleatorio después de X intentos.
+
+
+NOTA: Ante error 500 con ese mensaje, es recomendable volver a realizar la petición sin que el usuario se entere, el PIN debería acabar generándose a los pocos intentos
+	________________
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Permite a un cliente obtener el sessionPin de una partida activa al escanear un código QR que contiene un token o identificador único. (H4.3)
+	Método HTTP
+	GET
+	Request Path
+	/multiplayer-sessions/qr-token/:qrToken
+	Request Body
+	No aplica
+	Response (200 OK)
+	Se obtuvo el pin de la partida exitosamente al escanear el código QR para unirse a la partida
+	Esqueleto JSON (Request)
+	No aplica
+	Esqueleto JSON (Response)
+	JSON { 
+    "sessionPin": "number (El PIN de entre 6 y 10 dígitos)",
+}
+NOTA: El cliente debe usar el gamePin devuelto para hacer el handshake inicial con el namespace y así unirse a la sala a nivel de infraestructura
+	Error
+	404 Not Found: El código QR o token no está asociado a una sesión activa.
+	
+
+
+
+
+
+
+
+
+
+
+
+Namespace y eventos para el manejo de WebSockets
+Elemento
+	Detalle
+	Propósito Específico
+	Permite a Hosts y Jugadores conectarse a una sala de juego a través del PIN de la misma y recibir actualizaciones en tiempo real del estado del Lobby y la partida.
+	Namespace/Ruta
+	/multiplayer-sessions
+	Dependencia (Autenticación)
+	Requiere los siguientes parámetros de conexión como headers para hacer join con la sala en cuestión:
+
+
+    pin: ‘123456’ // Pin de la sesión
+    role: 'HOST' //Enum: ‘HOST’ o ‘PLAYER’ 
+    jwt: 'jwt-del-host-o-player' // JWT, el cual contiene el id del usuario y su username
+
+
+	
+
+Conexión y Gestión del Lobby
+Eventos enviados Por el Cliente
+Evento de Entrada
+	client_ready
+	Propósito
+	Establecer la sincronización lógica entre el cliente (Host o Jugador) y el servidor. Este evento actúa como una señal de confirmación para que el servidor inicie la transmisión de datos de estado.
+Su función principal es garantizar que el cliente ha completado la configuración de sus "listeners" (escuchadores de eventos) antes de recibir cualquier información crítica. Es el mecanismo de seguridad para evitar la pérdida de eventos durante el handshake inicial o en procesos de reconexión.
+Nota técnica: Este evento debe ser emitido obligatoriamente por el cliente sólo después de haber suscrito todos los eventos necesarios del servidor. De lo contrario, los datos de sincronización inicial podrían no ser capturados por la interfaz.
+
+
+	Emisor
+	Host y Jugador.
+	Payload Requerido
+	No Aplica
+	Respuestas del Servidor
+	El servidor no responde con un "ACK" genérico, sino que dispara el proceso de sincronización basado en el rol y el estado actual de la partida:
+A. En caso de Éxito (Solo inicio de la partida): Dependiendo del rol identificado en el socket, el servidor emitirá una ráfaga de eventos con el estado actual:
+   * Para el HOST:
+   * HOST_CONNECTED_SUCCESS: Confirmación de ingreso administrativo a la sala.
+   * HOST_LOBBY_UPDATE: Estado actual de todos los jugadores conectados y configuraciones de la sala.
+   * Para el JUGADOR:
+   * PLAYER_CONNECTED_TO_SESSION: Estado específico del jugador, su puntuación y fase actual de la partida (lobby).
+B. En caso de Reconexión (Partida avanzada / en curso)
+Si el cliente se reconecta cuando la sesión ya ha superado la etapa del Lobby, el servidor detectará el estado actual del juego y enviará un Snapshot de Sincronización.
+Dependiendo del rol y la fase de la partida, el servidor emitirá los eventos específicos que el cliente necesita para reconstruir la interfaz inmediatamente, tales como:
+   * QUESTION_STARTED: Si hay una pregunta activa en curso (incluyendo tiempo restante y datos de la pregunta).
+   * PLAYER_RESULTS / HOST_RESULTS: Si el cliente vuelve justo en la pantalla de puntajes.
+   * HOST_GAME_END / PLAYER_GAME_END: Si la partida finalizó durante su ausencia.
+Propósito Técnico: Evitar que un usuario reconectado se quede en una "pantalla negra" esperando al siguiente evento global. El servidor lo fuerza a sincronizarse con el tiempo real de la sala.
+C. En caso de Error:
+   * SYNC_ERROR: Se emite únicamente al cliente solicitante si ocurre un fallo al recuperar el estado del dominio (ej. la sala dejó de existir durante el proceso). Tras este evento, el servidor cerrará la conexión por seguridad.
+
+
+	
+
+Evento de Entrada
+	player_join
+	Propósito
+	Un jugador se une a la sesión dando el nickname que tendrá durante la misma. En este punto el jugador se conecta finalmente a nivel de lógica de negocio (dominio).
+
+
+El cliente puede reutilizar este evento para cambiar su nickname en caso de haberse desconectado de la partida, haberse sincronizado con la sesión aún en lobby, y desear cambiar el nickname de su entrada actual.*
+	Emisor
+	Jugador.
+	Payload Requerido
+	JSON { 
+  "nickname": string, 
+}
+
+
+NOTA: El nickname debe ser un string de entre 6-20 caracteres
+	Respuestas del Servidor
+	Éxito: host_lobby_update (solo al host) y player_connected_to_session (solo al cliente, es decir el emisor)
+Error: connection_error (solo al emisor)
+	*Nota particular sobre player_join: A nivel de dominio el jugador siempre se quedará registrado para posibilitar su regreso una vez haya hecho su primer player_join. Si vuelve durante la etapa de LOBBY, se volverán a cargar sus datos al emitir el evento client_ready recibiendo como respuesta un player_lobby_update, en ese punto el front, sí quiere, y solamente durante esta etapa, puede ofrecerle al usuario cambiar su nickname. Si esto es así, debe volver a emitir el evento player_join para cambiar su nickname.
+
+
+Evento de Entrada
+	host_start_game
+	Propósito
+	El Host inicia formalmente el juego desde el estado de LOBBY.
+	Emisor
+	Host/Anfitrión.
+	Payload Requerido
+	No aplica
+	Respuestas del Servidor
+	Éxito: question_started (Broadcast a todos)
+
+
+Error: game_error (Respuesta solo al emisor)
+	________________
+
+
+Eventos enviados Por el Servidor
+Evento de Salida
+	host_lobby_update
+	Propósito
+	Notifica al host del estado del lobby: jugadores conectados y cuántos hay en la sala
+	Receptores
+	Host
+	Payload (Output)
+	JSON {
+  "state": "lobby",
+   "players": [
+     {
+        "playerId": string (uuid),
+        "nickname": "Player 1"
+     },
+    {
+        "playerId": string (uuid),
+        "nickname": "Player 2"
+     }
+    ],
+    "numberOfPlayers": 2
+}
+	
+
+Evento de Salida
+	player_connected_to_session
+	Propósito
+	Notifica al jugador de que está conectado a la partida a nivel de negocios (dominio), está registrado y se le pasa su información actualizada para la pantalla de espera/lobby. 
+	Receptores
+	Jugador
+	Payload (Output)
+	JSON {
+    "state": "lobby",
+    "nickname": "Player 1",
+    "score": 0 (Siempre debería ser 0),
+    "connectedBefore": boolean , 
+      "theme": { (Opcional)
+          "id": string (uuid),
+           "url": string (url) , 
+           "name": string
+       }
+}
+
+
+NOTA: Theme es para que el jugador recupere la imagen de fondo de la partida en caso de reconexión a través de client_ready. ConnectedBefore es para saber si ya se había unido antes al lobby y así ofrecerle cambiar su nickname (solo en LOBBY).
+	Flujo de Preguntas y Respuestas
+Eventos enviados Por el Cliente
+Evento de Entrada
+	player_submit_answer
+	Propósito
+	Un jugador envía su respuesta a la pregunta actual.
+	Emisor
+	Jugador.
+	Payload Requerido
+	JSON { 
+  "questionId": "uuid" // id de la slide actual que se está jugando, 
+  "answerId": ["1", "0", "2"], 
+  "timeElapsedMs": number
+}
+Nota: timeElapsedMs es el tiempo que tardó en responder el usuario, el front debería hacerlo mediante un cálculo de dos Dates: timeElapsedMs = End - Start. Se pasa un arreglo de answerId para poder soportar slides tipo selección múltiple, este mismo es el id de la respuesta, es requerido, y  no se debe validar si es un Index o un UUID
+	Respuestas del Servidor
+	Éxito: player_answer_confirmation (Solo al emisor) y host_answer_update (solo al host)
+Error: game_error (Respuesta solo al emisor)
+	
+
+
+
+
+
+Evento de Entrada
+	host_next_phase
+	Propósito
+	El Host avanza manualmente la sesión a la siguiente fase (ej. de resultados a la siguiente pregunta, de pregunta a resultados, o de resultados a fin).
+	Emisor
+	Host/Anfitrión.
+	Payload Requerido
+	No aplica
+	Respuestas del Servidor
+	Éxito: 
+host_results y player_results (QUESTION → RESULTS), 
+question_started (RESULTS → QUESTION) ,  
+host_game_end y player_game_end (RESULTS → END) 
+(Broadcast a todos)
+	________________
+
+
+
+
+Evento de Entrada
+	host_end_session
+	Propósito
+	Cerrar la sesión, y por tanto cerrar a su vez la sala de juego y desconectar a los jugadores de la partida. Este evento lo emite manualmente el host tras la emisión del evento host_end_game por parte del servidor
+	Emisor
+	Host/Anfitrión.
+	Payload Requerido
+	No aplica
+	Respuestas del Servidor
+	Éxito: 
+session_closed  (Broadcast a todos)
+	________________
+
+
+Eventos enviados Por el Servidor
+Evento de Salida
+	question_started
+	Propósito
+	Notifica a los jugadores que una pregunta ha comenzado y tienen un tiempo límite para responder. Incluye los datos completos de visualización de la slide para que el cliente pueda renderizarla al instante.
+	Receptores
+	Todos los Jugadores y Host.
+	Payload (Output)
+	JSON {
+   “state”: “question”
+   "currentSlideData": { 
+      "id": "uuid", 
+      "position": number, 
+      "slideType": "Enum question_type", 
+      "timeLimitSeconds": number,
+      "questionText": "text",
+      "slideImageURL": "url",
+       "pointsValue": number, 
+       "options": [ 
+{ "index": “1” , "text": "Paris" | Null, “mediaURL”: String(URL) | null },
+{ "index": “2” , "text": "Tokio"  | Null, ”mediaURL”: String(URL) | null }
+       ] 
+    }
+      "timeRemainingMs": number (Opcional), 
+      "hasAnswered": boolean (Opcional), 
+      "theme": { (Opcional)
+          "id": string (uuid),
+           "url": string (url) , 
+           "name": string
+       }
+}
+Nota: position (índice del slide), se envía para que el front sepa en qué parte de la partida va, es decir en qué slide está parado en ese momento el servidor. En las options no se manda cuál es la opción correcta pues la verificación de eso lo hace el servidor.
+timeRemainingMs y hasAnswered, y theme son opcionales pues solo se envían como apéndice luego de un Client_Ready tras reconexión en medio de una pregunta. Time remaining es para colocar el contador con el tiempo restante verdadero, y hasAnswered para bloquear que el jugador de otra respuesta. El host solo recibe el atributo timeRemaingMs ya que este no responde preguntas. Theme es para que el jugador recupere la imagen de fondo de la partida en caso de reconexión a través de client_ready.
+	
+
+Evento de Salida
+	host_results
+	Propósito
+	Muestra el resumen de la pregunta para un HOST (respuesta correcta, distribución de respuestas y el ranking de puntajes).
+	Receptores
+	Host.
+	Payload (Output)
+	JSON {
+    "state": "results",
+    "correctAnswerId": [ "0", "2" ],
+    "leaderboard": [
+        {
+            "playerId": "uuid",
+            "nickname": "Player1",
+            "score": number,
+            "rank": number,
+            "previousRank": number
+        },
+        {
+            "playerId": "uuid",
+            "nickname": "Player2",
+            "score": number,
+            "rank": number,
+            "previousRank": number
+        }
+    ],
+    "stats": {
+        "totalAnswers": 2,
+        "distribution": {
+            "0 | uuid": number,
+            "1 | uuid": number,
+            "2 | uuid": number,
+            "3 | uuid": number,
+            …,
+        }
+    },
+    "progress": {
+        "current": number,
+        "total": number,
+        "isLastSlide": boolean
+    }
+}
+
+
+NOTA: Se pasa un arreglo de correctAnswerId para poder soportar slides tipo selección múltiple. El atributo distribution es un objeto cuyas llaves son los uuid o los índices de las opciones de respuesta, esto nos ayuda a ver cuál fue la distribución de opciones elegidas como respuestas. En el atributo leaderboard recibimos solamente el top 5.
+	
+
+Evento de Salida
+	player_results
+	Propósito
+	Muestra el resumen de la pregunta para un PLAYER (respuesta correcta, posición en el ranking, streak, y mensajes de motivación).
+	Receptores
+	Jugador: Cada jugador recibe individualmente su propia respuesta según lo que haya respondido en la ronda.
+	Payload (Output)
+	JSON {
+    "isCorrect": boolean,
+    "pointsEarned": number,
+    "totalScore": number,
+    "rank": number,
+    "previousRank": number,
+    "streak": number,
+    "correctAnswerIds": [
+        "0",
+        "2"
+    ],
+    "message": string,
+    "progress": {
+        "current": number,
+        "total": number
+    }
+     "theme": { (Opcional)
+          "id": string (uuid),
+           "url": string (url) , 
+           "name": string
+       }
+}
+
+
+
+
+NOTA: Se pasa un arreglo de correctAnswerId para poder soportar slides tipo selección múltiple. Theme es para que el jugador recupere la imagen de fondo de la partida en caso de reconexión a través de client_ready.
+	Nota: Justo antes de emitirse estos eventos de Finalización, el Servidor inicia automáticamente el proceso asíncrono de persistir toda la información de la partida (puntajes, respuestas y metadata) bajo el id del kahoot y del id de la sesión para futuras consultas en el módulo de Informes.
+Evento de Salida
+	host_game_end
+	Propósito
+	Marca el final de la sesión de juego y envía el podium final al HOST. 
+	Receptores
+	Host.
+	Payload (Output)
+	JSON{
+    "state": "end",
+    "finalPodium": [
+        {
+            "playerId": "uuid",
+            "nickname": "Player1",
+            "score": number,
+            "rank": number,
+            "previousRank": number
+        },
+        {
+            "playerId": "uuid",
+            "nickname": "Player2",
+            "score": number,
+            "rank": number,
+            "previousRank": number
+        },
+        {
+            "playerId": "uuid",
+            "nickname": "Player3",
+            "score": number,
+            "rank": number,
+            "previousRank": number
+        }
+    ],
+    "winner": {
+        "playerId": "897115b0-e3ff-4448-ac06-58584df826ea",
+        "nickname": "Player1",
+        "score": number,
+        "rank": number,
+        "previousRank": number
+    },
+    "totalParticipants": number
+}
+NOTA: En finalPodium recibimos solamente el Top 3 de jugadores en base a sus puntajes 
+	
+
+Evento de Salida
+	player_game_end
+	Propósito
+	Marca el final de la sesión de juego y envía el resumen final respectivo de cada PLAYER. 
+	Receptores
+	Jugador: Cada jugador recibe individualmente su propia respuesta a modo de resumen de la partida.
+	Payload (Output)
+	JSON {
+    "state": "end",
+    "rank":  number,
+    "totalScore": number,
+    "isPodium": boolean,
+    "isWinner": boolean,
+    "finalStreak": number
+     "theme": { (Opcional)
+          "id": string (uuid),
+           "url": string (url) , 
+           "name": string
+       }
+}
+
+
+NOTA: Theme es para que el jugador recupere la imagen de fondo de la partida en caso de reconexión a través de client_ready.
+	________________
+
+
+Evento de Salida
+	session_closed
+	Propósito
+	Notificar a todos los involucrados del cierre de la sesión para una desconexión segura y alineada con una buena UX
+	Receptores
+	Todos: jugadores y host
+	Payload (Output)
+	JSON {
+      reason: “HOST_CLOSED_SESSION”,
+      message: “El anfitrión ha finalizado la sesión.”
+ }
+
+
+	
+
+Evento de Salida
+	player_left_session
+	Propósito
+	Notificar de manera proactiva al Host (y opcionalmente a la sala) que un jugador ha perdido la conexión o ha abandonado la sesión.
+El objetivo es permitir que la interfaz del Host actualice la lista de jugadores activos en tiempo real, permitiéndole identificar quiénes han tenido problemas técnicos o quiénes han abandonado voluntariamente. Esto es crucial para la toma de decisiones del Host (ej. decidir si esperar a alguien para empezar o continuar la partida).
+Nota: Se recomienda al Frontend del Host no eliminar inmediatamente al jugador de la lista visual, sino marcarlo como 'Desconectado' (ej. en gris) durante el periodo de espera de reconexión.
+	Receptores
+	Host
+	Payload (Output)
+	JSON { 
+     “userId”: string (uuid),
+     “nickname”: string,
+     “message”: “El jugador ${nickname} se ha desconectado.”
+ }
+
+
+
+
+	
+
+Evento de Salida
+	host_left_session
+	Propósito
+	Notificar a los jugadores que el host se ha desconectado
+	Receptores
+	Jugadores
+	Payload (Output)
+	JSON { 
+     “message”: “El host ha abandonado la sesión por favor espere"
+ }
+
+
+
+
+	
+
+Evento de Salida
+	host_returned_to_session
+	Propósito
+	Notificar a los jugadores que el host ha recuperado la conexión con la sesión
+	Receptores
+	Jugadores
+	Payload (Output)
+	JSON { 
+     “message”: “El host ha recuperado la conexión con la sesión"
+ }
+
+
+	
+
+Evento de Salida
+	host_answer_update
+	Propósito
+	Notificar al host de cuantas respuestas van siendo registradas para una slide durante la etapa de QUESTION
+	Receptores
+	Host
+	Payload (Output)
+	JSON { 
+     “numberOfSubmissions”: number
+ }
+
+
+	
+
+Evento de Salida
+	player_connected_to_server
+	Propósito
+	Notificar al jugador que está conectado al servidor. Más allá de eso, este evento provee al jugador de la imagen de fondo de la partida. Este evento se emite como respuesta al primer client_ready exitoso de la sesión.
+	Receptores
+	Jugador
+	Payload (Output)
+	JSON{
+   "status": "IN_LOBBY - CONNECTED TO SERVER",
+     "theme": {
+          "id": string (uuid),
+           "url": string (url) , 
+           "name": string
+     }
+}
+NOTA: El atributo status es omisible y no tiene ningún propósito real, el uso de este evento es para obtener por primera vez la url de la imagen de fondo.
+
+
+	
+
+Nota: A continuación se adjunta una tabla con una explicación más detallado de los estados de la partida:
+Estado (Enum)
+	Propósito
+	Transiciones Comunes
+	LOBBY
+	Esperando jugadores: El recurso de juego existe, el PIN está activo, pero la partida aún no ha comenzado. Es el punto de entrada para los jugadores.
+	→ QUESTION (Al hacer host_start_game)
+	QUESTION
+	Interacción principal: La fase donde se activa el temporizador y se espera la entrada del jugador (la respuesta).
+	→ RESULTS (Al terminar el tiempo o por host_next_phase)
+	RESULTS
+	Retroalimentación y Clasificación: El jugador no interactúa, sino que recibe feedback sobre la pregunta anterior (respuesta correcta) y ve la actualización de su puntuación y el ranking general en la pantalla del host.
+	→ QUESTION (Si quedan preguntas) o →  END (Si fue la última pregunta).
+	END
+	Fin del juego: El juego ha concluido formalmente y se muestra el podio final en la pantalla del host.
+	→ Cerrar Conexión (El recurso se libera).
+	________________
+Modos de Juego Asíncrono y Solitario
+Iniciar un Nuevo Kahoot en Modo Solitario - H5.1
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Inicia un nuevo intento de juego en modo singleplayer para el usuario autenticado. Se crea el registro de la partida en estado IN_PROGRESS. Se devuelve además toda la información de la primera slide para mayor optimización en el frontend
+	Método HTTP
+	POST
+	Request Path
+	/attempts
+
+
+Ojo se debe proporcionar el kahootid en el body !!! 
+	Headers
+	Authorization: Bearer <accessToken>
+	Request Body
+	{kahootId: uuid}
+	Response (201 Created)
+	Retorna el ID del intento creado y el primer slide.
+	Esqueleto JSON (Request)
+	No aplica
+	Esqueleto JSON (Response)
+	JSON { "attemptId": "uuid-attempt-123", "firstSlide": { "slideId": "uuid-slide-abc", questionType=”Enum question_type”, "questionText": "...", "timeLimitSeconds": 30, mediaID: String(URL) | Null, "options": [{ "index": “1” , "text": "Paris" | Null, mediaID: String(URL) | Null },{ "index": “2” , "text": "London"  | Null, mediaID: String(URL) | Null // no se devuelve ningún atributo boolean para saber si la respuesta es correcta} ] }  }
+
+
+Notas: Dentro de las opciones (options) es importante no devolver cuál es la correcta, el procesamiento lo hace el servidor durante la partida, el frontend se encarga de actualizar la UI una vez recibe la confirmación de si la respuesta fue correcta o no.
+
+
+Nota 2: Las preguntas pueden tanto tener una imagen como no tenerla, pero siempre tienen texto, por eso texto obligatorio e imagen opcional. Por otro lado, las respuestas o solo tienen texto o solo tienen imagen, uno de los 2, por eso ambos campos tienen posibilidad de null. En front se valida que se obtiene y se pone lo que se obtenga.  
+	Error 
+	401 Unauthorized: Usuario no auténticado
+404 Not Found: El Kahoot no existe o no es accesible para el usuario / es privado.
+
+
+	 Obtener el Estado Actual del Intento/Próxima Pregunta - H5.2
+Este endpoint permite la reanudación de una sesión no terminada.
+Elemento
+	Detalle
+	Propósito Específico
+	Permite consultar el estado de un intento de Kahoot singleplayer. Incluyendo si ha sido completado o está en progreso. Si está en progreso, devuelve la información del siguiente slide a responder. 
+
+
+Usar este endpoint para reanudar un kahoot singleplayer pausado.
+	Método HTTP
+	GET
+	Request Path
+	/attempts/:attemptId.
+Nota: Si el front no tiene el attemptId, porque el usuario lo pauso y lo continuo despues y se perdio eso de la memoria, puede obtenerlo de nuevo haciendo GET kahoots/inspect/:kahootid (ver detalles del endpoint en epica 2), en esa ruta se guardan los detalles personales del kahoot incluyendo si hay un intento activo y su attemptid (con state.attemptid). 
+	Headers
+	Authorization: Bearer <accessToken>
+	Request Body
+	No aplica
+	Response (200 OK)
+	Retorna el estado del intento, el progreso y la información del próximo slide (si existe).
+	Esqueleto JSON (Request)
+	No aplica
+	Esqueleto JSON (Response)
+	JSON { "attemptId": "uuid-attempt-123", "state": "IN_PROGRESS", "currentScore": 500, "nextSlide (Opcional, solo si existe)": { "slideId": "uuid-slide-xyz", mediaID: String(URL) | Null, questionType=”Enum question_type”, "questionText": "...", "timeLimitSeconds": 30  "options": [{ "index": “1” , "text": "Paris" | Null, mediaID: String(URL) | Null },{ "index": “2” , "text": "London"  | Null, mediaID: String(URL) | Null // no se devuelve ningún atributo boolean para saber si la respuesta es correcta} ] } } 
+Notas: Dentro de las opciones (options) es importante no devolver cuál es la correcta, el procesamiento lo hace el servidor durante la partida, el frontend se encarga de actualizar la UI una vez recibe la confirmación de si la respuesta fue correcta o no. 
+
+
+Nota 2: Las preguntas pueden tanto tener una imagen como no tenerla, pero siempre tienen texto, por eso texto obligatorio e imagen opcional. Por otro lado, las respuestas o solo tienen texto o solo tienen imagen, uno de los 2, por eso ambos campos tienen posibilidad de null. En front se valida que se obtiene y se pone lo que se obtenga.  
+
+
+	Error 
+	404 Not Found: Intento no existe o no pertenece al usuario
+	Enviar respuesta de un slide y avanzar - H5.3
+Elemento
+	Detalle
+	Propósito Específico
+	Registra la respuesta del jugador, la evalúa y actualiza el puntaje y el estado del intento. Se devuelve al front si la respuesta es correcta o no, los puntos ganados, el score total nuevo, y si el kahoot ya ha sido completado o no. 
+
+
+Si el kahoot no ha sido completado, se devuelve instantáneamente la nueva slide, para que el front la pueda construir en ese mismo instante y reducir la latencia. Una vez construido el nuevo slide se espera de nuevo a que responda otra vez el usuario y se vuelve a lanzar este endpoint hasta que el usuario se salga o termine el kahoot. Si termina el kahoot se lanza get attempts/attemptid/summary para obtener el resumen de resultados. Si se sale cuando se vaya a reanudar se debe usar post attempts/attemptid para continuar.
+	Método HTTP
+	POST
+	Request Path
+	/attempts/:attemptId/answer
+	Headers
+	Authorization: Bearer <accessToken>
+	Request Body
+	JSON con el registro de la respuesta.
+	Response (200 OK)
+	Retorna el resultado inmediato de la respuesta, la puntuación actualizada y el estado del juego.
+	Esqueleto JSON (Request)
+	JSON { "slideId": "uuid-slide-xyz", "answerIndex": NUMBER ARRAY[ ], "timeElapsedSeconds": 12 )}
+Nota 1: answerIndex retorna un array para cubrir el caso de selección múltiple. Si el usuario no mando ninguna respuesta (timeout) mandar el array vacío. 
+Nota 2: timeElapsedSeconds es el tiempo que tardó en responder el usuario, el front debería hacerlo mediante un cálculo de dos Dates: timeElapsedMs = End - Start.
+Nota 3: Si hubo timeout, el timeElapsed mandado deberia ser el tiempo total. 
+	Esqueleto JSON (Response)
+	JSON { "wasCorrect": true, "pointsEarned": 900, "updatedScore": 1400, "attemptState": "COMPLETED" / "IN_PROGRESS",  
+"nextSlide (Opcional, solo si existe)": { "slideId": "uuid-slide-xyz", mediaID: String(URL) | Null, questionType=”Enum question_type”, "questionText": "...", "timeLimitSeconds": 30  "options": [{ "index": “1” , "text": "Paris" | Null, mediaID: String(URL) | Null },{ "index": “2” , "text": "London"  | Null, mediaID: String(URL) | Null // no se devuelve ningún atributo boolean para saber si la respuesta es correcta} ] }
+ }
+Se devuelve al front si la respuesta es correcta o no, los puntos ganados, el score total nuevo, y si el kahoot ya ha sido completado o no. 
+
+
+Si el kahoot no ha sido completado, se devuelve instantáneamente la nueva slide, para que el front la pueda construir en ese mismo instante y reducir la latencia. Una vez construido el nuevo slide se espera de nuevo a que responda otra vez el usuario y se vuelve a lanzar este endpoint hasta que el usuario se salga o termine el kahoot. Si termina el kahoot se lanza get attempts/attemptid/summary para obtener el resumen de resultados. Si se sale cuando se vaya a reanudar se debe usar post attempts/attemptid para continuar.
+	Error
+	400 Bad Request: Slide ya respondida, estado no IN_PROGRESS,
+
+
+404 Not Found: Intento no existe o no pertenece al usuario.
+	Obtener resumen del intento realizado - H5.4
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Obtener el resumen final, incluye numero de preguntas correctas vs numero de preguntas totales, la puntuación total y el porcentaje de aciertos. Esto se muestra al final de la partida cuando haya sido completado el kahoot.
+	Método HTTP
+	GET
+	Request Path
+	/attempts/:attemptId/summary
+	Headers
+	Authorization: Bearer <accessToken>
+	Request Body
+	No aplica
+	Response (200 OK)
+	Retorna los resultados de la partida
+	Esqueleto JSON (Request)
+	No aplica
+	Esqueleto JSON (Response)
+	JSON { "attemptId": "uuid-attempt-123", "finalScore": 1800, "totalCorrect": 8, "totalQuestions": 10, "accuracyPercentage": 80 }
+	Error 
+	404 Not Found: Intento no existe o no pertenece al usuario.
+400 Bad Request: El intento no ha sido completado
+	Nota: A continuación se adjunta una tabla con una explicación más detallada de los estados de un juego en modo solitario. Todo juego en solitario concluido resetea el progreso del kahoot y se puede volver a repetir desde 0.
+Estado (Enum)
+	Propósito
+	Transiciones Comunes
+	IN_PROGRESS (En Curso)
+	El jugador ha iniciado el intento y aún no ha respondido todas las preguntas
+	→ COMPLETED (Al hacer responder todas las preguntas)
+	COMPLETED (Completado)
+	El jugador ha respondido a todas las preguntas del Kahoot. El intento ha finalizado.
+	Nota: Bajo este estado el jugador ya no puede enviar preguntas y solo se puede consultar el resumen de la partida
+	Exploración, Búsqueda y Descubrimiento
+Búsqueda y Filtrado de Quices (H6.1, H6.3)
+Elemento
+	Detalle
+	Propósito Específico
+	Recuperar una lista paginada de Kahoots públicos (status: "published" y visibility: "public"), permitiendo búsqueda por texto (H6.1) y filtro por tema (H6.3).
+	Método HTTP
+	GET
+	Request Path
+	/explore
+	Query Params
+	q (opcional): string - Término de búsqueda en título, descripción o nombre del creador
+categories (opcional): string[] - Array de categorias para filtrar
+limit (opcional): number - Límite de resultados (default: 20)
+page (opcional): number - Página actual (default: 1)
+orderBy (opcional): string - Campo para ordenar (ej: 'createdAt', 'title', 'likesCount')
+order (opcional): 'asc' o 'desc' - Dirección del ordenamiento
+	Response Status
+	200 OK
+	Response Body
+	Retorna un array de Kahoots que coinciden con los filtros.
+	Esqueleto JSON (Response)
+	{
+  "data": [
+    {
+      "id": uuid_kahoot,
+      "title": string,
+      "description": string,
+      "themeId": String,
+      “category”: String (“Matematica”, “Castellano”)
+      "author": { "id": uuid-author, 
+                         "name": string },
+      "coverImageId": String(URL),
+      "playCount": number,
+      "createdAt": ISODate,
+      “visibility”: “public” | “private”,
+      “Status”: “draft” | “published”, 
+     },
+    {
+      …
+    },
+    …
+  ],
+  "pagination": {
+    "page": number, //ej 1
+    "limit": number, //ej 20
+    "totalCount": number, //ej 35
+    "totalPages": number //ej 2
+  }
+}
+	Error 
+	400 Bad Request: Parámetros de query inválidos (por ej. limit no es un número).
+	
+
+Quices Destacados (H6.2)
+Propósito Específico
+	Recuperar Quices destacados basados en un algoritmo que considera novedad (fecha creación) y cantidad de likes
+	Método HTTP
+	GET
+	Request Path
+	/explore/featured
+	Query Params
+	limit (opcional): number - Límite de resultados (default: 10).
+	Response Status
+	200 OK
+	Response Body
+	Retorna un array de los Kahoots destacados.
+	Esqueleto JSON (Response)
+	{
+  "data": [
+    {
+      "id": uuid_kahoot,
+      "title": string,
+      "description": string,
+      "themeId": String,
+      “category”: String (“Matematica”, “Castellano”)
+      "author": { "id": uuid-author, 
+                         "name": string },
+      "coverImageId": String(URL) ,
+      "playCount": number,
+      "createdAt": ISODate,
+      “visibility”: “public” | “private”,
+      “Status”: “draft” | “published”, 
+     },
+    {
+      …
+    },
+    …
+  ],
+  "pagination": {
+    "page": number, //ej 1
+    "limit": number, //ej 20
+    "totalCount": number, //ej 35
+    "totalPages": number //ej 2
+  }
+}
+
+
+	Error 
+	500 Internal Server Error: Error al recuperar contenido destacado
+	
+
+Listado de Categorias Disponibles (H6.3)
+Propósito Específico
+	Obtener lista de temas disponibles para filtrar Quices
+	Método HTTP
+	GET
+	Request Path
+	/explore/categories
+	Response Status
+	200 OK
+	Response Body
+	Retorna el array de temas disponibles.
+	Esqueleto JSON (Response)
+	JSON [ { "name": "Matemáticas"}, {name: “Biology”}, … ]
+	Error 
+	500 Internal Server Error: Error al recuperar temas
+	________________
+
+
+Biblioteca y Gestión de Contenido Personal (sujeto a cambios, en proceso)
+Consulta de Quices creados y borradores (drafts) (H7.1)
+Propósito Específico
+	Obtener todos los kahoots creados por el usuario autenticado
+	Método HTTP
+	GET
+	Request Path
+	/library/my-creations
+	Headers
+	Authorization: Bearer <accessToken>
+	Query Parameters
+	Se tienen query parameters de paginación (todos son opcionales):
+   * limit: number (default: 20, max: 50)
+   * Page: number (default: 1)
+   * Status: “draft” | “published” | “all” (default: “all”)
+   * Visibility: “public” | “private” | “all” (default: “all”)
+   * OrderBy: “createdAt” | “title” | ”likesCount” (default: “createdAt”)
+   * Order: “asc” | “desc” (default: “asc”, dirección de ordenamiento)
+   * Categories: string[] (default: [], array de categorias para filtrar)
+   * q: string (término de búsqueda por título, descripción o nombre del creador)
+	Response Status
+	200 OK
+	Response Body
+	Retorna un array de los kahoots del usuario autenticado y algunos metadatos de paginación
+	Esqueleto JSON (Response)
+	JSON (la estructura de los kahoots es igual a la que se presenta en la sección de creación y edición de quices para mantener la consistencia en las estructuras de datos):
+{
+  "data": [
+    {
+      "id": UUID (kahoot Id),
+      "title": string | null (opcional),
+      "description": string | null (opcional),
+      “coverImageId”: string | null (URL opcional), 
+      “visibility”: “public” | “private”,
+      "themeId": UUID,
+       "author": { "id": uuid-author, 
+                         "name": string },
+      “createdAt”: Date (formato ISO 8601 DATE),
+      “playCount”: number,
+      “category”: String (“Matematica”, “Castellano”, etc ),
+      “Status”: “draft” | “published”, 
+     },
+    {
+      …
+    },
+    …
+  ],
+  "pagination": {
+    "page": number, //ej 1
+    "limit": number, //ej 20
+    "totalCount": number, //ej 35
+    "totalPages": number //ej 2
+  }
+}
+
+
+	Error 
+	401 Unauthorized: el usuario intentó consultar sus kahoots sin utilizar su token de autorización
+500 Internal Server Error: Error al recuperar kahoots del usuario (este error es por defecto, si no es alguno de los anteriores)
+	Consulta de Quices marcados como favoritos (H7.2)
+Propósito Específico
+	Obtener kahoots marcados como favoritos por el usuario
+	Método HTTP
+	GET
+	Request Path
+	/library/favorites
+	Headers
+	Authorization: Bearer <accessToken>
+	Query Parameters
+	Se tienen query parameters de paginación
+   * limit: number (default: 20, max: 50)
+   * Page: number (default: 1)
+   * Status: “draft” | “published” | “all” (default: “all”)
+   * Visibility: “public” | “private” | “all” (default: “all”)
+   * OrderBy: “createdAt” | “title” | ”likesCount” (default: “createdAt”)
+   * Order: “asc” | “desc” (default: “asc”, dirección de ordenamiento)
+   * Categories: string[] (default: [], array de categorias para filtrar)
+   * q: string (término de búsqueda por título, descripción o nombre del creador)
+	Response Status
+	200 OK
+	Response Body
+	Retorna un array con los kahoots que tiene guardados el usuario como favoritos y algunos metadatos de la paginación
+	Esqueleto JSON (Response)
+	{
+  "data": [
+    {
+      "id": UUID (kahoot Id),
+      "title": string | null (opcional),
+      "description": string | null (opcional),
+      “coverImageId”: string | null (URL opcional), 
+      “visibility”: “public” | “private”,
+      "themeId": UUID,
+       "author": { "id": uuid-author, 
+                         "name": string },
+      “createdAt”: Date (formato ISO 8601 DATE),
+      “playCount”: number,
+      “category”: String (“Matematica”, “Castellano”, etc ),
+      “Status”: “draft” | “published”, 
+     },
+    {
+      …
+    },
+    …
+  ],
+  "pagination": {
+    "page": number, //ej 1
+    "limit": number, //ej 20
+    "totalCount": number, //ej 35
+    "totalPages": number //ej 2
+  }
+}
+
+
+	Error 
+	401 Unauthorized: el usuario intentó consultar sus kahoots sin utilizar su token de autorización
+500 Internal Server Error: Error al recuperar kahoots del usuario (este error es por defecto, si no es alguno de los anteriores)
+	
+
+Marcar un Quiz como favorito (H7.3)
+Propósito Específico
+	Marcar un quiz como favorito para un usuario dado el id del kahoot.
+	Método HTTP
+	POST
+	Request Path
+	/library/favorites/:kahootId
+	Headers
+	Authorization: Bearer <accessToken>
+	Query Parameters
+	N.A.
+	Response Status
+	201 Created
+	Response Body
+	No retorna nada.
+	Esqueleto JSON (Response)
+	No retorna nada
+	Error 
+	404 Not found: si el quiz no existe
+409 Conflict: si el quiz ya estaba marcado como favorito
+401 Unauthorized: el usuario intentó consultar sus kahoots sin utilizar su token de autorización
+500 Internal Server Error: este error es por defecto, si no es alguno de los anteriores.
+	
+
+Desmarcar un Quiz como favorito (H7.4)
+
+
+Propósito Específico
+	Marcar un quiz como favorito para un usuario dado el id del kahoot.
+	Método HTTP
+	DELETE
+	Request Path
+	/library/favorites/:kahootId
+	Headers
+	Authorization: Bearer <accessToken>
+	Query Parameters
+	N.A.
+	Response Status
+	204 No content
+	Response Body
+	No retorna nada.
+	Esqueleto JSON (Response)
+	No retorna nada
+	Error 
+	404 Not found: si el quiz no existe
+401 Unauthorized: el usuario intentó consultar sus kahoots sin utilizar su token de autorización
+500 Internal Server Error: este error es por defecto, si no es alguno de los anteriores.
+	
+
+
+
+Consulta de lista de Quices en progreso (H7.5)
+Propósito Específico
+	Obtener kahoots que el usuario comenzó pero que no completó. Cada kahoot iniciado por el usuario debe tener un punto de guardado para que el usuario lo pueda retomar cuando quiera. El punto de guardado es único por cada kahoot y hay puntos de guardado en función de la modalidad de juego individual que haya elegido el usuario (El progreso se guarda para los modos “flashcards” y “classic”, al ejecutar el juego en modo “kahoot self-study”)
+	Método HTTP
+	GET
+	Request Path
+	/library/in-progress
+	Headers
+	Authorization: Bearer <accessToken>
+	Query Parameters
+	Se tienen query parameters de paginación
+   * limit: number (default: 20, max: 50)
+   * Page: number (default: 1)
+   * Status: “draft” | “published” | “all” (default: “all”)
+   * Visibility: “public” | “private” | “all” (default: “all”)
+   * OrderBy: “createdAt” | “title” | ”likesCount” (default: “createdAt”)
+   * Order: “asc” | “desc” (default: “asc”, dirección de ordenamiento)
+   * Categories: string[] (default: [], array de categorias para filtrar)
+   * q: string (término de búsqueda por título, descripción o nombre del creador)
+	Response Status
+	200 OK
+	Response Body
+	Retorna un array con los kahoots que el usuario comenzó pero que no terminó. 
+	Esqueleto JSON (Response)
+	{
+  "data": [
+    {
+      "id": UUID (kahoot Id),
+      "title": string,
+      "description": string,
+      “coverImageId”: string (URL), 
+      “visibility”: “public” | “private”,
+      "themeId": UUID,
+       "author": { "id": uuid-author, 
+                         "name": string },
+      “createdAt”: Date (formato ISO 8601 DATE),
+      “playCount”: number,
+      “category”: String (“Matematica”, “Castellano”, etc ),
+      “Status”: “draft” | “published”, 
+      “gameId”: uuid
+      “gameType”: string (“multiplayer” | “singleplayer”)
+     },
+    {
+      …
+    },
+    …
+  ],
+  "pagination": {
+    "page": number, //ej 1
+    "limit": number, //ej 20
+    "totalCount": number, //ej 35
+    "totalPages": number //ej 2
+  }
+}
+
+
+Nota: El game ID corresponde a un attemptId si el gametype es Singleplayer, y corresponde a un sessionId si el gametype es Multiplayer. Estos son ids requeridos para los endpoints de juego singleplayer y multiplayer.
+	Error 
+	401 Unauthorized: el usuario intentó consultar sus kahoots sin utilizar su token de autorización
+500 Internal Server Error: Error al recuperar kahoots del usuario (este error es por defecto, si no es alguno de los anteriores)
+	
+
+Consulta de Quices Completados (H7.6)
+Propósito Específico
+	Obtener kahoots que el usuario ya completó previamente. Este endpoint es muy similar al anterior. Se sabe que un kahoot fue completado si se tiene el registro de que el usuario respondió todas las preguntas del mismo. Esta validación es interna y solo se devuelve
+	Método HTTP
+	GET
+	Request Path
+	/library/completed
+	Headers
+	Authorization: Bearer <accessToken>
+	Query Parameters
+	Se tienen query parameters de paginación
+   * limit: number (default: 20, max: 50)
+   * Page: number (default: 1)
+   * Status: “draft” | “published” | “all” (default: “all”)
+   * Visibility: “public” | “private” | “all” (default: “all”)
+   * OrderBy: “createdAt” | “title” | ”likesCount” (default: “createdAt”)
+   * Order: “asc” | “desc” (default: “asc”, dirección de ordenamiento)
+   * Categories: string[] (default: [], array de categorias para filtrar)
+   * q: string (término de búsqueda por título, descripción o nombre del creador)
+	Response Status
+	200 OK
+	Response Body
+	Retorna un array con los kahoots que el usuario terminó.
+	Esqueleto JSON (Response)
+	{
+  "data": [
+    {
+      "id": UUID (kahoot Id),
+      "title": string,
+      "description": string,
+      “coverImageId”: string, 
+      “visibility”: “public” | “private”,
+      "themeId": UUID,
+       "author": { "id": uuid-author, 
+                         "name": string },
+      “createdAt”: Date (formato ISO 8601 DATE),
+      “playCount”: number,
+      “category”: String (“Matematica”, “Castellano”, etc ),
+      “Status”: “draft” | “published”, 
+      “gameId”: uuid
+      “gameType”: string (“multiplayer” | “singleplayer”)
+     },
+    {
+      …
+    },
+    …
+  ],
+  "pagination": {
+    "page": number, //ej 1
+    "limit": number, //ej 20
+    "totalCount": number, //ej 35
+    "totalPages": number //ej 2
+  }
+}
+
+
+	Error 
+	401 Unauthorized: el usuario intentó consultar sus kahoots sin utilizar su token de autorización
+500 Internal Server Error: Error al recuperar kahoots del usuario (este error es por defecto, si no es alguno de los anteriores)
+	
+
+________________
+Gestión de Grupos y Roles
+Elemento
+	Detalle
+	Propósito Específico
+	Obtener una lista de todos los grupos de Estudio a los que pertenece el usuario autenticado
+[a]	
+Método HTTP
+	GET
+	Request Path
+	/groups
+	Request Body
+	No aplica
+	Response status
+	200 OK
+	Response Body
+	Retorna un arreglo con los grupos del usuario
+	Esqueleto JSON (Response)
+	[JSON{"id": "groupID", "name": "groupName", "role": "userRol", "memberCount":”numberOfMembers”, "createdAt": "datetime"}, …][b][c][d]
+	Error
+	401 Unauthorized (Usuario no está autenticado)
+	
+
+________________
+Elemento
+	Detalle
+	Propósito Específico[e]
+	Crear un nuevo Grupo de Estudio y establecer al usuario autenticado como administrador
+	Método HTTP
+	POST
+	Request Path
+	/groups
+	Request Body
+	Objeto JSON con los datos del grupo a crear
+	Response (201 Created)
+	Retorna el grupo recien creado con su identificador unico
+	Esqueleto JSON (Request)
+	JSON{"name": "groupName"}
+
+
+	Esqueleto JSON (Response)
+	JSON{"id": "groupID", "name": "groupName", "adminId": "idCurrentUser", “memberCount”:”numberOfMembers”, "createdAt": "datetime"}
+	Error
+	400 Bad Request (Faltan campos requeridos), 401 Unauthorized (Usuario no autenticado).
+	Elemento
+	Detalle
+	Propósito Específico
+	Editar parcialmente la información del grupo (nombre o descripción).
+[f]	
+Método HTTP
+	PATCH
+	Request Path
+	/groups/:groupId
+	Request Body
+	JSON {“name”:”groupName”, “description”: ”newGroupDescription”}
+	Response (200 OK)
+	{ "id": "groupId", "name": "groupName", "description": "newGroupDescription", "updatedAt": "dateTime"}
+
+
+	Error
+	403 Forbidden: No es administrador, 404 Not Found: Grupo no encontrado.
+	
+
+
+
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	El administrador elimina miembros y un miembro abandona el grupo.
+[g]	
+Método HTTP
+	DELETE
+	Request Path
+	/groups/:groupId/members/:memberId
+	Response (204 No Content)
+	Miembro eliminado exitosamente.
+	Esqueleto JSON (Request)
+	No aplica
+	Esqueleto JSON (Response)
+	No aplica
+	Error
+	401 Unauthorized, 403 Forbidden: No es Administrador, 404 Not Found: Miembro o Grupo no existe
+	
+
+
+
+
+
+
+
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Transferir la administración a otro miembro del grupo.
+[h]	
+Método HTTP
+	PATCH
+	Request Path
+	/groups/:groupId/transfer-admin
+	Request Body
+	{ "newAdminId": "uuid-member-2"}
+
+
+	Response (201 Created)
+	{ "groupId": "uuid-1", "previousAdmin": {"userId": "uuid-admin-1", "newRole": "member”  }, "newAdmin": { "userId": "uuid-member-2", "newRole": "admin"}, "transferredAt": "dateTime"}
+
+
+	Error
+	400 Bad Request: El nuevo administrador no pertenece al grupo., 403 Forbidden: No es Administrador
+	
+
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Eliminar permanentemente un grupo. Solo el administrador puede hacerlo.[i]
+	Método HTTP
+	DELETE
+	Request Path
+	/groups/:groupId
+	Response (204 No Content)
+	El grupo fue eliminado exitosamente.
+	Error
+	403 Forbidden (Usuario no es administrador), 404 Not Found (Grupo no existe).
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Generar un enlace de invitación [j]para unirse al grupo (solo administrador).
+	Método HTTP
+	POST
+	Request Path
+	/groups/:groupId/invitations
+	Request Body
+	Objeto JSON con la configuración de expiración del enlace.
+	Response (201 Created)
+	Retorna el enlace generado para unirse al grupo
+	Esqueleto JSON (Request)
+	json { "expiresIn": "7d" }
+
+
+	Esqueleto JSON (Response)
+	json { "groupId": "groupID", "invitationLink": "toekenInvitation", "expiresAt": "datetime" }
+	Error
+	401 Unauthorized (Usuario no autenticado), 403 Forbidden (No es administrador)
+	
+
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	unirse a un grupo un grupo mediante un token de invitación válido.
+[k]	
+Método HTTP
+	POST
+	Request Path
+	/groups/join
+	Request Body
+	Objeto JSON con el token de invitación.
+	Response (201 Created)
+	Retorna la información del grupo al que se unió el usuario.
+	Esqueleto JSON (Request)
+	json { "invitationToken": "tokenInvitation" }
+
+
+	Esqueleto JSON (Response)
+	jjson { "groupId": "groupID", "groupName": "groupName", "joinedAt": "datetime", "role": "member" }
+	Error
+	400 Bad Request (Token inválido o expirado)
+	
+
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Agregar o asignar un Kahoot existente al grupo. 
+[l]	
+Método HTTP
+	POST
+	Request Path
+	/groups/:groupId/quizzes
+	Request Body
+	Objeto JSON con el ID del quiz y las fechas de disponibilidadd
+	Response (201 Created)
+	Retorna el quiz asignado al grupo con su disponibilidad.
+	Esqueleto JSON (Request)
+	json { "quizId": "uuid-quiz-1", "availableFrom": "availableTimeStart”, "availableUntil": "availableTimeEnd" }
+	Esqueleto JSON (Response)
+	json { "groupId": "uuid-1", "quizId": "uuid-quiz-1", "assignedBy": "uuid-User", "availableFrom": "datetime", "availableTo": "datetime" }
+	Error
+	400 Bad Request (Fechas inválidas), 403 Forbidden (Miembro intentó agregar un quiz no compartido). 404 Not Found(Quiz no existe)
+	
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Obtener la lista de kahoots asignados al grupo, así como el status de cada kahoot asignado del usuario, y los resultados de los kahoots completados.  
+Es importante recordar la siguiente interaccion: un quiz asignado comparte el progreso con su quiz equivalente fuera del grupo, no obstante, una vez realizado por primera vez el quiz, ya sea dentro del grupo o afuera, se registra el resultado obtenido en la asignacion, y si el usuario trata de entrar otra vez al quiz dentro del grupo, saldran los resultados del quiz directamente. 
+Por ello, al consultar el front a este endpoint, no solo recibe la lista de quizzes asignados con su data basica como titulo o fecha, sino Tambien recibe un status en cada quiz que le indique si ya ha sido completado o no, y en caso de haber sido completado, devuelve los resultados del mismo.
+	Método HTTP
+	GET
+	Request Path
+	/groups/:groupId/quizzes
+	Header
+	{userId: uuid}
+	Request Body
+	No aplica
+	Response (201 Created)
+	Retorna los quizes asignados al grupo, con su status y resultados.
+	Esqueleto JSON (Request)
+	No aplica
+	Esqueleto JSON (Response)
+	{ data: [
+  {
+    "assignmentId": "uuid-assignment-1",
+    "quizId": "uuid-quiz-101",
+    "title": "Algebra Basics: Linear Equations",
+    "availableUntil": "2025-11-27T23:59:59.000Z",
+    "status": "COMPLETED",
+    "userResult": {
+      "score": 950,
+      "attemptId": "uuid-attempt-77",
+      "completedAt": "2025-11-21T14:30:00.000Z"
+    },
+    "leaderboard": [
+      { "name": "Maria", "score": 1200 },
+      { "name": "Jorge", "score": 950 },
+      { "name": "Luis", "score": 800 }
+    ]
+  },
+  {
+    "id": "uuid-assignment-2",
+    "quizId": "uuid-quiz-202",
+    "title": "World Geography",
+    "availableUntil": "2025-12-01T00:00:00.000Z",
+    "status": "PENDING",
+    "userResult": null,
+    "leaderboard": []
+  }
+]}
+	Error
+	405 
+	
+
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Mostrar el leaderboard general del grupo, basado en la cantidad de Kahoots completados y puntos acumulados.[m]
+	Método HTTP
+	GET
+	Request Path
+	/groups/:groupId/leaderboard
+	Response (200 OK)
+	Retorna el ranking grupal.
+	Esqueleto JSON (Response)
+	json [ { "userId": "uuid-1", "name": "UserName", "completedQuizzes": “numberCompletedQuizzes”, "totalPoints": “numberPoints”, "position": “numberPosition” }, …]
+	Error
+	403 Forbidden (Usuario no pertenece al grupo), 404 Not Found (Grupo no encontrado).
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Mostrar el leaderboard individual de un Kahoot dentro del grupo. 
+	Método HTTP
+	GET
+	Request Path
+	/groups/:groupId/quizzes/:quizId/leaderboard
+	Response (200 OK)
+	Retorna las mejores puntuaciones de los miembros del grupo para ese Kahoot.
+	Esqueleto JSON (Response)
+	json { "quizId": "uuid-quiz-1", "groupId": "uuid-1", "topPlayers": [ { "userId": "uuid-1", "name": "userName", "score": “scoreNumber”}...] }
+	Error
+	404 Not Found (Grupo o Kahoot inexistente).
+	
+
+
+
+
+
+
+
+Sistema de Notificaciones
+1. Registrar Dispositivo para Notificaciones Push
+Elemento
+	Detalle
+	Propósito Específico
+	Registrar el token FCM (Firebase) del dispositivo del usuario 
+	Método HTTP
+	POST
+	Request Path
+	/notifications/register-device
+	Request Body (DTO)
+	RegisterDeviceDto
+	Esqueleto JSON (Request)
+	{ "token": "string-fcm", "deviceType": "android" }
+	Response Status
+	201 Created
+	Response Body (DTO)
+	(Vacío o Mensaje de éxito)
+	Error
+	400 Bad Request (Datos del DTO inválidos, ej. falta token).
+401 Unauthorized (Usuario no autenticado).
+	
+
+
+
+
+
+
+
+2. Anular Registro de Dispositivo
+Elemento
+	Detalle
+	Propósito Específico
+	Eliminar el token del dispositivo al cerrar sesión 
+	Método HTTP
+	DELETE
+	Request Path
+	/notifications/unregister-device
+	Request Body (DTO)
+	UnregisterDeviceDto
+	Esqueleto JSON (Request)
+	{ "token": "string-fcm" }
+	Response Status
+	204 No Content
+	Response Body (DTO)
+	(Vacío)
+	Error
+	400 Bad Request (Falta token en el body).
+401 Unauthorized (Usuario no autenticado).
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+3. Obtener Historial de Notificaciones (H9.1, H9.2)
+Elemento
+	Detalle
+	Propósito Específico
+	(Inferido) Recuperar la lista (historial) de notificaciones para el usuario autenticado.
+	Método HTTP
+	GET
+	Request Path
+	/notifications
+	Query Params
+	?limit=20&page=1
+	Response Status
+	200 OK
+	Response Body (DTO)
+	NotificationDto[] (Array de DTOs)
+	Esqueleto JSON (Response)
+	[ { "id": "uuid","type": "group_assignment", "message": "Se te asignó el Kahoot 'Historia'", "isRead": false, "createdAt": "datetime", "resourceId": "uuid-kahoot-1" }, ... ]
+	Error
+	401 Unauthorized (Usuario no autenticado).
+	
+
+4. Marcar Notificación como Leída (Acción implícita de H9.1/H9.2)
+Elemento
+	Detalle
+	Propósito Específico
+	(Inferido) Marcar una notificación específica como leída.
+	Método HTTP
+	PATCH
+	Request Path
+	/notifications/:id
+	Request Body (DTO)
+	UpdateNotificationDto
+	Esqueleto JSON (Request)
+	{ "isRead": true }
+	Response Status
+	200 OK
+	Response Body (DTO)
+	NotificationDto (Retorna el objeto actualizado)
+	Esqueleto JSON (Response)
+	{ "id": "uuid-notificacion-1", "message": "...", "isRead": true, ... }
+	Error
+	400 Bad Request (Body inválido).
+401 Unauthorized (Usuario no autenticado).
+404 Not Found (Notificación :id no encontrada o no pertenece al usuario).
+	Informes, Estadísticas y Feedback
+1. Obtener Informe de Sesión (Anfitrión) (H10.1, H10.2)
+Elemento
+	Detalle
+	Propósito Específico
+	Ver el reporte ordenado de resultados de una sesión (H10.1) y el análisis por pregunta (H10.2). Estos son los resultados generales de la sesión. No son para un jugador específico. Para obtener la sessionId hacer GET reports/kahoots/my-results (te da los ids de cada intento).
+	Método HTTP
+	GET
+	Request Path
+	/reports/sessions/:sessionId
+	Response Status
+	200 OK
+	Response Body (DTO)
+	SessionReportDto (DTO Complejo)
+	Esqueleto JSON (Response)
+	{ 
+"sessionId": "uuid-sesion", 
+"title": "string", 
+"executionDate": "datetime", 
+"playerRanking": [ {
+ "position": 1, 
+"username": "string", 
+"score": 9500, 
+"correctAnswers": 9 
+}, ... ], 
+"questionAnalysis": [ { 
+"questionIndex": 0, 
+"questionText": "string", 
+"correctPercentage": 0.85 
+}, ... ] }
+	Error
+	401 Unauthorized (Usuario no autenticado).
+403 Forbidden (Usuario no es el anfitrión/creador de este reporte).
+404 Not Found (Reporte/Sesión :id no encontrado).
+	
+
+2. Obtener Resultados Personales de un Quiz (Multijugador) (H10.3)
+Elemento
+	Detalle
+	Propósito Específico
+	Ver resultados personales (puntuación, aciertos) de un Kahoot específico multijugador completado (H10.3). Para obtener el sessionId hacer GET reports/kahoots/my-results (te da los ids de cada intento).
+	Método HTTP
+	GET
+	Request Path
+	/reports/multiplayer/:sessionId
+	Response Status
+	200 OK
+	Response Body (DTO)
+	PersonalResultDto
+	
+
+
+
+Esqueleto JSON (Response)
+	
+
+
+
+
+
+
+
+{ "kahootId": "uuid-kahoot-1", "title": "string", "userId": "uuid-me", "finalScore": 8200, "correctAnswers": 8, "totalQuestions": 10, "averageTimeMs": 6100, "rankingPosition": 5,
+"questionResults": [{ "questionIndex": 0, "questionText": "Cuál es la capital de Francia?", "isCorrect": true, answerText": String[ ], “answerMediaID”: “String[ ]" (URLarray), "timeTakenMs": 4500 },...]
+}
+
+
+Nota: Hay answerText y answerMediaID porque una respuesta puede tener o texto o una imagen. Son mutuamente excluyentes. Adicionalmente se manda un array de respuestas por cada pregunta para cubrir el caso multiple choice. 
+
+
+Como se maneja en el front:
+
+
+Por cada pregunta al front le llegara un array de answerText y un array de answerMediaID, como una respuesta sólo puede tener una de ambas (o texto o imagen), cada elemento de cualquiera de ambos arrays cuenta como una respuesta distinta seleccionada por el usuario (de nuevo para cubrir multiple choice), si ambos arrays llegan vacíos quiere decir que el usuario no seleccionó ninguna respuesta.
+
+
+El front debe ser flexible para poder modelar tanto imagenes como texto para las respuestas seleccionadas.
+
+
+	Error
+	401 Unauthorized (Usuario no autenticado).
+404 Not Found (Kahoot :id no encontrado, o el usuario actual no tiene resultados para ese kahoot).
+	
+
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Ver resultados personales (puntuación, aciertos) de un Kahoot específico singleplayer completado (H10.3). Para obtener el attempt id se debe hacer get reports/kahoots/my-results (te da los ids de cada intento).
+	Método HTTP
+	GET
+	Request Path
+	/reports/singleplayer/:attemptId
+	Response Status
+	200 OK
+	Response Body (DTO)
+	PersonalResultDto
+	
+
+
+
+Esqueleto JSON (Response)
+	{ "kahootId": "uuid-kahoot-1", "title": "string", "userId": "uuid-me", "finalScore": 8200, "correctAnswers": 8, "totalQuestions": 10, "averageTimeMs": 6100, "questionResults": [{ "questionIndex": 0, "questionText": "Cuál es la capital de Francia?", "isCorrect": true, answerText": String[ ], “answerMediaID”: “String[ ]" (URLarray), "timeTakenMs": 4500 },...]
+}
+
+
+Nota: Hay answerText y answerMediaID porque una respuesta puede tener texto o una imagen. Son mutuamente excluyentes. Adicionalmente se manda un array de respuestas por cada pregunta para cubrir el caso multiple choice. 
+
+
+Como se maneja en el front:
+
+
+Por cada pregunta al front le llegara un array de answerText y un array de answerMediaID, como una respuesta sólo puede tener una de ambas (o texto o imagen), cada elemento de cualquiera de ambos arrays cuenta como una respuesta distinta seleccionada por el usuario (de nuevo para cubrir multiple choice), si ambos arrays llegan vacíos quiere decir que el usuario no seleccionó ninguna respuesta.
+
+
+El front debe ser flexible para poder modelar tanto imagenes como texto para las respuestas seleccionadas.
+
+
+Nota 2: Este response es igual que el de multiplayer pero sin rankingPosition. (Porq es solo play)
+	Error
+	401 Unauthorized (Usuario no autenticado).
+404 Not Found (Kahoot :id no encontrado, o el usuario actual no tiene resultados para ese kahoot).
+	
+
+
+
+3. Obtener Lista de los Resultados Personales de los Quices (Jugador) (H10.3)
+Elemento
+	Detalle
+	Propósito Específico
+	Obtener un listado de los resultados personales de los Kahoots en los que el usuario haya participado. Cada kahoot puede tener multiples registros de partida. Se incluye un identificador gameType en cada uno que indica si la partida fue singlePlayer o Multiplayer, además se incluye el sessionId o attemptId segun corresponda. 
+	Método HTTP
+	GET
+	Request Path
+	/reports/kahoots/my-results
+	Query Params
+	limit (opcional): number - Límite de resultados (default: 20)
+page (opcional): number - Página actual (default: 1)
+	Response Status
+	200 OK
+	Response Body (DTO)
+	KahootResultSummaryDto[]
+	Esqueleto JSON (Response)
+	{ "results": [ { 
+"kahootId": "uuid-kahoot-1", 
+“gameId”: UUID, 
+“gameType” = "Singleplayer" | "Multiplayer_host | Multiplayer_player (ENUM)", 
+  ”title": "string", 
+  "completionDate": "datetime", 
+  "finalScore": 8200 | Null (Opcional), 
+  "rankingPosition": 5 | Null  (Opcional),}, ... ], 
+  "meta": { 
+  "totalItems": 80, 
+  "currentPage": 1, 
+  "totalPages": 8 , 
+  “limit”:10
+} 
+El front debe revisar que tipo de juego es cada intento (con gameType) y de acuerdo a eso sabrá si el id de juego recibido (gameId) corresponde a un attemptid (singleplayer) o a un sessionid (para multiplayer). Con estos ids se puede hacer consulta a reports/multiplayer/:sessionid si era jugador o reports/session/:sessionId si era anfitrión y reports/singleplayer/attemptid para obtener los detalles específicos de un intento.
+Nota: Para los kahoots individuales no se proporcionará rankingPosition.  A su vez tampoco se proporcionará ranking position ni finalScore en caso de que el kahoot haya sido hosteado por un anfitrión
+	Error
+	401 Unauthorized (Usuario no autenticado).
+400 Bad Request (Parámetros de query inválidos)
+	
+
+Panel de Administración (Backoffice)
+GET /backoffice/users: obtener lista de usuarios.
+Elemento
+	Detalle
+	Propósito Específico
+	Consultar la lista de los usuarios registrados en la aplicación.
+	Método HTTP
+	GET
+	Request Path
+	/backoffice/users
+	Headers
+	Authorization: Bearer<accessToken> (token de usuario de admnistrador)
+	Query Parameters
+	Se tienen query parameters de paginación
+   * name (opcional): string (nombre del creador)
+   * userId (opcional): string (id del usuario)
+   * limit (opcional): number (default: 20, max: 50)
+   * page (opcional): number (default: 1)
+   * orderBy (opcional): “createdAt” | “name” | ”usertype” | “updatedAt” (default: “createdAt”)
+   * order (opcional): “asc” | “desc” (default: “asc”, dirección de ordenamiento)
+	Response Status
+	200 OK
+	Response Body
+	Retorna un JSON con un objeto que detalla la paginación y una lista de los usuarios registrados
+	Esqueleto JSON (Response)
+	JSON
+
+
+{
+  "data": [
+    {
+      "id": UUID (User Id),
+      "username": string,
+      “name”: string,
+      “email”: string,
+      "description": string,
+      “userType”: string,
+      “avatarUrl”: string | null,
+      “createdAt”: date (ISO8601),
+     “updatedAt: date (ISO8601),
+     “isAdmin”: Boolean,
+     “status”: string (“Active” | “Blocked”) .
+     },
+    {
+      …
+    },
+    …
+  ],
+  "pagination": {
+    "page": number, //ej 1
+    "limit": number, //ej 20
+    "totalCount": number, //ej 35
+    "totalPages": number //ej 2
+  }
+}
+	Response (200 OK)
+	Retorna el recurso (perfil) actualizado.
+	Error
+	- 400 Bad Request (Errores de validación).
+- 401 Unauthorized (si el usuario no es admin al intentar usar el endpoint)
+- 500 internal server error (si ocurre cualquier otro error)
+	
+
+PATCH /backoffice/blockUser/:userId, para bloquear un usuario.
+Elemento
+	Detalle
+	Propósito Específico
+	Bloquear a un usuario para que cuando intente loguearse (obtener su token JWT) este le sea denegado.
+	Método HTTP
+	PATCH
+	Request Path
+	/backoffice/blockUser/:userid
+	Headers
+	Authorization: Bearer<accessToken> (token de usuario de admnistrador)
+	Query Parameters
+	N.A
+	Request Body
+	N.A
+	Response Status
+	200 OK
+	Response Body
+	Retorna los datos del usuario modificado (bloqueado)
+	Esqueleto JSON (Response)
+	JSON
+
+
+    {
+      "id": UUID (User Id),
+      "username": string,
+      “name”: string,
+      “email”: string,
+      "description": string,
+      “userType”: string,
+      “avatarUrl”: string | null,
+      “createdAt”: date (ISO8601),
+     “updatedAt: date (ISO8601),
+     “isadmin”: Boolean,
+     “status”: string (“Blocked”).
+     },
+
+
+	Error
+	- 400 Bad Request (El usuario con el id dado no existe).
+- 401 Unauthorized (si el usuario no es admin al intentar usar el endpoint)
+- 500 internal server error (si ocurre cualquier otro error)
+	
+
+PATCH /backoffice/unblockUser/:userId, para desbloquear un usuario.
+Elemento
+	Detalle
+	Propósito Específico
+	Desbloquear a un usuario.
+	Método HTTP
+	PATCH
+	Request Path
+	/backoffice/unblockUser/:userid
+	Headers
+	Authorization: Bearer<accessToken> (token de usuario de admnistrador)
+	Query Parameters
+	N.A
+	Request Body
+	N.A
+	Response Status
+	200 OK
+	Response Body
+	Retorna los datos del usuario modificado (desbloqueado)
+	Esqueleto JSON (Response)
+	JSON
+
+
+    {
+      "id": UUID (User Id),
+      "username": string,
+      “name”: string,
+      “email”: string,
+      "description": string,
+      “userType”: string,
+      “avatarUrl”: string | null,
+      “createdAt”: date (ISO8601),
+     “updatedAt: date (ISO8601),
+     “isAdmin”: Boolean,
+     “status”:string(“Active”)
+     },
+
+
+	Error
+	- 400 Bad Request (El usuario con el id dado no existe).
+- 401 Unauthorized (si el usuario no es admin al intentar usar el endpoint)
+- 500 internal server error (si ocurre cualquier otro error)
+	
+
+PATCH /backoffice/giveAdmin/:userId, para otorgar permisos de administrador a un usuario.
+Elemento
+	Detalle
+	Propósito Específico
+	Otorga permisos de administrador a un usuario, permitiéndole crear otros usuarios y acceder a todos los endpoints del backoffice. Cuando el usuario se loguee, en su JWT token aparecerá como isAdmin: true.
+	Método HTTP
+	PATCH
+	Request Path
+	/backoffice/giveAdmin/:userid
+	Headers
+	Authorization: Bearer<accessToken> (token de usuario de admnistrador)
+	Query Parameters
+	N.A
+	Request Body
+	N.A
+	Response Status
+	200 OK
+	Response Body
+	Retorna los datos del usuario modificado (con permisos de admin habilitados)
+	Esqueleto JSON (Response)
+	JSON
+
+
+    {
+      "id": UUID (User Id),
+      "username": string,
+      “name”: string,
+      “email”: string,
+      "description": string,
+      “userType”: string,
+      “avatarUrl”: string | null,
+      “createdAt”: date (ISO8601),
+     “updatedAt: date (ISO8601),
+     “isAdmin”: Boolean (true),
+     “status”: string (“Active” | “Blocked”).
+     },
+
+
+	Error
+	- 400 Bad Request (El usuario con el id dado no existe).
+- 401 Unauthorized (si el usuario no es admin al intentar usar el endpoint)
+- 500 internal server error (si ocurre cualquier otro error)
+	
+
+PATCH /backoffice/removeAdmin/:userId, para quitar permisos de administrador.
+Elemento
+	Detalle
+	Propósito Específico
+	Le quita permisos de administrador a un usuario dado.
+	Método HTTP
+	PATCH
+	Request Path
+	/backoffice/removeAdmin/:userid
+	Headers
+	Authorization: Bearer<accessToken> (token de usuario de admnistrador)
+	Query Parameters
+	N.A
+	Request Body
+	N.A
+	Response Status
+	200 OK
+	Response Body
+	Retorna los datos del usuario modificado (con permisos de admin deshabilitados)
+	Esqueleto JSON (Response)
+	JSON
+
+
+    {
+      "id": UUID (User Id),
+      "username": string,
+      “name”: string,
+      “email”: string,
+      "description": string,
+      “userType”: string,
+      “avatarUrl”: string | null,
+      “createdAt”: date (ISO8601),
+     “updatedAt: date (ISO8601),
+     “isAdmin”: Boolean (false),
+     “status”: string (“Active” | “Blocked”).
+     },
+
+
+	Error
+	- 400 Bad Request (El usuario con el id dado no existe).
+- 401 Unauthorized (si el usuario no es admin al intentar usar el endpoint)
+- 500 internal server error (si ocurre cualquier otro error)
+	
+
+DELETE /backoffice/user/:userid, para eliminar un usuario permanentemente.
+Elemento
+	Detalle
+	Propósito Específico
+	Elimina a un usuario permanentemente
+	Método HTTP
+	DELETE
+	Request Path
+	/backoffice/user/:userid
+	Headers
+	Authorization: Bearer<accessToken> (token de usuario de admnistrador)
+	Query Parameters
+	N.A
+	Request Body
+	N.A
+	Response Status
+	204 No content
+	Response Body
+	No retorna nada.
+	Error
+	- 400 Bad Request (El usuario con el id dado no existe).
+- 401 Unauthorized (si el usuario no es admin al intentar usar el endpoint)
+- 500 internal server error (si ocurre cualquier otro error)
+	
+
+POST /backoffice/massNotification, para enviar notificacion masiva por correo.
+Elemento
+	Detalle
+	Propósito Específico
+	Elimina a un usuario permanentemente
+	Método HTTP
+	POST
+	Request Path
+	/backoffice/massNotification
+	Headers
+	Authorization: Bearer<accessToken> (token de usuario de admnistrador)
+	Query Parameters
+	N.A
+	Request Body
+	JSON
+
+
+    {
+      "title": string (ej. “mantenimiento programado”),
+      “message”: “Estimado usuario, hola”,
+      “filters”: {
+                         toAdmins: boolean,
+                         toRegularUsers: boolean 
+     },
+
+
+	Response Status
+	201 Created
+	Response Body
+	Datos sobre la notificación
+	Esqueleto JSON (Response)
+	JSON
+
+
+    {
+      "id": string (uuid),
+      ”title”: string (uuid)
+      "message": string,
+      ”createdAt”: date,,
+      “sender”: {
+                         “ImageUrl”: string | null,
+                          “Id”: string (UserId),
+                          “name”: string,
+                          “email”: string,
+                        },
+     },
+	Error
+	- 400 Bad Request (faltan propiedades en el body de la request o no hay destinatarios).
+- 401 Unauthorized (si el usuario no es admin al intentar usar el endpoint)
+- 500 internal server error (si ocurre cualquier otro error)
+	
+
+GET backoffice/massNotifications, para consultar las notificaciones enviadas
+Elemento
+	Detalle
+	Propósito Específico
+	Consultar las notificaciones enviadas
+	Método HTTP
+	GET
+	Request Path
+	/backoffice/massNotifications
+	Headers
+	Authorization: Bearer<accessToken> (token de usuario de admnistrador)
+	Query Parameters
+	Se tienen query parameters de paginación
+   * userId (opcional): string (id de la persona que envió la notificación)
+   * limit (opcional): number (default: 20, max: 50)
+   * page (opcional): number (default: 1)
+   * orderBy (opcional): “createdAt”,
+   * order (opcional): “asc” | “desc” (default: “asc”, dirección de ordenamiento)
+	Response Status
+	200 OK
+	Response Body
+	Retorna un JSON con un objeto que detalla la paginación y una lista de las notificaciones enviadas
+	Esqueleto JSON (Response)
+	JSON
+
+
+{
+  "data": [
+    {
+      "id": string (uuid),
+      ”title”: string (uuid)
+      "message": string,
+      ”createdAt”: date,
+       “sender”: {
+                         “ImageUrl”: string | null,
+                          “Id”: string (UserId),
+                          “name”: string,
+                          “email”: string,
+                        },
+     },
+    {
+      …
+    },
+    …
+  ],
+  "pagination": {
+    "page": number, //ej 1
+    "limit": number, //ej 20
+    "totalCount": number, //ej 35
+    "totalPages": number //ej 2
+  }
+}
+	Error
+	- 400 Bad Request (Errores de validación).
+- 401 Unauthorized (si el usuario no es admin al intentar usar el endpoint)
+- 500 internal server error (si ocurre cualquier otro error)
+	
+
+
+
+
+
+________________
+
+
+
+
+Simulación de Pagos y Kahoot Premium (Backoffice)
+Invariantes
+
+plan: “FREE” o “PREMIUM”
+status: “ACTIVE” o “INACTIVE”
+
+
+1. Como usuario, quiero poder ver el estado de mi membresía actual.
+Elemento
+	Detalle
+	Propósito Específico
+	Obtener el estado de la membresía actual del usuario autenticado.
+	Método HTTP
+	GET
+	Request Path
+	/subscription (Ruta 'singleton' que usa el token para identificar al usuario)
+	Headers
+	Authorization: Bearer {accessToken}
+	Request Body
+	No aplica.
+	Esqueleto JSON (Request)
+	No aplica.
+	Response Status
+	200 OK
+	Response Body (DTO)
+	Retorna el objeto de la suscripción actual del usuario.
+	Esqueleto JSON (Response)
+	{ "userId": "uuid-user-1", "plan": "FREE", "status": "active", "expiresAt": null }
+	Error
+	
+
+401 Unauthorized (Usuario no autenticado).
+	
+
+2. Como usuario, quiero poder "simular" la compra de la membresía Premium.
+
+
+Elemento
+	Detalle
+	Propósito Específico
+	Simula la "compra" o "actualización" a un nuevo plan de membresía.
+	Método HTTP
+	POST
+	Request Path
+	/subscription
+	Headers
+	Authorization: Bearer {accessToken}
+	Request Body
+	Objeto JSON con el ID del plan a "comprar". (camelCase) [cite: 27]
+	Esqueleto JSON (Request)
+	No hace falta
+	Response Status
+	201 Created (Se crea/activa un nuevo estado de suscripción)
+	Response Body (DTO)
+	Retorna el nuevo estado de la suscripción actualizada.
+	Esqueleto JSON (Response)
+	{ "userId": "uuid-user-1", "plan": "PREMIUM", "status": "active", "expiresAt": "2025-12-05T11:35:00.000Z" }
+	Error
+	
+
+401 Unauthorized (Usuario no autenticado).
+	________________
+
+
+3. Como usuario, quiero poder cancelar mi membresía Premium.
+Elemento
+	Detalle
+	Propósito Específico
+	Simula la "cancelación" de la membresía Premium actual, revirtiendo al plan "Gratis" inmediatamente.
+	Método HTTP
+	DELETE
+	Request Path
+	/subscription
+	Headers
+	Authorization: Bearer {accessToken}
+	Request Body
+	No aplica.
+	Esqueleto JSON (Request)
+	No aplica.
+	Response Status
+	200 OK (Devolvemos el nuevo estado "Gratis" para confirmar)
+	Response Body (DTO)
+	Retorna el estado de la suscripción actualizada (ahora "Gratis").
+	Esqueleto JSON (Response)
+	{ "userId": "uuid-user-1", "plan":"FREE", "status": "active", "expiresAt": null }
+	Error
+	401 Unauthorized (Usuario no autenticado).
+404 Not Found (El usuario no tiene una suscripción activa que cancelar).
+	
+
+
+
+[a]2 reacciones en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-04 13:38 p. m.
+José Gabriel Vilchez Porra ha reaccionado con ☑️ a las 2025-12-31 02:42 a. m.
+[b]Agregar "description": groupDescription @jiramirez.22@est.ucab.edu.ve
+[c]@jgvilchez.22@est.ucab.edu.ve
+[d]@jjramirez.22@est.ucab.edu.ve
+[e]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-04 13:38 p. m.
+[f]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-04 13:39 p. m.
+[g]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-04 14:28 p. m.
+[h]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-28 02:02 a. m.
+[i]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-05 00:38 a. m.
+[j]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-04 13:41 p. m.
+[k]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-04 13:41 p. m.
+[l]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-05 04:08 a. m.
+[m]1 reacción en total
+Sergio José Rodríguez García ha reaccionado con ☑️ a las 2025-12-28 05:07 a. m.

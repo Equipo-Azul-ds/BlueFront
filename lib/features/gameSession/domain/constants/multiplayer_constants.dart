@@ -82,4 +82,7 @@ abstract class MultiplayerConstants {
   
   /// Default connection error message.
   static const String errorConnectionDefault = 'Connection error';
+
+  /// Default session not found error message.
+  static const String errorSessionNotFound = 'Session not found';
 }

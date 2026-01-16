@@ -50,6 +50,9 @@ abstract class MultiplayerEvents {
   /// Notificación a los jugadores de que el anfitrión regresó.
   static const String hostReturnedToSession = 'host_returned_to_session';
   
+  /// La sesión solicitada no existe o no está disponible.
+  static const String unavailableSession = 'unnavailable_session';
+  
   /// Error de sincronización fatal del servidor (generalmente cierra la sesión).
   static const String syncError = 'sync_error';
   

@@ -16,6 +16,7 @@ class HostSessionReportBloc extends ChangeNotifier {
 
   /// Carga un informe de sesión dado el sessionId.
   Future<void> loadSessionReport(String sessionId) async {
+    print('🏠 [HostSessionReportBloc] Loading session report - sessionId: $sessionId');
     isLoading = true;
     error = null;
     sessionReport = null;
@@ -24,7 +25,9 @@ class HostSessionReportBloc extends ChangeNotifier {
     try {
       sessionReport = await getSessionReportUseCase(sessionId);
       error = null;
+      print('✅ [HostSessionReportBloc] Session report loaded successfully');
     } catch (e) {
+      print('❌ [HostSessionReportBloc] Error loading session report: $e');
       error = e.toString();
       sessionReport = null;
     } finally {
@@ -35,8 +38,11 @@ class HostSessionReportBloc extends ChangeNotifier {
 
   /// Refresca el informe actual.
   Future<void> refresh() async {
+    print('🔄 [HostSessionReportBloc] Refreshing session report');
     if (sessionReport != null) {
       await loadSessionReport(sessionReport!.sessionId);
+    } else {
+      print('⚠️ [HostSessionReportBloc] No session report to refresh');
     }
   }
 }

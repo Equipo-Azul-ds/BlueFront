@@ -12,13 +12,11 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
   final String baseUrl;
   final http.Client httpClient;
   final FutureOr<String?> Function()? tokenProvider;
-  final String? mockAuthToken;
 
   SinglePlayerGameRepositoryImpl({
     required this.baseUrl,
     http.Client? client,
     this.tokenProvider,
-    this.mockAuthToken,
   }) : httpClient = client ?? http.Client();
 
   void _logRequest(
@@ -65,7 +63,10 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
 
     final token = await _resolveAuthToken();
     if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = token;
+      final authValue = RegExp(r'^bearer ', caseSensitive: false).hasMatch(token)
+          ? token
+          : 'Bearer $token';
+      headers['Authorization'] = authValue;
     }
 
     return headers;
@@ -84,12 +85,6 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
     } catch (e) {
       print('SinglePlayerGameRepositoryImpl -> tokenProvider failed: $e');
     }
-
-    final fallback = mockAuthToken?.trim();
-    if (fallback != null && fallback.isNotEmpty) {
-      return fallback;
-    }
-
     return null;
   }
 

@@ -53,7 +53,9 @@ class MultiplayerSocketClient {
       MultiplayerConstants.headerRole: params.role.toHeaderValue(),
       MultiplayerConstants.headerJwt: sanitizedToken,
     };
-    print('[SOCKET_CONNECT] Auth params to be sent: pin=${params.pin}, role=${params.role.toHeaderValue()}, jwt=$sanitizedToken');
+    print('[SOCKET_AUTH_SETUP] ========== AUTH SETUP PHASE =========');
+    print('[SOCKET_AUTH_SETUP] Auth params to be sent: pin=${params.pin}, role=${params.role.toHeaderValue()}, jwt=${sanitizedToken.substring(0, (sanitizedToken.length / 4).toInt())}...***REDACTED***');
+    print('[SOCKET_AUTH_SETUP] Auth keys: ${auth.keys.join(", ")}');
     final options = io.OptionBuilder()
         .setTransports(MultiplayerConstants.socketTransports)
         .enableForceNew()
@@ -83,24 +85,32 @@ class MultiplayerSocketClient {
     }
 
     socket.onConnect((_) {
-      print('[SOCKET] ✓ CONNECTED to multiplayer-sessions namespace');
+      print('[SOCKET_HANDSHAKE] ✓ CONNECTED to multiplayer-sessions namespace');
+      print('[SOCKET_HANDSHAKE] Handshake complete at ${DateTime.now()}');
+      print('[SOCKET_HANDSHAKE] Socket.connected = ${socket.connected}, Socket.id = ${socket.id}');
+      print('[SOCKET_HANDSHAKE] Auth should now persist for all subsequent events');
       _statusController.add(MultiplayerSocketStatus.connected);
       completeSuccess();
     });
     socket.onDisconnect((_) {
-      print('[SOCKET] ✗ DISCONNECTED from multiplayer-sessions namespace');
+      print('[SOCKET_LIFECYCLE] ✗ DISCONNECTED from multiplayer-sessions namespace at ${DateTime.now()}');
       _statusController.add(MultiplayerSocketStatus.disconnected);
     });
     socket.onReconnect((_) {
-      print('[SOCKET] ↻ RECONNECTED to multiplayer-sessions namespace');
+      print('[SOCKET_LIFECYCLE] ↻ RECONNECTED to multiplayer-sessions namespace at ${DateTime.now()}');
+      print('[SOCKET_LIFECYCLE] WARNING: Reconnection may require re-authentication');
       _statusController.add(MultiplayerSocketStatus.connected);
     });
     socket.onReconnectAttempt((_) {
-      print('[SOCKET] ↻ RECONNECT ATTEMPT...');
+      print('[SOCKET_LIFECYCLE] ↻ RECONNECT ATTEMPT at ${DateTime.now()}...');
       _statusController.add(MultiplayerSocketStatus.connecting);
     });
     void handleConnectError(dynamic error) {
-      print('[SOCKET] ✗ CONNECTION ERROR: $error');
+      print('[SOCKET_ERROR] ✗ CONNECTION ERROR at ${DateTime.now()}: $error');
+      print('[SOCKET_ERROR] Error type: ${error.runtimeType}');
+      if (error is String && error.contains('headers')) {
+        print('[SOCKET_ERROR] ⚠️ AUTH HEADERS ERROR DETECTED - Auth may not have persisted from handshake');
+      }
       _handleError(error);
       try {
         socket.disconnect();
@@ -114,22 +124,30 @@ class MultiplayerSocketClient {
 
     socket.onConnectError(handleConnectError);
     socket.on('connect_timeout', (_) {
+      print('[SOCKET_ERROR] ✗ CONNECT TIMEOUT at ${DateTime.now()}');
       handleConnectError(TimeoutException('Tiempo de conexión agotado.'));
     });
     socket.onError((error) {
-      print('[SOCKET] ✗ SOCKET ERROR: $error');
+      print('[SOCKET_ERROR] ✗ SOCKET ERROR at ${DateTime.now()}: $error');
       _handleError(error);
     });
     socket.onAny((event, data) {
-      print('[SOCKET] ← RECEIVED EVENT: "$event" with data: ${_sanitizeLogData(data)}');
+      print('[SOCKET_EVENT_RX] ← RECEIVED EVENT at ${DateTime.now()}: "$event"');
+      print('[SOCKET_EVENT_RX]    Data: ${_sanitizeLogData(data)}');
+      print('[SOCKET_EVENT_RX]    Socket.connected = ${socket.connected}, Has listeners = ${_eventControllers.containsKey(event)}');
       final controller = _eventControllers[event];
       if (controller != null && !controller.isClosed) {
         controller.add(_normalizePayload(data));
+      } else if (controller == null) {
+        print('[SOCKET_EVENT_RX]    ⚠️ No listener registered for event: $event');
       }
     });
 
     socket.connect();
-    print('[SOCKET] → CONNECTING to $_baseUrl/multiplayer-sessions with auth: {pin, role, jwt}');
+    print('[SOCKET_HANDSHAKE] ========== HANDSHAKE PHASE START =========');
+    print('[SOCKET_HANDSHAKE] Connecting to $_baseUrl/multiplayer-sessions');
+    print('[SOCKET_HANDSHAKE] Time: ${DateTime.now()}');
+    print('[SOCKET_HANDSHAKE] Auth attached: yes (via .setAuth())');
     timeoutTimer = Timer(const Duration(seconds: 10), () {
       handleConnectError(TimeoutException('Tiempo de conexión agotado.'));
     });
@@ -164,11 +182,20 @@ class MultiplayerSocketClient {
   /// Emite un evento del cliente con payload opcional.
   void emit(String eventName, [dynamic payload]) {
     if (_socket == null) {
-      print('[SOCKET] ✗ CANNOT EMIT "$eventName": socket not connected');
+      print('[SOCKET_EMIT] ✗ CANNOT EMIT "$eventName": socket is null');
       throw StateError('Socket is not connected. Unable to emit "$eventName".');
     }
-    print('[SOCKET] → EMIT EVENT: "$eventName" with payload: ${_sanitizeLogData(payload)}');
+    if (!(_socket?.connected ?? false)) {
+      print('[SOCKET_EMIT] ✗ CANNOT EMIT "$eventName": socket.connected = false');
+      throw StateError('Socket is not connected. Unable to emit "$eventName".');
+    }
+    print('[SOCKET_EMIT] ========== EVENT EMISSION =========');
+    print('[SOCKET_EMIT] → EMIT "$eventName" at ${DateTime.now()}');
+    print('[SOCKET_EMIT]    Socket.connected = ${_socket!.connected}, Socket.id = ${_socket!.id}');
+    print('[SOCKET_EMIT]    Payload: ${_sanitizeLogData(payload)}');
+    print('[SOCKET_EMIT]    Auth should persist from handshake - server should have cached credentials');
     _socket!.emit(eventName, payload);
+    print('[SOCKET_EMIT]    Emission complete');
   }
 
   /// Libera todos los controllers y desconecta el socket subyacente.

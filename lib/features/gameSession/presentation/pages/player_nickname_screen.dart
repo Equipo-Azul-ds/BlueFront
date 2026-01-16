@@ -69,6 +69,13 @@ class _PlayerNicknameScreenState extends State<PlayerNicknameScreen> {
     try {
       final controller = context.read<MultiplayerSessionController>();
 
+      // Verifica que el socket siga conectado
+      if (!controller.isSocketConnected) {
+        throw StateError(
+          'Connection lost. Please return to join screen and try again.',
+        );
+      }
+
       // Emitir evento player_join con el nuevo apodo
       await controller.joinLobbyWithNickname(nickname: nickname.trim());
 

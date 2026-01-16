@@ -1,3 +1,5 @@
+import 'multiplayer_session_dtos.dart';
+
 /// Estado del lobby para el anfitrión (lista de jugadores conectados y fase).
 class HostLobbyUpdateEvent {
   HostLobbyUpdateEvent({required this.state, required this.players, this.numberOfPlayers});
@@ -44,22 +46,30 @@ class PlayerConnectedEvent {
 }
 
 /// Snapshot de inicio de pregunta: slide actual + tiempo restante opcional.
+/// 
+/// **Optional Fields (only sent during reconnection):**
+/// - `timeRemainingMs`: Sent when client reconnects mid-question to display accurate countdown
+/// - `hasAnswered`: Sent when client reconnects mid-question to prevent duplicate answers
+/// - `theme`: Sent on reconnect to restore background image context
 class QuestionStartedEvent {
-  QuestionStartedEvent({required this.state, required this.slide, this.timeRemainingMs, this.hasAnswered});
+  QuestionStartedEvent({required this.state, required this.slide, this.timeRemainingMs, this.hasAnswered, this.theme});
 
   final String state;
   final SlideData slide;
   final int? timeRemainingMs;
   final bool? hasAnswered;
+  final SessionThemeDto? theme;
 
   factory QuestionStartedEvent.fromJson(Map<String, dynamic> json) {
     final slideData = json['currentSlideData'];
     final slide = SlideData.fromJson(slideData is Map ? _asMap(slideData) : const <String, dynamic>{});
+    final themeData = json['theme'];
     return QuestionStartedEvent(
       state: _string(json['state'], fallback: 'question'),
       slide: slide,
       timeRemainingMs: _int(json['timeRemainingMs']),
       hasAnswered: _bool(json['hasAnswered']),
+      theme: themeData is Map ? SessionThemeDto.fromJson(_asMap(themeData)) : null,
     );
   }
 }
@@ -86,8 +96,22 @@ class HostResultsEvent {
 }
 
 /// Resultados de la pregunta para un jugador (puntos, posición, streak).
+/// 
+/// **Optional Fields (only sent during reconnection):**
+/// - `theme`: Sent on reconnect to restore background image context
 class PlayerResultsEvent {
-  PlayerResultsEvent({required this.isCorrect, required this.pointsEarned, required this.totalScore, required this.rank, required this.previousRank, required this.streak, required this.correctAnswerIds, required this.progress, required this.message});
+  PlayerResultsEvent({
+    required this.isCorrect,
+    required this.pointsEarned,
+    required this.totalScore,
+    required this.rank,
+    required this.previousRank,
+    required this.streak,
+    required this.correctAnswerIds,
+    required this.progress,
+    required this.message,
+    this.theme,
+  });
 
   final bool isCorrect;
   final int pointsEarned;
@@ -98,8 +122,10 @@ class PlayerResultsEvent {
   final List<String> correctAnswerIds;
   final ProgressInfo progress;
   final String message;
+  final SessionThemeDto? theme;
 
   factory PlayerResultsEvent.fromJson(Map<String, dynamic> json) {
+    final themeData = json['theme'];
     return PlayerResultsEvent(
       isCorrect: _bool(json['isCorrect']) ?? false,
       pointsEarned: _int(json['pointsEarned']) ?? 0,
@@ -110,6 +136,7 @@ class PlayerResultsEvent {
       correctAnswerIds: _stringList(json['correctAnswerIds']) ?? const <String>[],
       progress: ProgressInfo.fromJson(json['progress'] is Map ? _asMap(json['progress']) : const <String, dynamic>{}),
       message: _string(json['message'], fallback: ''),
+      theme: themeData is Map ? SessionThemeDto.fromJson(_asMap(themeData)) : null,
     );
   }
 }
@@ -138,6 +165,10 @@ class HostGameEndEvent {
 }
 
 /// Resumen final para un jugador al cerrar la partida.
+/// 
+/// **Optional Fields:**
+/// - `theme`: Sent on reconnect to restore background image context
+/// - `finalPodium`: Top-3 players for podium display (may be empty if backend doesn't send it)
 class PlayerGameEndEvent {
   PlayerGameEndEvent({
     required this.state,
@@ -150,6 +181,7 @@ class PlayerGameEndEvent {
     required this.correctAnswers,
     required this.answers,
     required this.finalPodium,
+    this.theme,
   });
 
   final String state;
@@ -163,6 +195,7 @@ class PlayerGameEndEvent {
   final List<PlayerAnswerSummary> answers;
   /// Top-3 players for podium display. May be empty if backend doesn't send it.
   final List<LeaderboardEntry> finalPodium;
+  final SessionThemeDto? theme;
 
   factory PlayerGameEndEvent.fromJson(Map<String, dynamic> json) {
     final answers = _parseAnswerSummaries(json);
@@ -180,6 +213,8 @@ class PlayerGameEndEvent {
           json['correct'],
         ) ??
         inferredCorrect;
+    
+    final themeData = json['theme'];
 
     return PlayerGameEndEvent(
       state: _string(json['state'], fallback: 'end'),
@@ -192,6 +227,7 @@ class PlayerGameEndEvent {
       correctAnswers: correctAnswers,
       answers: List.unmodifiable(_fillAnswerGaps(answers, totalQuestions)),
       finalPodium: _parseList(json['finalPodium'], (map) => LeaderboardEntry.fromJson(map)),
+      theme: themeData is Map ? SessionThemeDto.fromJson(_asMap(themeData)) : null,
     );
   }
 }
@@ -321,6 +357,17 @@ class GameErrorEvent {
       code: _nullableString(json['code']),
       message: _nullableString(json['message']),
     );
+  }
+}
+
+/// Sesión no disponible: no existe o no se encontró.
+class UnavailableSessionEvent {
+  UnavailableSessionEvent({required this.message});
+
+  final String? message;
+
+  factory UnavailableSessionEvent.fromJson(Map<String, dynamic> json) {
+    return UnavailableSessionEvent(message: _nullableString(json['message']));
   }
 }
 
