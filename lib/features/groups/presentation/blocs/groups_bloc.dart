@@ -4,14 +4,21 @@ import '../../domain/entities/Group.dart';
 import '../../domain/entities/GroupMember.dart';
 import '../../domain/entities/GroupInvitationToken.dart';
 import '../../domain/entities/GroupQuizAssignment.dart';
+import '../../domain/entities/GroupLeaderboardEntry.dart';
 import '../../domain/repositories/GroupRepository.dart';
 import '../../../user/presentation/blocs/auth_bloc.dart';
 
 class GroupsBloc extends ChangeNotifier {
   final GroupRepository repository;
   final AuthBloc auth;
+  // Repo de usuarios para resolver nombres si el endpoint de grupos no los retorna
+  final dynamic userRepository; 
 
-  GroupsBloc({required this.repository, required this.auth});
+  GroupsBloc({
+    required this.repository, 
+    required this.auth,
+    this.userRepository,
+  });
 
   bool _loading = false;
   String? _error;
@@ -53,13 +60,36 @@ class GroupsBloc extends ChangeNotifier {
 
   Future<Group?> refreshGroup(String groupId) async {
     try {
-      final grp = await repository.getGroupDetail(groupId);
-      _groups = _groups.map((g) => g.id == groupId ? grp : g).toList();
+      var fresh = await repository.getGroupDetail(groupId);
+      
+      // Combinar con datos existentes para no perder info de la vista de lista (roles, contadores)
+      // si el endpoint de detalle no los retorna.
+      final idx = _groups.indexWhere((g) => g.id == groupId);
+      if (idx != -1) {
+        final existing = _groups[idx];
+        String? role = fresh.currentUserRole ?? existing.currentUserRole;
+        int? countSnapshot;
+        
+        // Si no vienen miembros y el conteo es 0, preservar el conteo del snapshot anterior
+        if (fresh.members.isEmpty && fresh.memberCount == 0 && existing.memberCount > 0) {
+          countSnapshot = existing.memberCount;
+        }
+        
+        fresh = fresh.copyWith(
+          userRoleSnapshot: role, 
+          memberCountSnapshot: countSnapshot
+        );
+      }
+
+      _groups = _groups.map((g) => g.id == groupId ? fresh : g).toList();
       notifyListeners();
-      return grp;
+      return fresh;
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      if (kDebugMode) {
+         print('[GroupsBloc] refreshGroup failed for $groupId: $e');
+      }
+      // No setear _error global para no afectar la lista principal
+      // No eliminar el grupo automáticamente si falla la carga de detalles (resiliencia)
       return null;
     }
   }
@@ -102,6 +132,12 @@ class GroupsBloc extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteGroup(String groupId) async {
+    await repository.deleteGroup(groupId);
+    _groups = _groups.where((g) => g.id != groupId).toList();
+    notifyListeners();
+  }
+
   Future<List<GroupQuizAssignment>> loadGroupAssignments(String groupId) async {
     final list = await repository.getGroupAssignments(groupId);
     if (kDebugMode) {
@@ -126,12 +162,37 @@ class GroupsBloc extends ChangeNotifier {
 
   Future<List<GroupMember>?> getMembers(String groupId) async {
     try {
-      final members = await repository.getGroupMembers(groupId);
+      final membersRaw = await repository.getGroupMembers(groupId);
+      
+      // Enriquecer con nombres si faltan y tenemos el repo
+      List<GroupMember> finalMembers = [];
+      if (userRepository != null) {
+        // Obtenemos los usuarios uno por uno (limitación actual del backend)
+        // Optimizacion: intentar getOneById
+        final futures = membersRaw.map((m) async {
+          if (m.userName.isNotEmpty) return m; // Ya tiene nombre
+          try {
+             // Asumimos que userRepository es UserRepository
+             // importamos '../../user/domain/repositories/UserRepository.dart'; idealmente
+             // Como es dynamic, usamos invocación dinámica o casteamos si importáramos
+             final user = await (userRepository).getOneById(m.userId);
+             if (user != null) {
+               final name = user.userName.isNotEmpty ? user.userName : user.email;
+               return m.copyWith(userName: name);
+             }
+          } catch (_) {}
+          return m;
+        });
+        finalMembers = await Future.wait(futures);
+      } else {
+        finalMembers = membersRaw;
+      }
+
       _groups = _groups
-          .map((g) => g.id == groupId ? g.copyWith(members: members) : g)
+          .map((g) => g.id == groupId ? g.copyWith(members: finalMembers) : g)
           .toList();
       notifyListeners();
-      return members;
+      return finalMembers;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
@@ -154,19 +215,45 @@ class GroupsBloc extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> assignQuiz({
+    required String groupId,
+    required String quizId,
+    required DateTime availableFrom,
+    required DateTime availableUntil,
+  }) async {
+    await repository.assignQuizToGroup(
+      groupId: groupId,
+      quizId: quizId,
+      availableFrom: availableFrom,
+      availableUntil: availableUntil,
+    );
+    // Recargar asignaciones para actualizar la lista en UI
+    await loadGroupAssignments(groupId);
+  }
+
+  Future<List<GroupLeaderboardEntry>> getLeaderboard(String groupId) async {
+    return await repository.getGroupLeaderboard(groupId);
+  }
+
   List<Group> joinedGroups() {
     final userId = _currentUserId;
-    if (userId == null) return _groups;
-    return _groups.where((g) => g.members.any((m) => m.userId == userId)).toList();
+    if (userId == null) return []; 
+    // En la vista resumen /groups, asumimos que todos los grupos en _groups pertenecen al usuario.
+    // Filtrar los que NO administra.
+    return _groups.where((g) => !g.isAdmin(userId)).toList();
   }
 
   List<Group> ownedGroups() {
     final userId = _currentUserId;
     if (userId == null) return [];
-    return _groups.where((g) => g.adminId == userId).toList();
+    // Filtrar los que SÍ administra.
+    return _groups.where((g) => g.isAdmin(userId)).toList();
   }
 
-  bool isCurrentUserAdmin(Group group) => group.adminId == _currentUserId;
+  bool isCurrentUserAdmin(Group group) {
+    final uid = _currentUserId;
+    return uid != null && group.isAdmin(uid);
+  }
 
   GroupMember? findMember(Group group, String userId) {
     for (final m in group.members) {

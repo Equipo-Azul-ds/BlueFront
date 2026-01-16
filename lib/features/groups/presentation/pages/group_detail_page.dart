@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/entities/Group.dart';
+import '../../domain/entities/GroupLeaderboardEntry.dart';
 import '../../presentation/blocs/groups_bloc.dart';
 import 'group_members_page.dart';
 import '../../../user/presentation/blocs/auth_bloc.dart';
@@ -28,6 +29,7 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   bool _inviteLoading = false;
   Future<void>? _assignmentsFuture;
   bool _assignmentsFetched = false;
+  Future<List<GroupLeaderboardEntry>>? _leaderboardFuture;
 
   @override
   void initState() {
@@ -46,15 +48,25 @@ class _GroupDetailPageState extends State<GroupDetailPage>
       return;
     }
     final bloc = context.read<GroupsBloc>();
-    final refreshed = await bloc.refreshGroup(groupId);
+    
+    // 1. Obtener versión local primero (Optimistic UI)
     Group? existing;
     try {
       existing = bloc.groups.firstWhere((g) => g.id == groupId);
     } catch (_) {}
-    setState(() {
-      _group = refreshed ?? existing;
-      _loading = false;
-    });
+
+    // 2. Intentar refrescar desde la red
+    final refreshed = await bloc.refreshGroup(groupId);
+    
+    if (mounted) {
+      setState(() {
+        _group = refreshed ?? existing;
+        _loading = false;
+        if (_group == null) {
+          _error = 'No se pudo cargar la información del grupo';
+        }
+      });
+    }
   }
 
   @override
@@ -101,17 +113,58 @@ class _GroupDetailPageState extends State<GroupDetailPage>
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.black87),
             onSelected: (value) async {
-              if (value == 'leave' && group != null) {
-                await bloc.leaveGroup(group.id);
-                if (mounted) Navigator.pop(context);
+              if (group == null) return;
+              if (value == 'leave') {
+                 // Confirmar salir
+                 final confirm = await showDialog<bool>(
+                   context: context,
+                   builder: (ctx) => AlertDialog(
+                     title: const Text('Salir del grupo'),
+                     content: const Text('¿Estás seguro de salir? No podrás volver a entrar sin invitación.'),
+                     actions: [
+                       TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+                       TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Salir', style: TextStyle(color: Colors.red))),
+                     ],
+                   ),
+                 );
+                 if (confirm == true) {
+                    await bloc.leaveGroup(group.id);
+                    if (mounted) Navigator.pop(context);
+                 }
+              }
+              if (value == 'delete') {
+                _confirmDeleteGroup(bloc, group);
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem<String>(
-                value: 'leave',
-                child: Text('Salir del grupo'),
-              ),
-            ],
+            itemBuilder: (context) {
+              if (isAdmin) {
+                return [
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_forever, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Eliminar grupo', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ];
+              } else {
+                return [
+                  const PopupMenuItem<String>(
+                    value: 'leave',
+                    child: Row(
+                      children: [
+                        Icon(Icons.exit_to_app, color: Colors.black87),
+                        SizedBox(width: 8),
+                        Text('Salir del grupo'),
+                      ],
+                    ),
+                  ),
+                ];
+              }
+            },
           ),
         ],
         bottom: TabBar(
@@ -125,7 +178,7 @@ class _GroupDetailPageState extends State<GroupDetailPage>
         ),
       ),
       body: _buildBody(bloc),
-      floatingActionButton: (group != null && _isCurrentUserMember(context, group))
+      floatingActionButton: (group != null && isAdmin)
           ? FloatingActionButton.extended(
               onPressed: () => _showAssignQuizDialog(bloc, group),
               icon: const Icon(Icons.assignment_add),
@@ -156,7 +209,9 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   bool _isCurrentUserAdmin(BuildContext context, Group? group) {
     if (group == null) return false;
     final auth = context.read<AuthBloc>();
-    return auth.currentUser?.id == group.adminId;
+    final userId = auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) return false;
+    return group.isAdmin(userId);
   }
 
   bool _isCurrentUserMember(BuildContext context, Group? group) {
@@ -170,17 +225,20 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   String _adminDisplayName(BuildContext context, Group group) {
     final auth = context.read<AuthBloc>();
     final current = auth.currentUser;
-    if (current != null && current.id == group.adminId) {
-      return current.userName.isNotEmpty ? current.userName : (current.email.isNotEmpty ? current.email : group.adminId);
+    // Si somos admin (por rol o id), mostramos nuestro nombre
+    if (current != null && group.isAdmin(current.id)) {
+      return current.userName.isNotEmpty ? current.userName : (current.email.isNotEmpty ? current.email : 'Tú');
     }
-    return group.adminId;
+    // Si no, fallback al adminId
+    return group.adminId.isNotEmpty ? group.adminId : 'Admin';
   }
 
   Widget _activityTab(Group group, String adminLabel) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _infoRow('Miembros', '${group.members.length}'),
+        // Usar memberCount para respetar el snapshot del listado
+        _infoRow('Miembros', '${group.memberCount}'),
         const SizedBox(height: 8),
         _infoRow('Admin', adminLabel),
         if ((group.description ?? '').isNotEmpty) ...[
@@ -191,12 +249,74 @@ class _GroupDetailPageState extends State<GroupDetailPage>
         if (_invite != null)
           _inviteCard(_invite!),
         const SizedBox(height: 24),
-        _placeholderCard(
-          title: 'Sin actividad todavía',
-          message: 'Comparte algo en el grupo para comenzar el feed.',
-          icon: Icons.chat_bubble_outline,
-        ),
+        const Text('Ranking Grupal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        _leaderboardSection(group),
       ],
+    );
+  }
+
+  Widget _leaderboardSection(Group group) {
+    // Lazy load del leaderboard
+    _leaderboardFuture ??= context.read<GroupsBloc>().getLeaderboard(group.id);
+
+    return FutureBuilder<List<GroupLeaderboardEntry>>(
+      future: _leaderboardFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+           return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error cargando ranking: ${snapshot.error}'));
+        }
+        final list = snapshot.data ?? [];
+        if (list.isEmpty) {
+          return _placeholderCard(
+            title: 'Sin ranking aún',
+            message: 'Nadie ha completado quizzes todavía.',
+            icon: Icons.emoji_events_outlined,
+          );
+        }
+
+        return Column(
+          children: list.map((entry) {
+             final isTop3 = entry.position <= 3;
+             final color = entry.position == 1 
+                 ? const Color(0xFFFFD700) 
+                 : entry.position == 2 
+                     ? const Color(0xFFC0C0C0) 
+                     : entry.position == 3 
+                         ? const Color(0xFFCD7F32) 
+                         : Colors.grey.shade400;
+             
+             return Card(
+               margin: const EdgeInsets.only(bottom: 8),
+               child: ListTile(
+                 leading: CircleAvatar(
+                   backgroundColor: color.withOpacity(0.2),
+                   child: Text(
+                     '#${entry.position}',
+                     style: TextStyle(fontWeight: FontWeight.bold, color: color.withOpacity(1.0)),
+                   ),
+                 ),
+                 title: Text(entry.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                 subtitle: Text('${entry.completedQuizzes} quizzes completados'),
+                 trailing: Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                   decoration: BoxDecoration(
+                     color: Colors.blue.shade50,
+                     borderRadius: BorderRadius.circular(20),
+                   ),
+                   child: Text(
+                     '${entry.totalPoints} pts',
+                     style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                   ),
+                 ),
+               ),
+             );
+          }).toList(),
+        );
+      },
     );
   }
 
@@ -327,25 +447,35 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   Future<void> _showEditGroupDialog(GroupsBloc bloc, Group group) async {
     final nameCtrl = TextEditingController(text: group.name);
     final descCtrl = TextEditingController(text: group.description ?? '');
-    final result = await showDialog<bool>(
+
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Editar grupo'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                decoration: const InputDecoration(labelText: 'Descripción', border: OutlineInputBorder()),
-                maxLines: 3,
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del grupo',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -361,22 +491,82 @@ class _GroupDetailPageState extends State<GroupDetailPage>
       },
     );
 
-    if (result == true) {
+    if (confirmed == true) {
       final newName = nameCtrl.text.trim();
       final newDesc = descCtrl.text.trim();
-      try {
-        await bloc.updateGroupInfo(groupId: group.id, name: newName.isEmpty ? null : newName, description: newDesc.isEmpty ? null : newDesc);
-        // Refrescar local
-        final updated = await bloc.refreshGroup(group.id);
-        setState(() {
-          _group = updated ?? _group?.copyWith(name: newName.isNotEmpty ? newName : _group!.name, description: newDesc.isNotEmpty ? newDesc : _group!.description);
-        });
+
+      if (newName.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Grupo actualizado')));
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('El nombre no puede estar vacío')),
+           );
+        }
+        return;
+      }
+      
+      setState(() => _loading = true); // Bloquear UI mientras guarda
+      
+      try {
+        await bloc.updateGroupInfo(
+            groupId: group.id,
+            name: newName,
+            description: newDesc
+        );
+        setState(() => _loading = false);
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('Grupo actualizado')),
+           );
+           // Recargar para refrescar campos
+           _load(); 
         }
       } catch (e) {
+        setState(() => _loading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo actualizar: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al actualizar: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteGroup(GroupsBloc bloc, Group group) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar grupo'),
+        content: const Text(
+          '¿Estás seguro de que quieres eliminar este grupo permanentemente?\n\n'
+          'Esta acción no se puede deshacer y se perderán todos los datos y asignaciones asociadas.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _loading = true);
+      try {
+        await bloc.deleteGroup(group.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Grupo eliminado exitosamente')),
+          );
+          Navigator.pop(context); // Volver a la lista
+        }
+      } catch (e) {
+        setState(() => _loading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar: $e')),
+          );
         }
       }
     }
@@ -414,7 +604,7 @@ class _GroupDetailPageState extends State<GroupDetailPage>
                   icon: Icons.task_outlined,
                 ),
                 const SizedBox(height: 12),
-                if (_isCurrentUserMember(context, group))
+                if (_isCurrentUserAdmin(context, group))
                   ElevatedButton.icon(
                     onPressed: () => _showAssignQuizDialog(context.read<GroupsBloc>(), group),
                     icon: const Icon(Icons.assignment_add),
@@ -433,26 +623,102 @@ class _GroupDetailPageState extends State<GroupDetailPage>
             final a = assignments[i];
             final availableUntilStr = _fmt(a.availableUntil.toLocal());
             final availableFromStr = _fmt(a.availableFrom.toLocal());
-            final title = a.quizTitle.isNotEmpty ? a.quizTitle : a.quizId;
+            final title = a.quizTitle.isNotEmpty ? a.quizTitle : 'Quiz pendiente de título';
+            final isCompleted = a.isCompleted;
+            
             return Card(
+              color: Colors.white,
+              elevation: 2,
+              margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Asignación de Quiz', style: TextStyle(fontWeight: FontWeight.w700)),
-                        Icon(a.isActive ? Icons.check_circle : Icons.cancel, color: a.isActive ? Colors.green : Colors.red, size: 18),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F0FE),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.assignment, color: Color(0xFF1F4B99)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.black87
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isCompleted ? Colors.green.shade50 : Colors.orange.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: isCompleted ? Colors.green.shade200 : Colors.orange.shade200,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      isCompleted ? 'Completado' : 'Pendiente',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isCompleted ? Colors.green.shade700 : Colors.orange.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isCompleted && a.attemptScore != null) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Puntaje: ${a.attemptScore}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text('Quiz: $title', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 14, color: Colors.black54),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Disponible: $availableFromStr',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 4),
-                    Text('Disponible desde: $availableFromStr', style: const TextStyle(color: Colors.black54, fontSize: 12)),
-                    Text('Disponible hasta: $availableUntilStr', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                    Row(
+                      children: [
+                        const Icon(Icons.event_busy, size: 14, color: Colors.black54),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Cierra: $availableUntilStr',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -529,9 +795,11 @@ class _GroupDetailPageState extends State<GroupDetailPage>
       return;
     }
 
-    Quiz? selected;
-    DateTime? selectedDate;
-    TimeOfDay? selectedTime;
+    Quiz? selectedQuiz;
+    DateTime? startDate;
+    TimeOfDay? startTime;
+    DateTime? endDate;
+    TimeOfDay? endTime;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -565,46 +833,88 @@ class _GroupDetailPageState extends State<GroupDetailPage>
                                 ),
                               ))
                           .toList(),
-                      onChanged: (q) => setState(() => selected = q),
-                      value: selected,
+                      onChanged: (val) { 
+                        setState(() {
+                          selectedQuiz = val;
+                        });
+                      },
+                      value: selectedQuiz,
                     ),
                     const SizedBox(height: 14),
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                      leading: const Icon(Icons.calendar_today),
-                      title: Text(
-                        selectedDate == null
-                            ? 'Elegir fecha límite'
-                            : 'Fecha: ${selectedDate!.toLocal().toString().split(' ').first}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: const Text('Hasta cuándo estará disponible'),
-                      onTap: () async {
-                        final now = DateTime.now();
-                        final picked = await showDatePicker(
-                          context: ctx,
-                          initialDate: selectedDate ?? now,
-                          firstDate: now,
-                          lastDate: DateTime(now.year + 5),
-                        );
-                        if (picked != null) setState(() => selectedDate = picked);
-                      },
+                    const Text('Disponible desde:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                initialDate: startDate ?? now,
+                                firstDate: now,
+                                lastDate: DateTime(now.year + 5),
+                              );
+                              if (picked != null) setState(() => startDate = picked);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Fecha Inicio'),
+                              child: Text(startDate == null ? '-' : startDate!.toLocal().toString().split(' ').first),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final now = TimeOfDay.now();
+                              final picked = await showTimePicker(context: ctx, initialTime: startTime ?? now);
+                              if (picked != null) setState(() => startTime = picked);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Hora Inicio'),
+                              child: Text(startTime == null ? '-' : startTime!.format(ctx)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                      leading: const Icon(Icons.access_time),
-                      title: Text(
-                        selectedTime == null
-                            ? 'Elegir hora límite'
-                            : 'Hora: ${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: const Text('Hora exacta de cierre'),
-                      onTap: () async {
-                        final now = TimeOfDay.now();
-                        final picked = await showTimePicker(context: ctx, initialTime: selectedTime ?? now);
-                        if (picked != null) setState(() => selectedTime = picked);
-                      },
+                    const SizedBox(height: 12),
+                    const Text('Disponible hasta:', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: ctx,
+                                initialDate: endDate ?? now,
+                                firstDate: now,
+                                lastDate: DateTime(now.year + 5),
+                              );
+                              if (picked != null) setState(() => endDate = picked);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Fecha Fin'),
+                              child: Text(endDate == null ? '-' : endDate!.toLocal().toString().split(' ').first),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () async {
+                              final now = TimeOfDay.now();
+                              final picked = await showTimePicker(context: ctx, initialTime: endTime ?? now);
+                              if (picked != null) setState(() => endTime = picked);
+                            },
+                            child: InputDecorator(
+                              decoration: const InputDecoration(labelText: 'Hora Fin'),
+                              child: Text(endTime == null ? '-' : endTime!.format(ctx)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -621,40 +931,50 @@ class _GroupDetailPageState extends State<GroupDetailPage>
 
     if (confirmed != true) return;
 
-    if (selected == null || selectedDate == null || selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona quiz, fecha y hora')));
+    if (selectedQuiz == null || startDate == null || startTime == null || endDate == null || endTime == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor completa todos los campos de fecha y hora.')));
+      }
       return;
     }
 
-    final availableUntilLocal = DateTime(
-      selectedDate!.year,
-      selectedDate!.month,
-      selectedDate!.day,
-      selectedTime!.hour,
-      selectedTime!.minute,
+    final startDateTime = DateTime(
+      startDate!.year, startDate!.month, startDate!.day,
+      startTime!.hour, startTime!.minute,
     );
-    final availableUntilUtc = availableUntilLocal.toUtc();
+    
+    final endDateTime = DateTime(
+      endDate!.year, endDate!.month, endDate!.day,
+      endTime!.hour, endTime!.minute,
+    );
+
+    if (endDateTime.isBefore(startDateTime)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('La fecha de fin debe ser posterior a la de inicio.')));
+      }
+      return;
+    }
 
     try {
-      final assignment = await bloc.repository.assignQuizToGroup(
+      await bloc.assignQuiz(
         groupId: group.id,
-        quizId: selected!.quizId,
-        availableUntil: availableUntilUtc,
+        quizId: selectedQuiz!.quizId,
+        availableFrom: startDateTime.toUtc(),
+        availableUntil: endDateTime.toUtc(),
       );
-      // Refrescar grupo para ver la asignación
-      final refreshed = await bloc.refreshGroup(group.id);
-      setState(() {
-        final currentAssignments = (refreshed ?? _group)?.quizAssignments ?? [];
-        final merged = [...currentAssignments, assignment];
-        _group = (refreshed ?? _group)?.copyWith(quizAssignments: merged) ?? _group;
-        _assignmentsFetched = false; // allow future reload if needed
-        _assignmentsFuture = null;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Quiz asignado hasta ${assignment.availableUntil.toLocal()}')),
-      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz asignado exitosamente')));
+        // Forzar recarga de asignaciones
+        await _ensureAssignmentsLoaded(bloc); 
+        setState(() {
+          _assignmentsFetched = false;
+        });
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo asignar: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo asignar: $e')));
+      }
     }
   }
 
