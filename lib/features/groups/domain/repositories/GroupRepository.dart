@@ -2,6 +2,7 @@ import '../entities/Group.dart';
 import '../entities/GroupMember.dart';
 import '../entities/GroupInvitationToken.dart';
 import '../entities/GroupQuizAssignment.dart';
+import '../entities/GroupLeaderboardEntry.dart';
 
 abstract class GroupRepository {
   /// Obtiene un grupo por id; devuelve null si no existe.
@@ -34,4 +35,5 @@ abstract class GroupRepository {
     required DateTime availableUntil,
   });
   Future<List<GroupQuizAssignment>> getGroupAssignments(String groupId);
+  Future<List<GroupLeaderboardEntry>> getGroupLeaderboard(String groupId);
 }

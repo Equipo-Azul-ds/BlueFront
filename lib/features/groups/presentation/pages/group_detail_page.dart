@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../domain/entities/Group.dart';
+import '../../domain/entities/GroupLeaderboardEntry.dart';
 import '../../presentation/blocs/groups_bloc.dart';
 import 'group_members_page.dart';
 import '../../../user/presentation/blocs/auth_bloc.dart';
@@ -28,6 +29,7 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   bool _inviteLoading = false;
   Future<void>? _assignmentsFuture;
   bool _assignmentsFetched = false;
+  Future<List<GroupLeaderboardEntry>>? _leaderboardFuture;
 
   @override
   void initState() {
@@ -247,12 +249,74 @@ class _GroupDetailPageState extends State<GroupDetailPage>
         if (_invite != null)
           _inviteCard(_invite!),
         const SizedBox(height: 24),
-        _placeholderCard(
-          title: 'Sin actividad todavía',
-          message: 'Comparte algo en el grupo para comenzar el feed.',
-          icon: Icons.chat_bubble_outline,
-        ),
+        const Text('Ranking Grupal', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 12),
+        _leaderboardSection(group),
       ],
+    );
+  }
+
+  Widget _leaderboardSection(Group group) {
+    // Lazy load del leaderboard
+    _leaderboardFuture ??= context.read<GroupsBloc>().getLeaderboard(group.id);
+
+    return FutureBuilder<List<GroupLeaderboardEntry>>(
+      future: _leaderboardFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+           return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error cargando ranking: ${snapshot.error}'));
+        }
+        final list = snapshot.data ?? [];
+        if (list.isEmpty) {
+          return _placeholderCard(
+            title: 'Sin ranking aún',
+            message: 'Nadie ha completado quizzes todavía.',
+            icon: Icons.emoji_events_outlined,
+          );
+        }
+
+        return Column(
+          children: list.map((entry) {
+             final isTop3 = entry.position <= 3;
+             final color = entry.position == 1 
+                 ? const Color(0xFFFFD700) 
+                 : entry.position == 2 
+                     ? const Color(0xFFC0C0C0) 
+                     : entry.position == 3 
+                         ? const Color(0xFFCD7F32) 
+                         : Colors.grey.shade400;
+             
+             return Card(
+               margin: const EdgeInsets.only(bottom: 8),
+               child: ListTile(
+                 leading: CircleAvatar(
+                   backgroundColor: color.withOpacity(0.2),
+                   child: Text(
+                     '#${entry.position}',
+                     style: TextStyle(fontWeight: FontWeight.bold, color: color.withOpacity(1.0)),
+                   ),
+                 ),
+                 title: Text(entry.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                 subtitle: Text('${entry.completedQuizzes} quizzes completados'),
+                 trailing: Container(
+                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                   decoration: BoxDecoration(
+                     color: Colors.blue.shade50,
+                     borderRadius: BorderRadius.circular(20),
+                   ),
+                   child: Text(
+                     '${entry.totalPoints} pts',
+                     style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue.shade800),
+                   ),
+                 ),
+               ),
+             );
+          }).toList(),
+        );
+      },
     );
   }
 

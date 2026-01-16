@@ -6,6 +6,7 @@ import '../../domain/entities/Group.dart';
 import '../../domain/entities/GroupInvitationToken.dart';
 import '../../domain/entities/GroupMember.dart';
 import '../../domain/entities/GroupQuizAssignment.dart';
+import '../../domain/entities/GroupLeaderboardEntry.dart';
 import '../../domain/repositories/GroupRepository.dart';
 
 /// Provides HTTP headers (Authorization, etc.) at call time.
@@ -282,6 +283,26 @@ class GroupRepositoryImpl implements GroupRepository {
       print('[groups] getGroupAssignments -> parsed ${parsed.length} assignments');
     } catch (_) {}
     return parsed;
+  }
+
+  Future<List<GroupLeaderboardEntry>> getGroupLeaderboard(String groupId) async {
+    final uri = Uri.parse('$_base/groups/$groupId/leaderboard');
+    final res = await _get(uri);
+    try {
+      // ignore: avoid_print
+      print('[groups] getGroupLeaderboard <- status=${res.statusCode} body=${res.body}');
+    } catch (_) {}
+    _ensureSuccess(res, {200});
+    final decoded = jsonDecode(res.body);
+    List<dynamic> list;
+    if (decoded is List) {
+      list = decoded;
+    } else if (decoded is Map<String, dynamic>) {
+       list = (decoded['data'] ?? decoded['items'] ?? []) as List? ?? [];
+    } else {
+      list = [];
+    }
+    return list.map((e) => GroupLeaderboardEntry.fromJson(e)).toList();
   }
 
   // --- HTTP helpers ---------------------------------------------------

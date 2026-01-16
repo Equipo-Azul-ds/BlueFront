@@ -4,6 +4,7 @@ import '../../domain/entities/Group.dart';
 import '../../domain/entities/GroupMember.dart';
 import '../../domain/entities/GroupInvitationToken.dart';
 import '../../domain/entities/GroupQuizAssignment.dart';
+import '../../domain/entities/GroupLeaderboardEntry.dart';
 import '../../domain/repositories/GroupRepository.dart';
 import '../../../user/presentation/blocs/auth_bloc.dart';
 
@@ -228,6 +229,10 @@ class GroupsBloc extends ChangeNotifier {
     );
     // Recargar asignaciones para actualizar la lista en UI
     await loadGroupAssignments(groupId);
+  }
+
+  Future<List<GroupLeaderboardEntry>> getLeaderboard(String groupId) async {
+    return await repository.getGroupLeaderboard(groupId);
   }
 
   List<Group> joinedGroups() {
