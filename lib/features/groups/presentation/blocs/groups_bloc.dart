@@ -84,8 +84,11 @@ class GroupsBloc extends ChangeNotifier {
       notifyListeners();
       return fresh;
     } catch (e) {
-      _error = e.toString();
-      notifyListeners();
+      if (kDebugMode) {
+         print('[GroupsBloc] refreshGroup failed for $groupId: $e');
+      }
+      // No setear _error global para no afectar la lista principal
+      // No eliminar el grupo automáticamente si falla la carga de detalles (resiliencia)
       return null;
     }
   }

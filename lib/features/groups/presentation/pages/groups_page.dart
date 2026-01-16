@@ -50,15 +50,17 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
       ),
       body: bloc.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : bloc.error != null
-              ? Center(child: Text(bloc.error!))
-              : TabBarView(
+          : bloc.groups.isNotEmpty
+              ? TabBarView(
                   controller: _tabController,
                   children: [
                     _groupsList(owned),
                     _groupsList(joined),
                   ],
-                ),
+                )
+              : bloc.error != null
+                  ? Center(child: Text(bloc.error!, textAlign: TextAlign.center))
+                  : const Center(child: Text('Aún no tienes grupos')),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCreateOrJoinSheet(context),
         child: const Icon(Icons.group_add),
@@ -139,13 +141,9 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (ctx) {
-        final nameCtrl = TextEditingController();
-        final tokenCtrl = TextEditingController();
         final bloc = context.read<GroupsBloc>();
 
         return _CreateJoinSheet(
-          nameCtrl: nameCtrl,
-          tokenCtrl: tokenCtrl,
           bloc: bloc,
           rootContext: context,
         );
@@ -155,25 +153,39 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
 }
 // Widget separado para evitar recrear controllers al cerrar teclado/reenfocar
 class _CreateJoinSheet extends StatefulWidget {
-  final TextEditingController nameCtrl;
-  final TextEditingController tokenCtrl;
   final GroupsBloc bloc;
   final BuildContext rootContext;
 
-  const _CreateJoinSheet({required this.nameCtrl, required this.tokenCtrl, required this.bloc, required this.rootContext});
+  const _CreateJoinSheet({required this.bloc, required this.rootContext});
 
   @override
   State<_CreateJoinSheet> createState() => _CreateJoinSheetState();
 }
 
 class _CreateJoinSheetState extends State<_CreateJoinSheet> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _tokenCtrl;
   bool isCreating = false;
   bool isJoining = false;
 
   @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController();
+    _tokenCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _tokenCtrl.dispose();
+    super.dispose();
+  }
+  
+  @override
   Widget build(BuildContext context) {
     Future<void> handleCreate() async {
-      final text = widget.nameCtrl.text.trim();
+      final text = _nameCtrl.text.trim();
       if (text.isEmpty) return;
       setState(() => isCreating = true);
       try {
@@ -196,19 +208,24 @@ class _CreateJoinSheetState extends State<_CreateJoinSheet> {
     }
 
     Future<void> handleJoin() async {
-      final input = widget.tokenCtrl.text.trim();
+      final input = _tokenCtrl.text.trim();
       if (input.isEmpty) return;
       // Permitir pegar el link completo o solo el token.
       String token = input;
       try {
         final uri = Uri.parse(input);
         if (uri.scheme.isNotEmpty) {
-          // Extraer el último segmento como token
-          if (uri.pathSegments.isNotEmpty) {
+          // Primero buscar en query parameters
+          if (uri.queryParameters.containsKey('token')) {
+            token = uri.queryParameters['token']!;
+          } else if (uri.queryParameters.containsKey('invitationToken')) {
+            token = uri.queryParameters['invitationToken']!;
+          } else if (uri.pathSegments.isNotEmpty) {
+            // Si no hay query param, usar el último segmento del path
             token = uri.pathSegments.last;
           }
         } else {
-          // Si no es un URI, intentar dividir por '/'
+          // Si no es un URI completo, intentar dividir por '/'
           final parts = input.split('/');
           token = parts.isNotEmpty ? parts.last : input;
         }
@@ -217,6 +234,20 @@ class _CreateJoinSheetState extends State<_CreateJoinSheet> {
         // Si parse falla, usar input tal cual
         token = input;
       }
+      
+      // Validación preventiva: si el token extraído es palabras reservadas del path comun
+      if (token.toLowerCase() == 'join' || token.toLowerCase() == 'groups') {
+         if (mounted) {
+            ScaffoldMessenger.of(widget.rootContext).showSnackBar(
+              SnackBar(
+                content: Text('Error: El link no contiene un token válido (se detectó "$token"). Asegúrate de copiar el link de invitación completo.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+         }
+         return;
+      }
+
       // Log para depuración
       // ignore: avoid_print
       print('[groups] join attempt input="$input" token="$token"');
@@ -273,7 +304,7 @@ class _CreateJoinSheetState extends State<_CreateJoinSheet> {
           const Text('Crear grupo', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           TextField(
-            controller: widget.nameCtrl,
+            controller: _nameCtrl,
             textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
               labelText: 'Nombre del grupo',
@@ -300,7 +331,7 @@ class _CreateJoinSheetState extends State<_CreateJoinSheet> {
           const Text('Unirse con link', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           TextField(
-            controller: widget.tokenCtrl,
+            controller: _tokenCtrl,
             textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
               labelText: 'Link de invitación',

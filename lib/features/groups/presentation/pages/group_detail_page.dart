@@ -46,15 +46,25 @@ class _GroupDetailPageState extends State<GroupDetailPage>
       return;
     }
     final bloc = context.read<GroupsBloc>();
-    final refreshed = await bloc.refreshGroup(groupId);
+    
+    // 1. Obtener versión local primero (Optimistic UI)
     Group? existing;
     try {
       existing = bloc.groups.firstWhere((g) => g.id == groupId);
     } catch (_) {}
-    setState(() {
-      _group = refreshed ?? existing;
-      _loading = false;
-    });
+
+    // 2. Intentar refrescar desde la red
+    final refreshed = await bloc.refreshGroup(groupId);
+    
+    if (mounted) {
+      setState(() {
+        _group = refreshed ?? existing;
+        _loading = false;
+        if (_group == null) {
+          _error = 'No se pudo cargar la información del grupo';
+        }
+      });
+    }
   }
 
   @override
