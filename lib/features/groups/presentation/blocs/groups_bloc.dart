@@ -128,6 +128,12 @@ class GroupsBloc extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteGroup(String groupId) async {
+    await repository.deleteGroup(groupId);
+    _groups = _groups.where((g) => g.id != groupId).toList();
+    notifyListeners();
+  }
+
   Future<List<GroupQuizAssignment>> loadGroupAssignments(String groupId) async {
     final list = await repository.getGroupAssignments(groupId);
     if (kDebugMode) {

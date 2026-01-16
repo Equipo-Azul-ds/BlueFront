@@ -181,6 +181,12 @@ class GroupRepositoryImpl implements GroupRepository {
     return data['groupId'] as String? ?? '';
   }
 
+  Future<void> deleteGroup(String groupId) async {
+    final uri = Uri.parse('$_base/groups/$groupId');
+    final res = await _delete(uri);
+    _ensureSuccess(res, {200, 204});
+  }
+
   Future<void> leaveGroup(String groupId) async {
     final uri = Uri.parse('$_base/groups/$groupId/leave');
     final res = await _post(uri, {});

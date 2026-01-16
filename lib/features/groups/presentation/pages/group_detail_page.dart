@@ -101,17 +101,58 @@ class _GroupDetailPageState extends State<GroupDetailPage>
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.black87),
             onSelected: (value) async {
-              if (value == 'leave' && group != null) {
-                await bloc.leaveGroup(group.id);
-                if (mounted) Navigator.pop(context);
+              if (group == null) return;
+              if (value == 'leave') {
+                 // Confirmar salir
+                 final confirm = await showDialog<bool>(
+                   context: context,
+                   builder: (ctx) => AlertDialog(
+                     title: const Text('Salir del grupo'),
+                     content: const Text('¿Estás seguro de salir? No podrás volver a entrar sin invitación.'),
+                     actions: [
+                       TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+                       TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Salir', style: TextStyle(color: Colors.red))),
+                     ],
+                   ),
+                 );
+                 if (confirm == true) {
+                    await bloc.leaveGroup(group.id);
+                    if (mounted) Navigator.pop(context);
+                 }
+              }
+              if (value == 'delete') {
+                _confirmDeleteGroup(bloc, group);
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem<String>(
-                value: 'leave',
-                child: Text('Salir del grupo'),
-              ),
-            ],
+            itemBuilder: (context) {
+              if (isAdmin) {
+                return [
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_forever, color: Colors.red),
+                        SizedBox(width: 8),
+                        Text('Eliminar grupo', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ];
+              } else {
+                return [
+                  const PopupMenuItem<String>(
+                    value: 'leave',
+                    child: Row(
+                      children: [
+                        Icon(Icons.exit_to_app, color: Colors.black87),
+                        SizedBox(width: 8),
+                        Text('Salir del grupo'),
+                      ],
+                    ),
+                  ),
+                ];
+              }
+            },
           ),
         ],
         bottom: TabBar(
@@ -410,6 +451,47 @@ class _GroupDetailPageState extends State<GroupDetailPage>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error al actualizar: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteGroup(GroupsBloc bloc, Group group) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar grupo'),
+        content: const Text(
+          '¿Estás seguro de que quieres eliminar este grupo permanentemente?\n\n'
+          'Esta acción no se puede deshacer y se perderán todos los datos y asignaciones asociadas.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _loading = true);
+      try {
+        await bloc.deleteGroup(group.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Grupo eliminado exitosamente')),
+          );
+          Navigator.pop(context); // Volver a la lista
+        }
+      } catch (e) {
+        setState(() => _loading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar: $e')),
           );
         }
       }
