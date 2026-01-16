@@ -77,6 +77,7 @@ class UserProviders extends StatelessWidget {
             ChangeNotifierProvider<GroupsBloc>(
               create: (context) => GroupsBloc(
                 repository: context.read<GroupRepository>(),
+                userRepository: context.read<AuthBloc>().repository,
                 auth: context.read<AuthBloc>(),
               ),
             ),

@@ -133,7 +133,17 @@ class GroupRepositoryImpl implements GroupRepository {
     _ensureSuccess(res, {200});
     // ignore: avoid_print
     print('DEBUG: GET /groups/$groupId/members response: ${res.body}');
-    final data = jsonDecode(res.body);
+    final dynamic data = jsonDecode(res.body);
+
+    // Caso 1: Lista directa (como se ve en la captura del usuario: [{userId, ...}, ...])
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(GroupMember.fromJson)
+          .toList();
+    }
+    
+    // Caso 2: Objeto envolvente (como estaba antes: {members: [...]})
     if (data is Map<String, dynamic>) {
       final members = data['members'];
       if (members is List) {
@@ -142,7 +152,10 @@ class GroupRepositoryImpl implements GroupRepository {
             .map(GroupMember.fromJson)
             .toList();
       }
+      // Caso 3: Objeto vacío o estructura diferente
+      return [];
     }
+    
     throw Exception('Unexpected response for group members');
   }
 
@@ -181,7 +194,8 @@ class GroupRepositoryImpl implements GroupRepository {
   Future<void> removeMember({required String groupId, required String memberId}) async {
     final uri = Uri.parse('$_base/groups/$groupId/members/$memberId');
     final res = await _delete(uri);
-    _ensureSuccess(res, {200});
+    // 200 OK or 204 No Content are valid for deletion
+    _ensureSuccess(res, {200, 204});
   }
 
   Future<Group> updateGroupInfo({required String groupId, String? name, String? description}) async {
@@ -205,8 +219,8 @@ class GroupRepositoryImpl implements GroupRepository {
 
   Future<void> transferAdmin({required String groupId, required String newAdminUserId}) async {
     final uri = Uri.parse('$_base/groups/$groupId/transfer-admin');
-    final res = await _post(uri, {'newAdminUserId': newAdminUserId});
-    _ensureSuccess(res, {200});
+    final res = await _patch(uri, {'newAdminId': newAdminUserId});
+    _ensureSuccess(res, {200, 201});
   }
 
   Future<GroupQuizAssignment> assignQuizToGroup({

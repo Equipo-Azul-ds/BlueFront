@@ -10,8 +10,14 @@ import '../../../user/presentation/blocs/auth_bloc.dart';
 class GroupsBloc extends ChangeNotifier {
   final GroupRepository repository;
   final AuthBloc auth;
+  // Repo de usuarios para resolver nombres si el endpoint de grupos no los retorna
+  final dynamic userRepository; 
 
-  GroupsBloc({required this.repository, required this.auth});
+  GroupsBloc({
+    required this.repository, 
+    required this.auth,
+    this.userRepository,
+  });
 
   bool _loading = false;
   String? _error;
@@ -146,12 +152,37 @@ class GroupsBloc extends ChangeNotifier {
 
   Future<List<GroupMember>?> getMembers(String groupId) async {
     try {
-      final members = await repository.getGroupMembers(groupId);
+      final membersRaw = await repository.getGroupMembers(groupId);
+      
+      // Enriquecer con nombres si faltan y tenemos el repo
+      List<GroupMember> finalMembers = [];
+      if (userRepository != null) {
+        // Obtenemos los usuarios uno por uno (limitación actual del backend)
+        // Optimizacion: intentar getOneById
+        final futures = membersRaw.map((m) async {
+          if (m.userName.isNotEmpty) return m; // Ya tiene nombre
+          try {
+             // Asumimos que userRepository es UserRepository
+             // importamos '../../user/domain/repositories/UserRepository.dart'; idealmente
+             // Como es dynamic, usamos invocación dinámica o casteamos si importáramos
+             final user = await (userRepository).getOneById(m.userId);
+             if (user != null) {
+               final name = user.userName.isNotEmpty ? user.userName : user.email;
+               return m.copyWith(userName: name);
+             }
+          } catch (_) {}
+          return m;
+        });
+        finalMembers = await Future.wait(futures);
+      } else {
+        finalMembers = membersRaw;
+      }
+
       _groups = _groups
-          .map((g) => g.id == groupId ? g.copyWith(members: members) : g)
+          .map((g) => g.id == groupId ? g.copyWith(members: finalMembers) : g)
           .toList();
       notifyListeners();
-      return members;
+      return finalMembers;
     } catch (e) {
       _error = e.toString();
       notifyListeners();
