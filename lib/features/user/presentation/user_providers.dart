@@ -11,15 +11,15 @@ import '../application/get_user_by_name_usecase.dart';
 import '../application/update_user_settings_usecase.dart';
 import '../presentation/blocs/auth_bloc.dart';
 import '../../../local/secure_storage.dart';
+import '../../../core/config/api_config.dart';
 import '../../groups/domain/repositories/GroupRepository.dart';
 import '../../groups/infrastructure/repositories/group_repository_impl.dart';
 import '../../groups/presentation/blocs/groups_bloc.dart';
 
 class UserProviders extends StatelessWidget {
   final Widget child;
-  final String baseUrl;
 
-  const UserProviders({super.key, required this.child, required this.baseUrl});
+  const UserProviders({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +37,7 @@ class UserProviders extends StatelessWidget {
           };
 
           final userRepo = UserRepositoryImpl(
-            baseUrl: baseUrl,
+            baseUrl: ApiConfigManager.httpBaseUrl,
             headersProvider: headersProvider,
             currentUserIdProvider: () async => await storage.read('currentUserId'),
             client: http.Client(),
@@ -69,7 +69,7 @@ class UserProviders extends StatelessWidget {
                   };
                 };
                 return GroupRepositoryImpl(
-                  baseUrl: baseUrl,
+                  baseUrl: ApiConfigManager.httpBaseUrl,
                   headersProvider: headersProvider,
                   client: http.Client(),
                 );

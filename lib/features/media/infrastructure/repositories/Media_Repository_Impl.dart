@@ -5,6 +5,8 @@ import 'package:http_parser/http_parser.dart' show MediaType;
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/Media.dart';
 import '../../domain/repositories/Media_Repository.dart';
+import '../../../../injection.dart';
+import '../../../../local/secure_storage.dart';
 
 class MediaRepositoryImpl implements MediaRepository {
   final String baseUrl;
@@ -37,9 +39,13 @@ class MediaRepositoryImpl implements MediaRepository {
       ),
     );
 
-    // Headers: Authorization Bearer userId (backend espera userId como token)
-    if ((bearerToken ?? '').trim().isNotEmpty) {
-      request.headers['Authorization'] = 'Bearer ${bearerToken!.trim()}';
+    // Recupera el token Bearer desde SecureStorage
+    final token = await SecureStorage.instance.read('token');
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+    } else {
+      print('[ERROR] No valid Bearer token found in SecureStorage');
+      throw Exception('Authentication token is missing');
     }
 
     // Información de depuración: cabeceras y metadatos del archivo (se imprimen justo antes del envío)

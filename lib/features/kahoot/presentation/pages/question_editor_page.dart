@@ -28,7 +28,8 @@ class QuestionEditorPage extends StatefulWidget {
 
 class _QuestionEditorPageState extends State<QuestionEditorPage> {
   late TextEditingController _textController;
-  String? _mediaPath;
+  String? _mediaPath; // Stores the ID or URL for persistence
+  String? _resolvedMediaUrl; // Stores the URL for display
   bool _busy = false;
 
   Widget _withThemeBackground(String? themeUrl, Widget child) {
@@ -65,9 +66,35 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
       );
       if (idx != -1) {
         final q = quiz.questions[idx];
-        _textController.text = q.text;
+        if (_textController.text.isEmpty) {
+          _textController.text = q.text;
+        }
         _mediaPath = q.mediaUrl;
+        _resolveMediaIfNeeded(q.mediaUrl);
       }
+    }
+  }
+
+  Future<void> _resolveMediaIfNeeded(String? idOrUrl) async {
+    if (idOrUrl == null || idOrUrl.isEmpty) {
+      if (mounted) setState(() => _resolvedMediaUrl = null);
+      return;
+    }
+    if (idOrUrl.startsWith('http')) {
+      if (mounted) setState(() => _resolvedMediaUrl = idOrUrl);
+      return;
+    }
+    // Is ID, resolve
+    try {
+      final mediaBloc = Provider.of<MediaEditorBloc>(context, listen: false);
+      final res = await mediaBloc.getMedia(idOrUrl);
+      if (mounted) {
+        setState(() {
+           _resolvedMediaUrl = res.media.path.isNotEmpty ? res.media.path : null;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _resolvedMediaUrl = null);
     }
   }
 
@@ -96,10 +123,25 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
 
       // Subida via MediaEditorBloc (que usa UploadMediaUseCase)
       final uploaded = await mediaBloc.upload(dto);
-      //  Monta el path de la media subida
-      final path = (uploaded as dynamic).path as String?;
-      if (path != null) {
-        setState(() => _mediaPath = path);
+      
+      final uploadedMap = uploaded as dynamic;
+      // Modificado para asegurar que tomamos el ID (assetId/UUID) para el backend
+      final id = (uploadedMap.id ?? uploadedMap.mediaId ?? '').toString();
+      final path = (uploadedMap.path ?? uploadedMap.url ?? '').toString();
+
+      // Preferir ID explícitamente porque el backend requiere UUID
+      // Si recibimos un ID válido, lo usamos.
+      final result = id.isNotEmpty ? id : path;
+      
+      print('[DEBUG] QuestionEditor: Uploaded media. ID=$id, Path=$path. Saving=$result');
+
+      if (result.isNotEmpty) {
+        setState(() {
+           _mediaPath = result;
+           // If we have a path (URL), use it for display. If we only have ID, we might need to resolve it 
+           // but normally upload returns both.
+           _resolvedMediaUrl = path.isNotEmpty ? path : null;
+        });
       }
       ScaffoldMessenger.of(
         context,
@@ -249,10 +291,22 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
                     label: const Text('Subir media'),
                   ),
                   const SizedBox(width: 12),
-                  if (_mediaPath != null)
+                  if (_resolvedMediaUrl != null)
+                     Container(
+                       height: 50,
+                       width: 50,
+                       decoration: BoxDecoration(
+                         border: Border.all(color: Colors.grey),
+                         image: DecorationImage(
+                           image: NetworkImage(_resolvedMediaUrl!),
+                           fit: BoxFit.cover
+                         )
+                       ),
+                     )
+                  else if (_mediaPath != null)
                     Flexible(
                       child: Text(
-                        'Media: $_mediaPath',
+                        'Media ID: $_mediaPath',
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),

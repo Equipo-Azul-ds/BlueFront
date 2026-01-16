@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../../../local/secure_storage.dart';
 import '../../domain/entities/kahoot_model.dart';
 import '../../domain/repositories/library_repository.dart';
 
@@ -12,10 +13,18 @@ class LibraryRepositoryImpl implements LibraryRepository {
 
   Future<List<Kahoot>> _fetchKahoots(String path, String userId) async {
     final url = Uri.parse('$baseUrl$path');
+    final token = await SecureStorage.instance.read('token');
 
     final request = http.Request('GET', url)
-      ..headers['Content-Type'] = 'application/json'
-      ..body = jsonEncode({'userId': userId});
+      ..headers['Content-Type'] = 'application/json';
+
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    // Aunque no es estándar enviar body en GET, se mantiene por compatibilidad si el backend lo requiere,
+    // pero la autenticación principal ahora va por Header.
+    request.body = jsonEncode({'userId': userId});
 
     final streamedResponse = await client.send(request);
     final response = await http.Response.fromStream(streamedResponse);
@@ -85,10 +94,16 @@ class LibraryRepositoryImpl implements LibraryRepository {
   }) async {
     final url = Uri.parse('$baseUrl/library/favorites/$kahootId');
     final method = isFavorite ? 'DELETE' : 'POST';
+    final token = await SecureStorage.instance.read('token');
 
     final request = http.Request(method, url)
-      ..headers['Content-Type'] = 'application/json'
-      ..body = jsonEncode({'userId': userId});
+      ..headers['Content-Type'] = 'application/json';
+      
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+
+    request.body = jsonEncode({'userId': userId});
 
     final streamedResponse = await client.send(request);
     final response = await http.Response.fromStream(streamedResponse);

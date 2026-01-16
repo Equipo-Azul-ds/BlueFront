@@ -2,11 +2,11 @@ import '../entities/subscription.dart';
 
 abstract class ISubscriptionRepository {
   Future<Subscription> createSubscription({
-    required String userId,
+    required String token,
     required String planId,
   });
 
-  Future<void> cancelSubscription(String subscriptionId);
+  Future<void> cancelSubscription(String token);
 
-  Future<Subscription?> getSubscriptionStatus(String userId);
+  Future<Subscription?> getSubscriptionStatus(String token);
 }

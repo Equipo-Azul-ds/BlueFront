@@ -9,21 +9,26 @@ class SubscriptionModel extends Subscription {
     required super.status,
   });
 
-  // Factory para convertir el JSON de la API en nuestro Modelo/Entidad
   factory SubscriptionModel.fromJson(Map<String, dynamic> json) {
     return SubscriptionModel(
-      id: json['id'],
-      userId: json['userId'],
-      planId: json['planId'],
-      status: json['status'],
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      planId:
+          json['plan']?.toString() ?? json['planId']?.toString() ?? 'Gratis',
+      status: json['status']?.toString() ?? 'inactive',
       expiresAt: json['expiresAt'] != null
-          ? DateTime.parse(json['expiresAt'])
+          ? DateTime.tryParse(json['expiresAt'].toString())
           : null,
     );
   }
 
-  // Para enviar datos al servidor (POST /subscription)
   Map<String, dynamic> toJson() {
-    return {'planId': planId};
+    return {
+      'id': id,
+      'userId': userId,
+      'plan': planId,
+      'status': status,
+      'expiresAt': expiresAt?.toIso8601String(),
+    };
   }
 }

@@ -7,12 +7,13 @@ import '../provider/subscription_provider.dart';
 class SubscriptionManagementScreen extends StatelessWidget {
   const SubscriptionManagementScreen({super.key});
 
+  Future<String> _getToken(BuildContext context) async {
+    final authBloc = context.read<AuthBloc>();
+    return await authBloc.storage.read('token') ?? '';
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Obtenemos el usuario del AuthBloc
-    final auth = context.watch<AuthBloc>();
-    final userId = auth.currentUser?.id ?? '';
-
     final provider = context.watch<SubscriptionProvider>();
     final subscription = provider.subscription;
     final Color trivvyBlue = const Color(0xFF0D47A1);
@@ -25,16 +26,14 @@ class SubscriptionManagementScreen extends StatelessWidget {
         elevation: 0,
       ),
       body: provider.status == SubscriptionStatus.loading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            ) // Feedback de carga
+          ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
                   const SizedBox(height: 24),
 
-                  // CARD PREMIUM (Solo se muestra si hay suscripción)
+                  // CARD PREMIUM
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
@@ -115,7 +114,6 @@ class SubscriptionManagementScreen extends StatelessWidget {
 
                   const SizedBox(height: 40),
 
-                  // Botón de cancelar pasando el userId
                   OutlinedButton(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade700,
@@ -125,8 +123,7 @@ class SubscriptionManagementScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(15),
                       ),
                     ),
-                    onPressed: () =>
-                        _showCancelDialog(context, provider, userId),
+                    onPressed: () => _showCancelDialog(context, provider),
                     child: const Text(
                       "CANCELAR SUSCRIPCIÓN",
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -147,11 +144,7 @@ class SubscriptionManagementScreen extends StatelessWidget {
     );
   }
 
-  void _showCancelDialog(
-    BuildContext context,
-    SubscriptionProvider provider,
-    String userId,
-  ) {
+  void _showCancelDialog(BuildContext context, SubscriptionProvider provider) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -174,14 +167,15 @@ class SubscriptionManagementScreen extends StatelessWidget {
             ),
             onPressed: () async {
               Navigator.pop(dialogContext);
-              // 3. LLAMADA AL PROVIDER CON EL USERID REAL
-              await provider.cancelCurrentSubscription(userId);
+
+              // Obtener el token y enviarlo al provider
+              final token = await _getToken(context);
+              await provider.cancelCurrentSubscription(token);
 
               if (context.mounted &&
                   provider.status == SubscriptionStatus.success) {
-                Navigator.of(
-                  context,
-                ).pop(); // Salir de la gestión tras cancelar
+                // Regresar a la pantalla anterior (Perfil) tras éxito
+                Navigator.of(context).pop();
               }
             },
             child: const Text(

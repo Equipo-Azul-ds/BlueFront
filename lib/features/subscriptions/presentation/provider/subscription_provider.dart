@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../domain/entities/subscription.dart';
 import '../../application/usecases/subscribe_user_usecase.dart';
 import '../../application/usecases/get_subscription_status_usecase.dart';
 import '../../application/usecases/cancel_subscription_usecase.dart';
-import '../../domain/entities/subscription.dart';
 
 enum SubscriptionStatus { initial, loading, success, error }
 
@@ -27,18 +27,19 @@ class SubscriptionProvider extends ChangeNotifier {
   Subscription? get subscription => _subscription;
   String? get errorMessage => _errorMessage;
 
+  // Ajustado: Compara con el nombre del plan que devuelve el back
   bool get isPremium =>
       _subscription != null &&
-      _subscription!.planId == 'plan_premium' &&
+      (_subscription!.planId.toLowerCase().contains('premium')) &&
       _subscription!.status == 'active';
 
-  // CARGAR ESTADO REAL (Se llama al entrar al Perfil)
-  Future<void> checkCurrentStatus(String userId) async {
-    if (userId.isEmpty) return;
+  // CARGAR ESTADO (Usando Token)
+  Future<void> checkCurrentStatus(String token) async {
+    if (token.isEmpty) return;
     _status = SubscriptionStatus.loading;
     notifyListeners();
     try {
-      _subscription = await _getSubscriptionStatusUseCase.execute(userId);
+      _subscription = await _getSubscriptionStatusUseCase.execute(token);
       _status = SubscriptionStatus.success;
     } catch (e) {
       _status = SubscriptionStatus.error;
@@ -48,30 +49,30 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  // COMPRAR PLAN (Recibe el userId del AuthBloc)
-  Future<void> purchasePlan(String userId, String planId) async {
+  // COMPRAR PLAN (Usando Token)
+  Future<void> purchasePlan(String token, String planId) async {
     _status = SubscriptionStatus.loading;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _subscription = await _subscribeUserUseCase.execute(userId, planId);
+      _subscription = await _subscribeUserUseCase.execute(token, planId);
       _status = SubscriptionStatus.success;
     } catch (e) {
       _status = SubscriptionStatus.error;
       _errorMessage = e.toString();
-      rethrow; // Para que la UI pueda mostrar el error
+      rethrow;
     } finally {
       notifyListeners();
     }
   }
 
-  // CANCELAR (Usa el userId)
-  Future<void> cancelCurrentSubscription(String userId) async {
+  // CANCELAR (Usando Token)
+  Future<void> cancelCurrentSubscription(String token) async {
     _status = SubscriptionStatus.loading;
     notifyListeners();
     try {
-      await _cancelSubscriptionUseCase.execute(userId);
+      await _cancelSubscriptionUseCase.execute(token);
       _subscription = null;
       _status = SubscriptionStatus.success;
     } catch (e) {

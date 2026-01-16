@@ -46,8 +46,9 @@ class _ProfilePageState extends State<ProfilePage> {
       context,
     ).push<String>(MaterialPageRoute(builder: (_) => const AvatarPickerPage()));
     if (picked != null && picked.isNotEmpty) {
-      // Solo selecciona y muestra el avatar; se guardará al presionar "Guardar cambios".
-      setState(() => _avatarUrl = picked);
+      // Construye la URL del avatar a partir del seed seleccionado
+      final avatarUrl = 'https://api.dicebear.com/7.x/micah/png?seed=$picked&background=%23ffffff&size=128';
+      setState(() => _avatarUrl = avatarUrl);
     }
   }
 
@@ -146,7 +147,10 @@ class _ProfilePageState extends State<ProfilePage> {
                             children: [
                               const Text(
                                 'Ingresa tu contraseña actual',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               const SizedBox(height: 12),
                               TextField(
@@ -165,7 +169,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                   final p = passCtrl.text.trim();
                                   if (p.length < 6) {
                                     ScaffoldMessenger.of(ctx).showSnackBar(
-                                      const SnackBar(content: Text('Min. 6 caracteres')),
+                                      const SnackBar(
+                                        content: Text('Min. 6 caracteres'),
+                                      ),
                                     );
                                     return;
                                   }
@@ -180,7 +186,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     );
                     if (current == null) return;
                     try {
-                      await auth.changePassword(currentPassword: current, newPassword: newP, confirmNewPassword: conf);
+                      await auth.changePassword(
+                        currentPassword: current,
+                        newPassword: newP,
+                        confirmNewPassword: conf,
+                      );
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Contraseña actualizada')),
@@ -264,8 +274,6 @@ class _ProfilePageState extends State<ProfilePage> {
               _subscriptionSection(context),
               const SizedBox(height: 16),
               _securitySection(auth),
-              const SizedBox(height: 16),
-              _dangerZone(auth),
               const SizedBox(height: 24),
 
               ElevatedButton.icon(
@@ -289,9 +297,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ElevatedButton.icon(
                 onPressed: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ReportsListPage(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const ReportsListPage()),
                   );
                 },
                 icon: const Icon(Icons.assessment),
@@ -301,7 +307,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 15),
                   textStyle: const TextStyle(fontSize: 18),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
 
@@ -334,11 +342,17 @@ class _ProfilePageState extends State<ProfilePage> {
       final nameVal = _nameCtrl.text.trim();
       final descVal = _descCtrl.text.trim();
       final avatarChanged = _avatarUrl.isNotEmpty && _avatarUrl != (auth.currentUser?.avatarUrl ?? widget.user.avatarUrl);
+
+      // Use currentUser values if form fields are empty
+      final name = nameVal.isNotEmpty ? nameVal : (auth.currentUser?.name ?? '');
+      final description = descVal.isNotEmpty ? descVal : (auth.currentUser?.description ?? '');
+
       await auth.updateProfile(
-        name: nameVal,
-        description: descVal.isNotEmpty ? descVal : '',
+        name: name,
+        description: description,
         avatarUrl: avatarChanged ? _avatarUrl : null,
       );
+
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
@@ -433,7 +447,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 4),
                 Text(u.email, style: const TextStyle(color: Colors.black54)),
                 const SizedBox(height: 12),
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -553,79 +568,20 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           const SizedBox(height: 12),
-          const Text('Tipo de cuenta'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              ChoiceChip(
-                label: const Text('Estudiante'),
-                selected:
-                    (_type.isNotEmpty ? _type : user.userType) == 'student',
-                onSelected: auth.isLoading
-                    ? null
-                    : (sel) async {
-                        if (!sel) return;
-                        setState(() => _type = 'student');
-                        try {
-                          await auth.changeUserType('student');
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Tipo de cuenta: Estudiante'),
-                            ),
-                          );
-                        } catch (e) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('No se pudo actualizar: $e'),
-                            ),
-                          );
-                        }
-                      },
-              ),
-              ChoiceChip(
-                label: const Text('Profesor'),
-                selected:
-                    (_type.isNotEmpty ? _type : user.userType) == 'teacher',
-                onSelected: auth.isLoading
-                    ? null
-                    : (sel) async {
-                        if (!sel) return;
-                        setState(() => _type = 'teacher');
-                        try {
-                          await auth.changeUserType('teacher');
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Tipo de cuenta: Profesor'),
-                            ),
-                          );
-                        } catch (e) {
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('No se pudo actualizar: $e'),
-                            ),
-                          );
-                        }
-                      },
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
           Builder(
             builder: (ctx) {
               final nameChanged = _nameCtrl.text.trim() != user.name;
               final descChanged = _descCtrl.text.trim() != user.description;
-              final avatarChanged = _avatarUrl.isNotEmpty && _avatarUrl != user.avatarUrl;
+              final avatarChanged =
+                  _avatarUrl.isNotEmpty && _avatarUrl != user.avatarUrl;
               return ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColor.primary,
                   foregroundColor: Colors.white,
                 ),
-                onPressed: (auth.isLoading || (!nameChanged && !descChanged && !avatarChanged))
+                onPressed:
+                    (auth.isLoading ||
+                        (!nameChanged && !descChanged && !avatarChanged))
                     ? null
                     : () => _save(auth),
                 child: auth.isLoading
@@ -640,80 +596,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     : const Text('Guardar cambios'),
               );
             },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _dangerZone(AuthBloc auth) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Opciones de cuenta',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: auth.isLoading
-                ? null
-                : () async {
-                    final ok = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Eliminar cuenta'),
-                        content: const Text(
-                          '¿Estás seguro de eliminar tu cuenta de forma permanente?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Cancelar'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text(
-                              'Eliminar',
-                              style: TextStyle(color: Colors.red),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (ok == true) {
-                      try {
-                        await auth.deleteAccount();
-                        if (!mounted) return;
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          '/discover',
-                          (route) => false,
-                        );
-                      } catch (e) {
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('No se pudo eliminar la cuenta: $e'),
-                          ),
-                        );
-                      }
-                    }
-                  },
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Eliminar cuenta'),
           ),
         ],
       ),

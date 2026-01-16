@@ -7,6 +7,7 @@ class UpdateUserSettingsParams {
   final String? name;
   final String? description;
   final String? avatarUrl;
+  final String? avatarAssetId; // Nuevo campo para el ID del avatar
   final String? userType;
   final String? theme;
   final String? language;
@@ -22,6 +23,7 @@ class UpdateUserSettingsParams {
     this.name,
     this.description,
     this.avatarUrl,
+    this.avatarAssetId, // Agregado el nuevo campo
     this.userType,
     this.theme,
     this.language,
@@ -43,6 +45,7 @@ class UpdateUserSettingsUseCase {
       name: params.name,
       description: params.description,
       avatarUrl: params.avatarUrl,
+      avatarAssetId: params.avatarAssetId, // Agregado el nuevo campo
       userType: params.userType,
       theme: params.theme,
       language: params.language,
