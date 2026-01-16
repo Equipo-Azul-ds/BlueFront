@@ -15,14 +15,26 @@ class PaginationDto {
 
   factory PaginationDto.fromJson(Map<String, dynamic> json) {
     return PaginationDto(
-      page: json['page'] as int,
-      limit: json['limit'] as int,
-      totalCount: json['totalCount'] as int,
-      totalPages: json['totalPages'] as int,
+      page: _toInt(json['page']) ?? 1,
+      limit: _toInt(json['limit']) ?? 20,
+      totalCount: _toInt(json['totalCount']) ?? 0,
+      totalPages: _toInt(json['totalPages']) ?? 1,
     );
   }
-}
 
+  static int? _toInt(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  factory PaginationDto.empty() => PaginationDto(
+    page: 1,
+    limit: 20,
+    totalCount: 0,
+    totalPages: 1,
+  );
+}
 
 class KahootSearchResponseDto {
   final List<KahootModel> data;
@@ -33,17 +45,36 @@ class KahootSearchResponseDto {
     required this.pagination,
   });
 
-  factory KahootSearchResponseDto.fromJson(Map<String, dynamic> json) {
-    final List<dynamic> dataList = json['data'] as List<dynamic>;
-    final paginationJson = json['pagination'] as Map<String, dynamic>;
+  factory KahootSearchResponseDto.fromDynamicJson(dynamic json) {
 
-    final List<KahootModel> kahoots = dataList
-        .map((item) => KahootModel.fromJson(item as Map<String, dynamic>))
-        .toList();
+    if (json is List) {
+      final kahoots = json
+          .map((item) => KahootModel.fromJson(item as Map<String, dynamic>))
+          .toList();
 
-    return KahootSearchResponseDto(
-      data: kahoots,
-      pagination: PaginationDto.fromJson(paginationJson),
-    );
+      return KahootSearchResponseDto(
+        data: kahoots,
+        pagination: PaginationDto.empty(),
+      );
+    }
+
+
+    if (json is Map<String, dynamic>) {
+      final List<dynamic> dataList = json['data'] as List<dynamic>? ?? [];
+      final List<KahootModel> kahoots = dataList
+          .map((item) => KahootModel.fromJson(item as Map<String, dynamic>))
+          .toList();
+
+      final paginationJson = json['pagination'] as Map<String, dynamic>?;
+
+      return KahootSearchResponseDto(
+        data: kahoots,
+        pagination: paginationJson != null
+            ? PaginationDto.fromJson(paginationJson)
+            : PaginationDto.empty(),
+      );
+    }
+
+    throw Exception("Formato de respuesta de Kahoot desconocido");
   }
 }

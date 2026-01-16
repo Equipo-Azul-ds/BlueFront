@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../../../../core/errors/exception.dart';
-import '../../application/DataSource/IKahootRemoteDataSource.dart';
 import '../../application/dto/KahootSearchresponseDto.dart';
-import '../../application/model/kahoot_Model.dart';
+import '../../domain/DataSource/IKahootRemoteDataSource.dart';
 
 
 class KahootRemoteDataSource implements IKahootRemoteDataSource {
@@ -11,74 +10,92 @@ class KahootRemoteDataSource implements IKahootRemoteDataSource {
   final http.Client cliente;
 
   KahootRemoteDataSource({required this.baseUrl, required http.Client cliente})
-      : cliente = cliente ?? http.Client();
+      : cliente = cliente ?? http.Client() {
+    try {
+      print('KahootRemoteDataSource initialized with baseUrl=$baseUrl');
+    } catch (_) {}
+  }
 
   Uri _buildUri(String path, Map<String, dynamic> params) {
-    final Map<String, dynamic> cleanParams = {};
+    final Map<String, String> cleanParams = {};
+
     params.forEach((key, value) {
-      if (value != null) {
-        if (value is List) {
-          cleanParams[key] = value.join(',');
-        } else {
-          cleanParams[key] = value.toString();
+      if (value == null) return;
+
+      if (value is List) {
+
+        final cleanList = value.where((e) => e.toString().trim().isNotEmpty).toList();
+        if (cleanList.isNotEmpty) {
+          cleanParams[key] = cleanList.join(',');
         }
+      } else if (value is String) {
+        if (value.trim().isNotEmpty) {
+          cleanParams[key] = value.trim();
+        }
+      } else {
+        cleanParams[key] = value.toString();
       }
     });
 
-    return Uri.parse('$baseUrl$path').replace(queryParameters: cleanParams.cast<String, String>());
+    final uri = Uri.parse('$baseUrl$path').replace(queryParameters: cleanParams);
+    print('KahootRemoteDataSource -> URI final: $uri');
+    return uri;
   }
 
   @override
   Future<KahootSearchResponseDto> fetchKahoots({
     String? query,
-    List<String> themes = const [],
-    String orderBy = 'createdAt',
-    String order = 'desc',
+    List<String>? themes,
+    String? orderBy,
+    String? order,
+    int? page,
+    int? limit,
   }) async {
-    final uri = _buildUri(
-      '/explore',
-      {'q': query, 'categories': themes, 'orderBy': orderBy, 'order': order},
-    );
+    final uri = _buildUri('/explore', {
+      'q': query,
+      'categories': themes,
+      'orderBy': orderBy,
+      'order': order,
+      'page': page,
+      'limit': limit,
+    });
 
     try {
-      final response = await cliente.get(uri, headers: {'Content-Type': 'application/json'});
+      // Forzamos el header de aceptación de JSON
+      final response = await cliente.get(uri, headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
+      });
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-        return KahootSearchResponseDto.fromJson(jsonResponse);
-      } else if (response.statusCode == 400) {
-        // Correcto manejo del 400 Bad Request
-        throw ServerException(message: "400: Parámetros de búsqueda inválidos.");
+        // Usar utf8.decode para manejar correctamente caracteres especiales (acentos)
+        final dynamic jsonBody = json.decode(utf8.decode(response.bodyBytes));
+        return KahootSearchResponseDto.fromDynamicJson(jsonBody);
       } else {
-        final msg = 'Fallo al cargar Kahoots: ${response.statusCode} - ${response.body}';
-        throw ServerException(message: msg);
+        // Log detallado para depuración
+        print('Error en fetchKahoots: ${response.statusCode} - ${response.body}');
+        throw ServerException(
+          message: 'Server Error: ${response.statusCode}',
+        );
       }
-    } catch (e) {
-      print('KahootRemoteDataSourceImpl.fetchKahoots -> Error: $e');
+    } catch (e, stack) {
+      print('Excepción en KahootRemoteDataSource: $e');
+      print('Stacktrace: $stack');
       rethrow;
     }
   }
 
   @override
-  Future<KahootSearchResponseDto> fetchFeaturedKahoots({
-    int? limit,
-  }) async {
-    final uri = _buildUri(
-      '/explore/featured',
-      {'limit': limit},
-    );
+  Future<KahootSearchResponseDto> fetchFeaturedKahoots({int? limit}) async {
+    final uri = _buildUri('/explore/featured', {'limit': limit});
 
     try {
       final response = await cliente.get(uri, headers: {'Content-Type': 'application/json'});
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonBody = json.decode(response.body);
-
-        // CORRECCIÓN CLAVE: Usar el DTO para parsear la respuesta paginada.
-        return KahootSearchResponseDto.fromJson(jsonBody);
+        return KahootSearchResponseDto.fromDynamicJson(json.decode(response.body));
       } else {
-        final msg = 'Error al recuperar Kahoots destacados: ${response.statusCode} - ${response.body}';
-        throw ServerException(message: msg);
+        throw ServerException(message: '500: Error al recuperar contenido destacado');
       }
     } catch (e) {
       rethrow;

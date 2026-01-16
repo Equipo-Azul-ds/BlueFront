@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/library_provider.dart';
 import '../../domain/entities/kahoot_model.dart';
-import '../../../../common_widgets/subpage_scaffold.dart';
 import 'kahoot_list_page.dart';
 import '../utils/kahoot_list_type.dart';
 
 class KahootsCategoryPage extends StatelessWidget {
   const KahootsCategoryPage({super.key});
 
-  // Helper para mapear el título del ListTile al tipo de lista requerido
   KahootListType _mapTitleToListType(String title) {
     return switch (title) {
       'Creados' => KahootListType.created,
@@ -22,9 +20,9 @@ class KahootsCategoryPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SubpageScaffold(
-      title: 'Tus Kahoots',
-      baseIndex: 3,
+    // CAMBIO: Usamos Scaffold normal de Flutter
+    return Scaffold(
+      appBar: AppBar(title: const Text('Tus Kahoots'), elevation: 0),
       body: Consumer<LibraryProvider>(
         builder: (context, provider, child) {
           if (provider.state == LibraryState.loading) {
@@ -39,33 +37,31 @@ class KahootsCategoryPage extends StatelessWidget {
               .toList();
 
           return ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
               _buildCategoryTile(
                 context,
                 'Creados',
                 publishedKahoots,
-                Icons.inventory_2,
+                Icons.inventory_2_outlined,
               ),
-
               _buildCategoryTile(
                 context,
                 'Favoritos',
                 provider.favoriteKahoots,
-                Icons.favorite,
+                Icons.favorite_border,
               ),
-
               _buildCategoryTile(
                 context,
                 'En Progreso',
                 provider.inProgressKahoots,
-                Icons.trending_up,
+                Icons.play_circle_outline,
               ),
-
               _buildCategoryTile(
                 context,
                 'Completados',
                 provider.completedKahoots,
-                Icons.check_circle,
+                Icons.check_circle_outline,
               ),
             ],
           );
@@ -83,11 +79,15 @@ class KahootsCategoryPage extends StatelessWidget {
     return Column(
       children: [
         ListTile(
-          leading: Icon(icon, color: Colors.blueGrey),
-          title: Text(title),
-          trailing: const Icon(Icons.arrow_forward_ios),
+          leading: Icon(icon, color: Colors.blueGrey[700]),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 14),
           onTap: () {
-            Navigator.of(context).push(
+            // Mantenemos el rootNavigator: true para "tapar" la barra de abajo
+            Navigator.of(context, rootNavigator: true).push(
               MaterialPageRoute(
                 builder: (context) => KahootListPage(
                   title: title,

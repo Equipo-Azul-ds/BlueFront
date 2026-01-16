@@ -1,9 +1,11 @@
-class ThemeEntity {
+class ThemeVO {
   final String name;
 
 
-  const ThemeEntity({
+  const ThemeVO({
     required this.name,
 
   });
+
+  get id => null;
 }

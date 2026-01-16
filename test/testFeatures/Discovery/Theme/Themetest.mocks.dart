@@ -33,7 +33,6 @@ import 'package:Trivvy/features/discovery/infraestructure/repositories/ThemeRepo
 // ignore_for_file: unnecessary_parenthesis
 // ignore_for_file: camel_case_types
 // ignore_for_file: subtype_of_sealed_class
-// ignore_for_file: invalid_use_of_internal_member
 
 class _FakeResponse_0 extends _i1.SmartFake implements _i2.Response {
   _FakeResponse_0(Object parent, Invocation parentInvocation)
@@ -312,18 +311,16 @@ class MockThemeRepository extends _i1.Mock implements _i10.ThemeRepository {
           as _i4.ThemeRemoteDataSource);
 
   @override
-  _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeEntity>>> getThemes() =>
+  _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeVO>>> getThemes() =>
       (super.noSuchMethod(
             Invocation.method(#getThemes, []),
             returnValue:
-                _i6.Future<
-                  _i5.Either<_i11.Failure, List<_i12.ThemeEntity>>
-                >.value(
-                  _FakeEither_5<_i11.Failure, List<_i12.ThemeEntity>>(
+                _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeVO>>>.value(
+                  _FakeEither_5<_i11.Failure, List<_i12.ThemeVO>>(
                     this,
                     Invocation.method(#getThemes, []),
                   ),
                 ),
           )
-          as _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeEntity>>>);
+          as _i6.Future<_i5.Either<_i11.Failure, List<_i12.ThemeVO>>>);
 }

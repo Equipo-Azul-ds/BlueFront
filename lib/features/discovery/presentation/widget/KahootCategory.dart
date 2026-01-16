@@ -1,45 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../kahoot/domain/entities/kahoot.dart';
-import 'kahootListItem.dart';
+import 'package:provider/provider.dart';
+import '../../domain/entities/kahoot.dart';
+import '../../domain/Repositories/IDiscoverRepository.dart';
+import '../Funciones/buildKahootWidgets.dart';
 
-final kDummyKahoots = [
-  Kahoot(
-    id: 'd-001',
-    title: 'Dummy: Matemáticas Básicas',
-    description: 'Quices de prueba para operaciones fundamentales.',
-    kahootImage: 'assets/images/placeholder.png',
-    visibility: 'public',
-    status: 'published',
-    themes: ['Matemáticas'],
-    author: 'auth-dummy',
-    createdAt: DateTime(2025, 11, 25),
-    playCount: 1500,
-  ),
-  Kahoot(
-    id: 'd-002',
-    title: 'Dummy: Historia del Arte',
-    description: 'Viaje por el Renacimiento.',
-    kahootImage: 'assets/images/placeholder.png',
-    visibility: 'public',
-    status: 'published',
-    themes: ['Arte', 'Historia'],
-    author: 'auth-dummy',
-    createdAt: DateTime(2025, 11, 20),
-    playCount: 800,
-  ),
-  Kahoot(
-    id: 'd-003',
-    title: 'Dummy: Ciencia Ficción',
-    description: 'Preguntas sobre los clásicos del género.',
-    kahootImage: 'assets/images/placeholder.png',
-    visibility: 'public',
-    status: 'published',
-    themes: ['Cine', 'Literatura'],
-    author: 'auth-dummy',
-    createdAt: DateTime(2025, 10, 15),
-    playCount: 2200,
-  ),
-];
+
 
 class KahootCategorySection extends StatefulWidget {
   final String categoryTitle;
@@ -54,17 +19,69 @@ class KahootCategorySection extends StatefulWidget {
 }
 
 class _KahootCategorySectionState extends State<KahootCategorySection> {
-  /*List<Kahoot> _kahoots = [];
+  List<Kahoot> _kahoots = [];
   bool _isLoading = true;
-  String? _error;*/
-  List<Kahoot> _kahoots = kDummyKahoots;
-  bool _isLoading = false;
   String? _error;
+
 
   @override
   void initState() {
     super.initState();
-    //Future.microtask(_fetchCategoryKahoots);
+    Future.microtask(_fetchCategoryKahoots);
+  }
+
+  Future<void> _fetchCategoryKahoots() async {
+    // 1. Verificación inicial de seguridad
+    if (!mounted) return;
+    if (widget.categoryTitle.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _error = "Categoría no válida";
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final repository = Provider.of<IDiscoverRepository>(context, listen: false);
+
+      // 2. Llamada al repositorio
+      final result = await repository.getKahoots(
+        query: null,
+        themes: [widget.categoryTitle],
+        orderBy: 'createdAt',
+        order: 'desc',
+      );
+
+      // 3. Verificación de montado tras la espera (Await)
+      if (!mounted) return;
+
+      result.fold(
+            (failure) {
+          setState(() {
+            _isLoading = false;
+            // Mensaje más descriptivo según el tipo de fallo
+            _error = "No se pudieron cargar los kahoots de ${widget.categoryTitle}";
+          });
+        },
+            (quizList) {
+          setState(() {
+            _kahoots = quizList;
+            _isLoading = false;
+          });
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _error = "Error inesperado";
+      });
+    }
   }
 
   @override
@@ -131,28 +148,3 @@ class _KahootCategorySectionState extends State<KahootCategorySection> {
   }
 }
 
-List<Widget> buildKahootWidgets(BuildContext context, List<Kahoot> kahoots) {
-  return kahoots.asMap().entries.map((entry) {
-    int index = entry.key;
-    Kahoot kahoot = entry.value;
-
-    return SizedBox(
-      width: 250,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 4.0),
-        child: KahootListItem(
-          number: (index + 1).toString(),
-          title: kahoot.title,
-          source: kahoot.author,
-          image: kahoot.kahootImage,
-          onTap: () {
-            Navigator.of(context).pushNamed(
-              '/kahoot-detail', //pagina de detalles del kahoot nombre temporal
-              arguments: kahoot.id,
-            );
-          },
-        ),
-      ),
-    );
-  }).toList();
-}

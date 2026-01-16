@@ -33,8 +33,10 @@ class Media {
       }
     }
 
-    final id = _safeStringOrNull(json['id'] ?? json['mediaId']) ?? '';
-    final path = _safeStringOrNull(json['path'] ?? json['url'] ?? json['pathUrl']) ?? '';
+    // Modificación para soportar 'assetId' (camelCase) como muestra la respuesta real,
+    // además de 'asset_id' y 'id'.
+    final id = _safeStringOrNull(json['assetId'] ?? json['asset_id'] ?? json['id'] ?? json['mediaId']) ?? '';
+    final path = _safeStringOrNull(json['path'] ?? json['url'] ?? json['pathUrl'] ?? json['secure_url']) ?? '';
     final mimeType = _safeStringOrNull(json['mimeType'] ?? json['contentType']) ?? '';
     final size = (json['size'] ?? json['fileSize'] ?? 0);
     final originalName = _safeStringOrNull(json['originalName'] ?? json['name']) ?? '';

@@ -9,19 +9,46 @@ import '../../application/get_quiz_usecase.dart';
 import '../../application/update_quiz_usecase.dart';
 import '../../application/delete_quiz_usecase.dart';
 import '../../application/list_user_quizzes_usecase.dart';
+import '../../../discovery/application/usecases/GetThemeUseCase.dart';
+import '../../../discovery/domain/entities/theme.dart';
 
 /// BLoC para gestionar el editor de Quiz.
 /// - Inyecta un `QuizRepository` para persistencia.
 /// - Usa los UseCases existentes (`run(...)`).
 class QuizEditorBloc extends ChangeNotifier {
   final QuizRepository repository;
+  final GetThemesUseCase? getThemesUseCase; // Opcional para no romper constructores previos si los hubiere
 
   Quiz? currentQuiz; // Quiz en edición
   bool isLoading = false;
   String? errorMessage;
   List<Quiz>? userQuizzes;
+  List<ThemeVO>? themes; // Categorías/Temas cargados del backend
 
-  QuizEditorBloc(this.repository);
+  QuizEditorBloc(this.repository, {this.getThemesUseCase});
+
+  Future<void> loadThemes() async {
+    if (getThemesUseCase == null) {
+      print('Warning: GetThemesUseCase is null in QuizEditorBloc');
+      return;
+    }
+    
+    // Solo carga si no tenemos temas
+    if (themes == null || themes!.isEmpty) {
+      final result = await getThemesUseCase!.execute();
+      result.fold(
+        (failure) {
+          print('Error loading themes: $failure');
+          errorMessage = 'Error loading themes';
+          notifyListeners();
+        },
+        (data) {
+          themes = data;
+          notifyListeners();
+        }
+      );
+    }
+  }
 
   // Crear un quiz a partir de un DTO
   Future<void> createQuiz(CreateQuizDto dto) async {
@@ -88,16 +115,16 @@ class QuizEditorBloc extends ChangeNotifier {
   }
 
   // Elimina un quiz
-  Future<void> deleteQuiz(String quizId) async {
+  Future<void> deleteQuiz(Quiz quiz) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
 
     try {
       final useCase = DeleteKahootUseCase(repository);
-      await useCase.run(quizId);
+      await useCase.run(quiz.quizId, quiz.authorId);
       // Si el quiz eliminado era el current, limpiamos
-      if (currentQuiz?.quizId == quizId) currentQuiz = null;
+      if (currentQuiz?.quizId == quiz.quizId) currentQuiz = null;
     } catch (e) {
       errorMessage = 'Error al eliminar el Quiz: $e';
     } finally {

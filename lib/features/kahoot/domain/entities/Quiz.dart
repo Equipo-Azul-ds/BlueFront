@@ -34,20 +34,34 @@ class Quiz {
   });
 
   factory Quiz.fromJson(Map<String, dynamic> json) {
+    // Robustez para authorId: busca en authorId plano o dentro de objeto author (id o authorId)
+    String extractedAuthorId = json['authorId']?.toString() ?? '';
+    if (extractedAuthorId.isEmpty && json['author'] != null && json['author'] is Map) {
+       final authMap = json['author'];
+       extractedAuthorId = (authMap['id'] ?? authMap['authorId'])?.toString() ?? '';
+    }
+
     return Quiz(
       quizId: json['quizId'] ?? json['id'],
-      authorId: json['authorId'] ?? (json['author'] != null ? json['author']['authorId'] : null) ?? '',
-      title: json['title'],
-      description: json['description'],
-      visibility: json['visibility'],
+      authorId: extractedAuthorId,
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      visibility: json['visibility'] ?? 'private',
       status: json['status'],
       category: json['category'],
-      themeId: json['themeId'],
+      // Fix: backend returns 'theme' object or 'themeId' string. Handle both and ensure not null.
+      themeId: json['themeId'] ?? (json['theme'] != null ? json['theme']['id'] : '') ?? '',
       isLocal: false,
       templateId: json['templateId'],
-      coverImageUrl: json['coverImageUrl'] ?? json['coverImage'] ?? json['cover_image'],
+      // Acepta tanto URL como assetId; si solo viene coverImageId lo guardamos aquí para resolver más adelante.
+      coverImageUrl: json['coverImageUrl'] ??
+          json['coverImage'] ??
+          json['cover_image'] ??
+          json['coverImageId']?.toString(),
       createdAt: DateTime.parse(json['createdAt'] ?? json['created_at'] ?? DateTime.now().toIso8601String()),
-      questions: (json['questions'] as List).map((q) => Question.fromJson(q as Map<String, dynamic>)).toList(),
+      questions: (json['questions'] is List) 
+          ? (json['questions'] as List).map((q) => Question.fromJson(q as Map<String, dynamic>)).toList() 
+          : [],
     );
   }
 

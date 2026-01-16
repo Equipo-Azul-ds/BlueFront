@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:Trivvy/core/constants/colors.dart';
+import 'package:Trivvy/core/widgets/animated_list_helpers.dart';
+import 'package:Trivvy/core/widgets/game_ui_kit.dart';
+import 'package:Trivvy/features/user/presentation/blocs/auth_bloc.dart';
 import '../../application/use_cases/single_player_usecases.dart';
-import '../../domain/repositories/single_player_game_repository.dart';
+import '../../domain/entities/single_player_game.dart';
 import '../blocs/single_player_results_bloc.dart';
 import 'single_player_challenge.dart';
 
@@ -15,8 +18,13 @@ import 'single_player_challenge.dart';
 // inicio.
 class SinglePlayerChallengeResultsScreen extends StatefulWidget {
   final String gameId;
+  final SinglePlayerGame? initialSummaryGame;
 
-  const SinglePlayerChallengeResultsScreen({super.key, required this.gameId});
+  const SinglePlayerChallengeResultsScreen({
+    super.key,
+    required this.gameId,
+    this.initialSummaryGame,
+  });
 
   @override
   State<SinglePlayerChallengeResultsScreen> createState() =>
@@ -50,19 +58,15 @@ class _SinglePlayerChallengeResultsScreenState
       begin: 0.95,
       end: 1.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
-    final repo = Provider.of<SinglePlayerGameRepository>(
-      context,
-      listen: false,
-    );
     final getSummary = Provider.of<GetSummaryUseCase>(context, listen: false);
 
-    _bloc = SinglePlayerResultsBloc(
-      repository: repo,
-      getSummaryUseCase: getSummary,
-    );
+    _bloc = SinglePlayerResultsBloc(getSummaryUseCase: getSummary);
+    _bloc.hydrate(widget.initialSummaryGame);
 
     // Cargamos el resumen del intento al iniciar el estado.
-    _bloc.load(widget.gameId);
+    // Pasamos el quizId del juego inicial para asegurar que se preserve en el resumen.
+    final quizId = widget.initialSummaryGame?.quizId;
+    _bloc.load(widget.gameId, quizId: quizId);
 
     _controller.forward();
     _confettiController =
@@ -84,30 +88,44 @@ class _SinglePlayerChallengeResultsScreenState
       child: Consumer<SinglePlayerResultsBloc>(
         builder: (context, bloc, _) {
           // Loading
-          if (bloc.isLoading) {
+          if (bloc.isLoading && bloc.summaryGame == null) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
           }
 
           // Error
-          if (bloc.error != null) {
+          if (bloc.error != null && bloc.summaryGame == null) {
             return Scaffold(
               body: SafeArea(
                 child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Error: ${bloc.error}",
-                        style: const TextStyle(color: AppColor.error),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                    child: SurfaceCard(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "Error: ${bloc.error}",
+                            style: const TextStyle(color: AppColor.error),
+                          ),
+                          const SizedBox(height: 12),
+                          PrimaryButton(
+                            label: "Reintentar",
+                            icon: Icons.refresh_rounded,
+                            onPressed: () => bloc.retry(widget.gameId),
+                          ),
+                          const SizedBox(height: 10),
+                          SecondaryButton(
+                            label: "Volver al inicio",
+                            icon: Icons.arrow_back,
+                            onPressed: () => Navigator.of(context)
+                                .popUntil((route) => route.isFirst),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: () => bloc.retry(widget.gameId),
-                        child: const Text("Reintentar"),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -119,9 +137,18 @@ class _SinglePlayerChallengeResultsScreenState
           final nickname = game.playerId;
           final finalScore = game.gameScore.score;
           final totalQuestions = game.totalQuestions;
-          final correctAnswers = game.gameAnswers
-              .where((qr) => qr.evaluatedAnswer.wasCorrect)
-              .length;
+          final authBloc = Provider.of<AuthBloc>(context, listen: false);
+          final avatarUrl = authBloc.currentUser?.avatarUrl ?? '';
+            final correctAnswers = game.totalCorrect ??
+              game.gameAnswers
+                .where((qr) => qr.evaluatedAnswer.wasCorrect)
+                .length;
+            final double? accuracyPercentage = game.accuracyPercentage ??
+              (totalQuestions > 0
+                ? (correctAnswers / totalQuestions) * 100
+                : null);
+            final accuracyLabel =
+              accuracyPercentage != null ? _formatAccuracy(accuracyPercentage) : null;
           final success = correctAnswers >= (totalQuestions / 2);
           final bool perfectRun =
               totalQuestions > 0 && correctAnswers == totalQuestions;
@@ -138,6 +165,7 @@ class _SinglePlayerChallengeResultsScreenState
 
           return Scaffold(
             body: Stack(
+              fit: StackFit.expand,
               children: [
                 Container(
                   decoration: const BoxDecoration(
@@ -164,35 +192,41 @@ class _SinglePlayerChallengeResultsScreenState
                           const SizedBox(height: 20),
                           Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                          child: FadeTransition(
-                            opacity: _fade,
+                          child: AnimatedBuilder(
+                            animation: _fade,
+                            builder: (context, child) {
+                              final opacity = _fade.value.clamp(0.0, 1.0);
+                              return Opacity(opacity: opacity, child: child);
+                            },
                             child: ScaleTransition(
                               scale: _scale,
-                              child: Container(
+                              child: SurfaceCard(
                                 padding: const EdgeInsets.symmetric(
                                   vertical: 24.0,
                                   horizontal: 16.0,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
+                                borderRadius: 14,
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     CircleAvatar(
                                       radius: 36,
                                       backgroundColor: AppColor.accent,
-                                      child: Text(
-                                        nickname.isNotEmpty
-                                            ? nickname[0].toUpperCase()
-                                            : "?",
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 32,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
+                                      backgroundImage: avatarUrl.isNotEmpty
+                                          ? NetworkImage(avatarUrl)
+                                          : null,
+                                      child: avatarUrl.isEmpty
+                                          ? Text(
+                                              nickname.isNotEmpty
+                                                  ? nickname[0].toUpperCase()
+                                                  : "?",
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            )
+                                          : null,
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
@@ -238,63 +272,54 @@ class _SinglePlayerChallengeResultsScreenState
                                       ),
                                     ),
                                     const SizedBox(height: 16),
-                                    Text(
-                                      "$finalScore puntos",
+                                    AnimatedCounter(
+                                      value: finalScore,
+                                      duration: const Duration(milliseconds: 800),
+                                      suffix: ' puntos',
                                       style: const TextStyle(
                                         color: Colors.black54,
                                         fontSize: 18,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
+                                    if (accuracyLabel != null) ...[
+                                      const SizedBox(height: 10),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColor.primary.withValues(alpha: 0.08),
+                                          borderRadius: BorderRadius.circular(999),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              Icons.speed_rounded,
+                                              color: AppColor.primary.withValues(alpha: 0.9),
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '$accuracyLabel% de precisión',
+                                              style: TextStyle(
+                                                color: AppColor.primary.withValues(alpha: 0.9),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
                             ),
                           ),
                           ),
-                          const SizedBox(height: 24),
-                          Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 24.0),
-                            child: Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Detalle de preguntas',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ...List.generate(totalQuestions, (index) {
-                                    final wasCorrect =
-                                        index < game.gameAnswers.length
-                                            ? game.gameAnswers[index]
-                                                .evaluatedAnswer
-                                                .wasCorrect
-                                            : null;
-                                    return _buildQuestionSummaryRow(
-                                      index: index,
-                                      wasCorrect: wasCorrect,
-                                    );
-                                  }),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 32),
                           Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 20.0,
@@ -303,51 +328,29 @@ class _SinglePlayerChallengeResultsScreenState
                           child: Row(
                             children: [
                               Expanded(
-                                child: ElevatedButton(
+                                child: PrimaryButton(
+                                  label: "Rematch",
+                                  icon: Icons.restart_alt_rounded,
                                   onPressed: () {
-                                    // `StartAttemptUseCase` se encargará de crear o
-                                    // reanudar un intento cuando se solicite un rematch.
                                     Navigator.of(context).pushReplacement(
                                       MaterialPageRoute(
                                         builder: (_) => SinglePlayerChallengeScreen(
-                                          nickname: nickname,
                                           quizId: game.quizId,
-                                          totalQuestions: game.totalQuestions,
                                         ),
                                       ),
                                     );
                                   },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: AppColor.primary,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    "Rematch",
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: ElevatedButton(
+                                child: SecondaryButton(
+                                  label: "Volver al inicio",
+                                  icon: Icons.home_rounded,
                                   onPressed: () {
                                     Navigator.of(context)
                                         .popUntil((route) => route.isFirst);
                                   },
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColor.accent,
-                                    foregroundColor: AppColor.onPrimary,
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    "Volver al inicio",
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
                                 ),
                               ),
                             ],
@@ -384,67 +387,9 @@ class _SinglePlayerChallengeResultsScreenState
       ),
     );
   }
-}
 
-Widget _buildQuestionSummaryRow({
-  required int index,
-  required bool? wasCorrect,
-}) {
-  final statusColor = wasCorrect == null
-      ? Colors.white70
-      : wasCorrect
-          ? AppColor.success
-          : AppColor.error;
-  final icon = wasCorrect == null
-      ? Icons.help_outline
-      : wasCorrect
-          ? Icons.check_circle
-          : Icons.cancel;
-  final label = wasCorrect == null
-      ? 'Sin responder'
-      : wasCorrect
-          ? 'Correcta'
-          : 'Incorrecta';
-
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 6),
-    child: Row(
-      children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: Colors.white.withValues(alpha: 0.15),
-          child: Text(
-            '${index + 1}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            'Pregunta ${index + 1}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Row(
-          children: [
-            Icon(icon, color: statusColor, size: 18),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: statusColor,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
+  String _formatAccuracy(double value) {
+    final bool isWhole = value % 1 == 0;
+    return isWhole ? value.toStringAsFixed(0) : value.toStringAsFixed(1);
+  }
 }

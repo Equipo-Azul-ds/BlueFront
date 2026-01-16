@@ -1,7 +1,10 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:Trivvy/features/challenge/application/dtos/single_player_dtos.dart';
 import 'package:Trivvy/features/challenge/application/use_cases/single_player_usecases.dart';
+import 'package:Trivvy/features/challenge/domain/entities/single_player_game.dart';
+import 'package:Trivvy/features/challenge/infrastructure/storage/single_player_attempt_tracker.dart';
 import 'package:Trivvy/features/challenge/presentation/pages/single_player_challenge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
@@ -9,7 +12,10 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart'
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
+import '../features/Administrador/Presentacion/pages/Persona_Page.dart';
+import '../features/discovery/presentation/pages/discover_page.dart';
 import '/features/gameSession/presentation/pages/join_game.dart';
+import '/features/gameSession/presentation/pages/host_lobby.dart';
 import '../common_widgets/kahoot_card.dart';
 import '../common_widgets/main_bottom_nav_bar.dart';
 import '../core/constants/colors.dart';
@@ -18,6 +24,11 @@ import '../features/kahoot/domain/entities/Quiz.dart';
 import '../features/kahoot/presentation/blocs/quiz_editor_bloc.dart';
 import '../features/media/presentation/blocs/media_editor_bloc.dart';
 import '../features/library/presentation/pages/library_page.dart';
+import '../features/user/presentation/pages/profile_page.dart';
+import '../features/user/presentation/blocs/auth_bloc.dart';
+import '../features/library/presentation/providers/library_provider.dart';
+
+import 'package:Trivvy/features/subscriptions/presentation/utils/subscription_guard.dart';
 
 class HomePageContent extends StatefulWidget {
   const HomePageContent({super.key});
@@ -41,22 +52,35 @@ class _HomePageContentState extends State<HomePageContent> {
   @override
   void initState() {
     super.initState();
-    // Se cargan los quizzes del usuario al ingresar (usa un ID de autor de marcador de posición)
+    // Se cargan los quizzes del usuario al ingresar.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final quizBloc = Provider.of<QuizEditorBloc>(context, listen: false);
       if (quizBloc.userQuizzes == null) {
-        // Se intenta cargar los quizzes del usuario. Si no hay un authorId en currentQuiz,
-        // utiliza un authorId de prueba por defecto para que el Dashboard muestre
-        // los quizzes creados durante el desarrollo o pruebas.
-        const defaultTestAuthorId = 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
-        var authorIdCandidate = quizBloc.currentQuiz?.authorId ?? '';
-        if (authorIdCandidate.isEmpty) authorIdCandidate = defaultTestAuthorId;
+        // Obtenemos el authBloc para recuperar el usuario actual o su ID
+        final auth = Provider.of<AuthBloc>(context, listen: false);
+        
+        // Si no hay user en memoria, intentamos leer desde storage (por si hubo recarga)
+        // aunque idealmente AuthBloc ya debió inicializar eso. 
+        // Tomaremos el ID disponible.
+        String authorIdCandidate = auth.currentUser?.id ?? '';
+        
+        // Si sigue vacío, probamos leer el que guardamos en SecureStorage en el login.
+        // Esto es un 'fallback' por si AuthBloc aún no lo tenía listo.
+        if (authorIdCandidate.isEmpty) {
+           // Nota: recuperar de secure storage es asíncrono, pero AuthBloc lo deberia tener.
+           // Si authBloc no tiene usuario, puede que no estemos logueados.
+        }
 
+        // Ya NO usamos el defaultTestAuthorId hardcodeado, porque queremos ver MIS quizzes.
+        // Si no hay authorId, se enviará cadena vacía, pero el repositorio usa el token.
+        // Así que enviamos lo que tengamos.
+        
         setState(() => _loadingUserQuizzes = true);
         try {
+          // Llama al bloc, que llama al caso de uso, que llama al repo searchByAuthor
+          // El repo (modificado) usará el token en el header y la ruta /library/my-creations.
           await quizBloc.loadUserQuizzes(authorIdCandidate);
         } catch (e) {
-          // Registrar el error pero no bloqueaa la interfaz si el backend rechaza el authorId.
           print(
             '[dashboard] loadUserQuizzes error for author=$authorIdCandidate -> $e',
           );
@@ -201,7 +225,7 @@ class _HomePageContentState extends State<HomePageContent> {
         }
 
         print('[dashboard] requesting delete for quizId=${q.quizId}');
-        await quizBloc.deleteQuiz(q.quizId);
+        await quizBloc.deleteQuiz(q);
         if (quizBloc.errorMessage != null) {
           print('[dashboard] delete returned error: ${quizBloc.errorMessage}');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -304,6 +328,60 @@ class _HomePageContentState extends State<HomePageContent> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      Navigator.of(ctx).pop();
+                                      await _startSinglePlayerQuiz(context, q);
+                                    },
+                                    icon: const Icon(
+                                      Icons.play_arrow_rounded,
+                                      size: 20,
+                                    ),
+                                    label: const Text(
+                                      'Jugar en modo solitario',
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColor.secundary,
+                                      foregroundColor: AppColor.onPrimary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      Navigator.of(ctx).pop();
+                                      await _startHostingQuiz(context, q);
+                                    },
+                                    icon: const Icon(
+                                      Icons.wifi_tethering_rounded,
+                                      size: 20,
+                                    ),
+                                    label: const Text('Hostear en vivo'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColor.primary,
+                                      foregroundColor: AppColor.onPrimary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Expanded(
@@ -323,6 +401,8 @@ class _HomePageContentState extends State<HomePageContent> {
                                     Navigator.of(ctx).pop();
                                     try {
                                       if (q.quizId.isNotEmpty && !q.isLocal) {
+                                        // Pre-cargar el quiz seleccionado en el bloc para que la UI muestre ese mismo quiz mientras llega el fetch
+                                        quizBloc.setCurrentQuiz(q);
                                         // Carga el quiz completo en el Bloc (actualiza currentQuiz antes de navegar al editor)
                                         await quizBloc.loadQuiz(q.quizId);
                                       } else {
@@ -358,6 +438,17 @@ class _HomePageContentState extends State<HomePageContent> {
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            SizedBox(height: 6),
+                            Text(
+                              'ID: ${q.quizId.isNotEmpty ? q.quizId : '(sin id)'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
                             SizedBox(height: 8),
                             // Template / Theme info
                             Text(
@@ -390,6 +481,8 @@ class _HomePageContentState extends State<HomePageContent> {
                               Navigator.of(ctx).pop();
                               try {
                                 if (q.quizId.isNotEmpty && !q.isLocal) {
+                                  // Pre-cargar el quiz seleccionado en el bloc para que la UI muestre ese mismo quiz mientras llega el fetch
+                                  quizBloc.setCurrentQuiz(q);
                                   await quizBloc.loadQuiz(q.quizId);
                                 } else {
                                   WidgetsBinding.instance.addPostFrameCallback(
@@ -438,13 +531,19 @@ class _HomePageContentState extends State<HomePageContent> {
                             // Realizar una petición POST para crear la copia del quiz en el backend (se construye el DTO a continuación)
                             Navigator.of(ctx).pop();
 
+                            final auth = Provider.of<AuthBloc>(
+                              context,
+                              listen: false,
+                            );
                             const defaultTestAuthorId =
                                 'f1986c62-7dc1-47c5-9a1f-03d34043e8f4';
                             final authorIdCandidate =
-                                (q.authorId.isEmpty ||
-                                    q.authorId.contains('placeholder'))
-                                ? defaultTestAuthorId
-                                : q.authorId;
+                                (auth.currentUser?.id ?? '').isNotEmpty
+                                ? auth.currentUser!.id
+                                : ((q.authorId.isEmpty ||
+                                          q.authorId.contains('placeholder'))
+                                      ? defaultTestAuthorId
+                                      : q.authorId);
 
                             // Mapear preguntas y respuestas a los DTOs Create* para la petición de duplicado.
                             // NO se generan ni se reasignan IDs aquí: el backend debe asignar los nuevos identificadores.
@@ -565,6 +664,50 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
+  Future<void> _startHostingQuiz(BuildContext context, Quiz quiz) async {
+    final kahootId = quiz.quizId.trim();
+    if (kahootId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Este quiz debe estar sincronizado para poder hostearlo.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => HostLobbyScreen(kahootId: kahootId)),
+    );
+  }
+
+  Future<void> _startSinglePlayerQuiz(BuildContext context, Quiz quiz) async {
+    final kahootId = quiz.quizId.trim();
+    if (kahootId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Este quiz aún no tiene un ID válido; sincronízalo antes de jugar.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final resume = await _resolveSinglePlayerResume(context, kahootId);
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SinglePlayerChallengeScreen(
+          quizId: kahootId,
+          initialGame: resume.game,
+          initialSlide: resume.nextSlide,
+        ),
+      ),
+    );
+  }
+
   String _themeName(String? id) {
     if (id == null || id.isEmpty) return '—';
     final map = {
@@ -578,54 +721,31 @@ class _HomePageContentState extends State<HomePageContent> {
     return map[id] ?? id;
   }
 
-  final List<Map<String, dynamic>> activeTrivvys = [
-    {
-      'id': 'mock_quiz_1',
-      'title': 'Ciencia y Matemática Básica',
-      'questions': 5,
-    },
-    {
-      'id': 'mock_quiz_ddd',
-      'title': 'Domain-Driven Design Básico',
-      'questions': 5,
-    },
-  ];
+  Future<({SinglePlayerGame? game, SlideDTO? nextSlide})>
+  _resolveSinglePlayerResume(BuildContext context, String quizId) async {
+    final tracker = context.read<SinglePlayerAttemptTracker>();
+    final attemptStateUseCase = context.read<GetAttemptStateUseCase>();
+    final authBloc = Provider.of<AuthBloc>(context, listen: false);
+    final userId = authBloc.currentUser?.id ?? '';
 
-  Future<void> _startTrivvy(
-    BuildContext context,
-    Map<String, dynamic> quiz,
-  ) async {
-    final startAttempt = Provider.of<StartAttemptUseCase>(
-      context,
-      listen: false,
-    );
+    final storedAttemptId = await tracker.readAttemptId(quizId, userId);
+    if (storedAttemptId == null) {
+      return (game: null, nextSlide: null);
+    }
+
     try {
-      final res = await startAttempt.execute(
-        kahootId: quiz['id'] as String,
-        playerId: 'Jugador',
-        totalQuestions: quiz['questions'] as int,
-      );
-      if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SinglePlayerChallengeScreen(
-            nickname: res.game.playerId,
-            quizId: res.game.quizId,
-            totalQuestions: res.game.totalQuestions,
-          ),
-        ),
-      );
-    } catch (_) {
-      if (!context.mounted) return;
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => SinglePlayerChallengeScreen(
-            nickname: 'Jugador',
-            quizId: quiz['id'] as String,
-            totalQuestions: quiz['questions'] as int,
-          ),
-        ),
-      );
+      final attemptState = await attemptStateUseCase.execute(storedAttemptId);
+      final game = attemptState.game;
+      if (game == null ||
+          game.gameProgress.state == GameProgressStatus.COMPLETED) {
+        await tracker.clearAttempt(quizId, userId);
+        return (game: null, nextSlide: null);
+      }
+      return (game: game, nextSlide: attemptState.nextSlide);
+    } catch (e) {
+      print('[dashboard] Failed to resume attempt for quiz=$quizId -> $e');
+      await tracker.clearAttempt(quizId, userId);
+      return (game: null, nextSlide: null);
     }
   }
 
@@ -633,6 +753,11 @@ class _HomePageContentState extends State<HomePageContent> {
   Widget build(BuildContext context) {
     // Obtener el bloc si es necesario en el futuro
     final quizBloc = Provider.of<QuizEditorBloc>(context);
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    final user = auth.currentUser;
+    final displayName = (user != null && user.name.trim().isNotEmpty)
+        ? user.name.trim()
+        : (user?.userName ?? 'Jugador');
     // Si el navegador pasó un cuestionario creado como argumento, se inserta en userQuizzes
     //para que sea visible inmediatamente sin llamar al backend.
     final args = ModalRoute.of(context)?.settings.arguments;
@@ -831,7 +956,7 @@ class _HomePageContentState extends State<HomePageContent> {
                               children: [
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Hola, Jugador!',
+                                  'Hola, $displayName!',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: constraints.maxWidth * 0.07,
@@ -989,6 +1114,16 @@ class _HomePageContentState extends State<HomePageContent> {
                         }
                       }
 
+                      final auth = Provider.of<AuthBloc>(
+                        context,
+                        listen: false,
+                      );
+                      final authorName =
+                          (auth.currentUser?.id == q.authorId &&
+                              (auth.currentUser?.name.isNotEmpty ?? false))
+                          ? auth.currentUser!.name
+                          : q.authorId;
+
                       return GestureDetector(
                         onLongPress: () async {
                           if (coverId != null && !coverId.startsWith('http')) {
@@ -1015,6 +1150,7 @@ class _HomePageContentState extends State<HomePageContent> {
                         },
                         child: KahootCard(
                           kahoot: q,
+                          authorNameOverride: authorName,
                           coverBytes: cachedBytes,
                           coverUrlOverride: cachedUrlOverride,
                           onTap: () => _showQuizOptions(context, q),
@@ -1129,8 +1265,15 @@ class _HomePageContentState extends State<HomePageContent> {
                 childCount: recommendedKahoots.length,
                 itemBuilder: (context, index) {
                   final kahoot = recommendedKahoots[index];
+                  final auth = Provider.of<AuthBloc>(context, listen: false);
+                  final authorName =
+                      (auth.currentUser?.id == kahoot.authorId &&
+                          (auth.currentUser?.name.isNotEmpty ?? false))
+                      ? auth.currentUser!.name
+                      : kahoot.authorId;
                   return KahootCard(
                     kahoot: kahoot,
+                    authorNameOverride: authorName,
                     onTap: () => Navigator.pushNamed(
                       context,
                       '/gameDetail',
@@ -1139,109 +1282,6 @@ class _HomePageContentState extends State<HomePageContent> {
                   );
                 },
               ),
-            ),
-            SliverPadding(
-              // Sección Trivvys activos
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.025,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Trivvys Activos',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: constraints.maxWidth * 0.045,
-                      ),
-                    ),
-                    Text(
-                      '${activeTrivvys.length} juegos',
-                      style: TextStyle(
-                        color: AppColor.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: constraints.maxWidth * 0.035,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SliverPadding(
-              // Lista de trivvys activos
-              padding: EdgeInsets.symmetric(
-                horizontal: constraints.maxWidth * 0.05,
-                vertical: screenSize.height * 0.005,
-              ),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final quiz = activeTrivvys[index];
-                  return Container(
-                    margin: EdgeInsets.only(bottom: screenSize.height * 0.015),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => _startTrivvy(context, quiz),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: constraints.maxWidth * 0.045,
-                            vertical: screenSize.height * 0.018,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    quiz['title'] as String,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: constraints.maxWidth * 0.042,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${quiz['questions']} preguntas',
-                                    style: TextStyle(
-                                      color: Colors.grey[700],
-                                      fontSize: constraints.maxWidth * 0.035,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Icon(
-                                Icons.play_circle_fill,
-                                color: AppColor.primary,
-                                size: 32,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }, childCount: activeTrivvys.length),
-              ),
-            ),
-            // Espacio inferior para dejar respirar el FAB
-            SliverToBoxAdapter(
-              child: SizedBox(height: min(screenSize.height * 0.06, 120)),
             ),
           ],
         );
@@ -1260,27 +1300,39 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
 
+  List<Widget> _buildPages(BuildContext context) {
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    final currentUser = auth.currentUser;
+    return [
+      const HomePageContent(), // 0: Inicio
+      const DiscoverScreen(), // 1: Descubre (Placeholder)
+      const SizedBox.shrink(), // 2: Placeholder for FAB
+      const LibraryPage(), // 3: Biblioteca
+      currentUser == null
+          ? const Scaffold(
+              body: Center(child: Text('Inicia sesión para ver tu perfil')),
+            )
+          : ProfilePage(user: currentUser), // 4: Perfil
+    ];
+  }
+
+  /*
+=======
   final List<Widget> _pages = const [
     HomePageContent(), // 0: Inicio
-    Scaffold(
-      body: Center(child: Text('Descubre Page')),
-    ), // 1: Descubre (Placeholder)
+    DiscoverScreen(), //Discovery
     SizedBox.shrink(), // 2: Placeholder for FAB
     LibraryPage(), // 3: Biblioteca (Épica 7)
-    Scaffold(
-      body: Center(child: Text('Perfil Page')),
-    ), // 4: Perfil (Placeholder)
+    PersonaPage(), // 4: Perfil (Placeholder)
   ];
-
+>>>>>>> epica9y11
+*/
   void _onItemTapped(int index) {
     if (index == 2) {
       Navigator.pushNamed(context, '/create');
       return;
     }
-    if (index == 1) {
-      Navigator.pushReplacementNamed(context, '/discover');
-      return;
-    }
+
     setState(() {
       _currentIndex = index;
     });
@@ -1288,9 +1340,22 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Si no hay usuario (tras logout), redirige inmediatamente a la pantalla de bienvenida
+    final auth = Provider.of<AuthBloc>(context, listen: true);
+    if (auth.currentUser == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.of(
+          context,
+          rootNavigator: true,
+        ).pushNamedAndRemoveUntil('/welcome', (route) => false);
+      });
+      // Devuelve un contenedor vacío mientras se realiza la navegación
+      return const SizedBox.shrink();
+    }
     return Scaffold(
       backgroundColor: AppColor.background,
-      body: IndexedStack(index: _currentIndex, children: _pages),
+      body: IndexedStack(index: _currentIndex, children: _buildPages(context)),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           // Aseguro de que el editor comience vacío: limpiar cualquier currentQuiz previo

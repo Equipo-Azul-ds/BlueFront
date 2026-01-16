@@ -1,7 +1,6 @@
 import '../../domain/entities/single_player_game.dart';
-import '../../domain/repositories/single_player_game_repository.dart';
 import '../dtos/single_player_dtos.dart';
-import '../ports/slide_provider.dart';
+import '../../domain/repositories/single_player_game_repository.dart';
 
 // Wrappers
 
@@ -30,11 +29,13 @@ class SubmitAnswerResult {
   final QuestionResult evaluatedQuestion;
   final SlideDTO? nextSlide;
   final int? correctAnswerIndex;
+  final SinglePlayerGame? updatedGame;
 
   SubmitAnswerResult({
     required this.evaluatedQuestion,
     this.nextSlide,
     this.correctAnswerIndex,
+    this.updatedGame,
   });
 }
 
@@ -49,51 +50,17 @@ class SummaryResult {
 /// StartAttemptUseCase: Empieza un intento y devuelve el agregado y la primera pregunta a traves de DTO
 class StartAttemptUseCase {
   final SinglePlayerGameRepository repository;
-  final SlideProvider slideProvider;
-  final GetAttemptStateUseCase? getAttemptStateUseCase;
 
-  StartAttemptUseCase({
-    required this.repository,
-    required this.slideProvider,
-    this.getAttemptStateUseCase,
-  });
+  StartAttemptUseCase({required this.repository});
 
   Future<StartAttemptResult> execute({
     required String kahootId,
-    required String playerId,
-    required int totalQuestions,
   }) async {
-    final game = await repository.startAttempt(
+    final response = await repository.startAttempt(
       kahootId: kahootId,
-      playerId: playerId,
-      totalQuestions: totalQuestions,
     );
-
-    // Intentamos obtener el estado más reciente del intento mediante
-    // `GetAttemptStateUseCase` cuando esté disponible. De esta forma la
-    // capa de aplicación usa explícitamente el caso de uso de consulta para
-    // reanudar en lugar de depender únicamente del comportamiento de
-    // `startAttempt`.
-    SinglePlayerGame latest = game;
-    if (getAttemptStateUseCase != null) {
-      try {
-        final state = await getAttemptStateUseCase!.execute(game.gameId);
-        if (state.game != null) {
-          latest = state.game!;
-        }
-      } catch (_) {
-        // Si falla la consulta de estado, continuamos con la respuesta de
-        // `startAttempt` para no bloquear el inicio.
-      }
-    }
-
-    // Sincronizamos el puntero del proveedor de slides con el número de
-    // respuestas persistidas en el agregado para evitar avances dobles.
-    await slideProvider.ensurePointerSynced(
-      latest.gameId,
-      latest.gameAnswers.length,
-    );
-    final firstSlide = await slideProvider.getNextSlideDto(latest.gameId);
+    SinglePlayerGame latest = response.game;
+    SlideDTO? firstSlide = response.nextSlide;
 
     return StartAttemptResult(game: latest, firstSlide: firstSlide);
   }
@@ -105,8 +72,11 @@ class GetAttemptStateUseCase {
   GetAttemptStateUseCase({required this.repository});
 
   Future<AttemptStateResult> execute(String attemptId) async {
-    final game = await repository.getAttemptState(attemptId);
-    return AttemptStateResult(game: game, nextSlide: null);
+    final response = await repository.getAttemptState(attemptId);
+    return AttemptStateResult(
+      game: response.game,
+      nextSlide: response.nextSlide,
+    );
   }
 }
 
@@ -114,25 +84,19 @@ class GetAttemptStateUseCase {
 /// De la siguiente pregunta (Slide)
 class SubmitAnswerUseCase {
   final SinglePlayerGameRepository repository;
-  final SlideProvider slideProvider;
 
-  SubmitAnswerUseCase({required this.repository, required this.slideProvider});
+  SubmitAnswerUseCase({required this.repository});
 
   Future<SubmitAnswerResult> execute(
     String attemptId,
     PlayerAnswer playerAnswer,
   ) async {
-    final evaluated = await repository.submitAnswer(attemptId, playerAnswer);
-    final nextSlide = await slideProvider.getNextSlideDto(attemptId);
-    final correctIndex = await slideProvider.getCorrectAnswerIndex(
-      attemptId,
-      evaluated.questionId,
-    );
-
+    final response = await repository.submitAnswer(attemptId, playerAnswer);
     return SubmitAnswerResult(
-      evaluatedQuestion: evaluated,
-      nextSlide: nextSlide,
-      correctAnswerIndex: correctIndex,
+      evaluatedQuestion: response.evaluatedQuestion,
+      nextSlide: response.nextSlide,
+      correctAnswerIndex: response.correctAnswerIndex,
+      updatedGame: response.updatedGame,
     );
   }
 }
@@ -142,8 +106,8 @@ class GetSummaryUseCase {
   final SinglePlayerGameRepository repository;
   GetSummaryUseCase(this.repository);
 
-  Future<SummaryResult> execute(String attemptId) async {
-    final game = await repository.getAttemptSummary(attemptId);
+  Future<SummaryResult> execute(String attemptId, {String? quizId}) async {
+    final game = await repository.getAttemptSummary(attemptId, quizId: quizId);
     return SummaryResult(summaryGame: game);
   }
 }
