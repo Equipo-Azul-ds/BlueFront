@@ -559,26 +559,102 @@ class _GroupDetailPageState extends State<GroupDetailPage>
             final a = assignments[i];
             final availableUntilStr = _fmt(a.availableUntil.toLocal());
             final availableFromStr = _fmt(a.availableFrom.toLocal());
-            final title = a.quizTitle.isNotEmpty ? a.quizTitle : a.quizId;
+            final title = a.quizTitle.isNotEmpty ? a.quizTitle : 'Quiz pendiente de título';
+            final isCompleted = a.isCompleted;
+            
             return Card(
+              color: Colors.white,
+              elevation: 2,
+              margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Asignación de Quiz', style: TextStyle(fontWeight: FontWeight.w700)),
-                        Icon(a.isActive ? Icons.check_circle : Icons.cancel, color: a.isActive ? Colors.green : Colors.red, size: 18),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F0FE),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.assignment, color: Color(0xFF1F4B99)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Colors.black87
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isCompleted ? Colors.green.shade50 : Colors.orange.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: isCompleted ? Colors.green.shade200 : Colors.orange.shade200,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      isCompleted ? 'Completado' : 'Pendiente',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: isCompleted ? Colors.green.shade700 : Colors.orange.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isCompleted && a.attemptScore != null) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Puntaje: ${a.attemptScore}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text('Quiz: $title', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 14, color: Colors.black54),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Disponible: $availableFromStr',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 4),
-                    Text('Disponible desde: $availableFromStr', style: const TextStyle(color: Colors.black54, fontSize: 12)),
-                    Text('Disponible hasta: $availableUntilStr', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                    Row(
+                      children: [
+                        const Icon(Icons.event_busy, size: 14, color: Colors.black54),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Cierra: $availableUntilStr',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),

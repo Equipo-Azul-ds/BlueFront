@@ -8,6 +8,8 @@ class GroupQuizAssignment {
   final DateTime availableFrom;
   final DateTime availableUntil;
   final bool isActive;
+  final String status; 
+  final int? attemptScore;
 
   const GroupQuizAssignment({
     required this.id,
@@ -19,7 +21,11 @@ class GroupQuizAssignment {
     required this.availableFrom,
     required this.availableUntil,
     required this.isActive,
+    this.status = 'PENDING',
+    this.attemptScore,
   });
+
+  bool get isCompleted => status == 'COMPLETED';
 
   bool isAvailableAt(DateTime now) {
     if (!isActive) return false;
@@ -42,6 +48,18 @@ class GroupQuizAssignment {
       parsedTitle = nestedQuiz['title'] as String;
     }
 
+    // Extraer score de userResult o directo
+    int? parsedScore;
+    if (json['userResult'] != null && json['userResult']['score'] != null) {
+      parsedScore = json['userResult']['score'] is int 
+          ? json['userResult']['score'] 
+          : int.tryParse(json['userResult']['score'].toString());
+    } else if (json['score'] != null) {
+      parsedScore = json['score'] is int 
+          ? json['score'] 
+          : int.tryParse(json['score'].toString());
+    }
+
     return GroupQuizAssignment(
       id: json['id'] as String? ?? json['assignmentId'] as String? ?? '',
       groupId: json['groupId'] as String? ?? json['group_id'] as String? ?? '',
@@ -58,6 +76,8 @@ class GroupQuizAssignment {
           ? DateTime.parse(availableUntilRaw)
           : DateTime.now(),
       isActive: (json['isActive'] ?? json['active'] ?? true) as bool,
+      status: json['status'] as String? ?? 'PENDING',
+      attemptScore: parsedScore,
     );
   }
 
@@ -72,6 +92,8 @@ class GroupQuizAssignment {
       'availableFrom': availableFrom.toIso8601String(),
       'availableUntil': availableUntil.toIso8601String(),
       'isActive': isActive,
+      'status': status,
+      'score': attemptScore,
     };
   }
 }
