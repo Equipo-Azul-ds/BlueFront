@@ -28,14 +28,14 @@ class SessionLobbyManager extends ChangeNotifier {
   bool _isResolvingQr = false;
 
   PlayerLeftSessionEvent? _playerLeftDto;
-  HostConnectedSuccessEvent? _hostConnectedSuccessDto;
   PlayerAnswerConfirmationEvent? _playerAnswerConfirmationDto;
   PlayerConnectedEvent? _playerConnectedDto;
+  PlayerConnectedToServerEvent? _playerConnectedToServerDto;
 
   StreamSubscription<dynamic>? _gameStateSubscription;
   StreamSubscription<dynamic>? _hostLobbySubscription;
   StreamSubscription<dynamic>? _playerConnectedSubscription;
-  StreamSubscription<dynamic>? _hostAnswerUpdateSubscription;
+  StreamSubscription<dynamic>? _playerConnectedToServerSubscription;
   StreamSubscription<dynamic>? _playerLeftSubscription;
   StreamSubscription<dynamic>? _playerAnswerConfirmationSubscription;
 
@@ -50,9 +50,9 @@ class SessionLobbyManager extends ChangeNotifier {
   bool get isJoiningSession => _isJoiningSession;
   bool get isResolvingQr => _isResolvingQr;
   PlayerLeftSessionEvent? get playerLeftDto => _playerLeftDto;
-  HostConnectedSuccessEvent? get hostConnectedSuccessDto => _hostConnectedSuccessDto;
   PlayerAnswerConfirmationEvent? get playerAnswerConfirmationDto => _playerAnswerConfirmationDto;
   PlayerConnectedEvent? get playerConnectedDto => _playerConnectedDto;
+  PlayerConnectedToServerEvent? get playerConnectedToServerDto => _playerConnectedToServerDto;
 
   /// Establece la sesión del anfitrión y el PIN actual.
   void setHostSession(CreateSessionResponse session) {
@@ -129,12 +129,12 @@ class SessionLobbyManager extends ChangeNotifier {
           onError: onEventError,
         );
 
-    _hostAnswerUpdateSubscription?.cancel();
-    _hostAnswerUpdateSubscription = _realtime
+    _playerConnectedToServerSubscription?.cancel();
+    _playerConnectedToServerSubscription = _realtime
         .listenToServerEvent<Map<String, dynamic>>(
-            MultiplayerEvents.hostAnswerUpdate)
+            MultiplayerEvents.playerConnectedToServer)
         .listen(
-          (payload) => _handleHostAnswerUpdate(payload, onEventError),
+          (payload) => _handlePlayerConnectedToServer(payload, onEventError),
           onError: onEventError,
         );
 
@@ -196,28 +196,31 @@ class SessionLobbyManager extends ChangeNotifier {
     // Procesa confirmación de conexión del jugador, actualiza nickname local si es necesario
     try {
       final event = PlayerConnectedEvent.fromJson(payload);
-      print('[EVENT] ← RECEIVED: player_connected (nickname=${event.nickname})');
+      print('[EVENT] ← RECEIVED: player_connected_to_session (nickname=${event.nickname})');
       _playerConnectedDto = event;
       if (event.nickname.isNotEmpty) {
         _currentNickname = event.nickname;
       }
       notifyListeners();
     } catch (error) {
-      print('[EVENT] ✗ ERROR parsing player_connected: $error');
+      print('[EVENT] ✗ ERROR parsing player_connected_to_session: $error');
       onEventError(error);
     }
   }
 
-  void _handleHostAnswerUpdate(
+  void _handlePlayerConnectedToServer(
     Map<String, dynamic> payload,
     void Function(Object error) onEventError,
   ) {
-    // Procesa actualización de respuestas del anfitrión (enviada por GamePhaseManager)
+    // Procesa confirmación de conexión inicial del jugador al servidor (primer client_ready)
+    // Provee el tema de fondo de la partida
     try {
-      HostAnswerUpdateEvent.fromJson(payload);
-      // Esto es manejado en GamePhaseManager pero se almacena aquí para contexto del lobby
+      final event = PlayerConnectedToServerEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: player_connected_to_server (status=${event.status}, theme=${event.theme?.name})');
+      _playerConnectedToServerDto = event;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing player_connected_to_server: $error');
       onEventError(error);
     }
   }
@@ -286,21 +289,15 @@ class SessionLobbyManager extends ChangeNotifier {
     _isJoiningSession = false;
     _isResolvingQr = false;
     _playerLeftDto = null;
-    _hostConnectedSuccessDto = null;
     _playerAnswerConfirmationDto = null;
     _playerConnectedDto = null;
+    _playerConnectedToServerDto = null;
     notifyListeners();
   }
 
   /// Limpia el evento de jugador que se fue después de procesarlo.
   void clearPlayerLeftDto() {
     _playerLeftDto = null;
-    notifyListeners();
-  }
-
-  /// Limpia el evento de conexión exitosa del anfitrión después de procesarlo.
-  void clearHostConnectedSuccessDto() {
-    _hostConnectedSuccessDto = null;
     notifyListeners();
   }
 
@@ -315,7 +312,7 @@ class SessionLobbyManager extends ChangeNotifier {
     _gameStateSubscription?.cancel();
     _hostLobbySubscription?.cancel();
     _playerConnectedSubscription?.cancel();
-    _hostAnswerUpdateSubscription?.cancel();
+    _playerConnectedToServerSubscription?.cancel();
     _playerLeftSubscription?.cancel();
     _playerAnswerConfirmationSubscription?.cancel();
     super.dispose();

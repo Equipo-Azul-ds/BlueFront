@@ -297,6 +297,24 @@ class HostReturnedSessionEvent {
   }
 }
 
+/// Confirmación de conexión inicial del jugador al servidor.
+/// Se emite como respuesta al primer client_ready exitoso de la sesión.
+/// Provee el tema de fondo de la partida.
+class PlayerConnectedToServerEvent {
+  PlayerConnectedToServerEvent({this.status, this.theme});
+
+  final String? status;
+  final SessionThemeDto? theme;
+
+  factory PlayerConnectedToServerEvent.fromJson(Map<String, dynamic> json) {
+    final themeData = json['theme'];
+    return PlayerConnectedToServerEvent(
+      status: _nullableString(json['status']),
+      theme: themeData is Map ? SessionThemeDto.fromJson(_asMap(themeData)) : null,
+    );
+  }
+}
+
 // Error de sincronización al reconstruir estado; el server suele cerrar.
 class SyncErrorEvent {
   SyncErrorEvent({required this.message});

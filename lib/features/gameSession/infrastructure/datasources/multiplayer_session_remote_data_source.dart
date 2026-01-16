@@ -79,17 +79,13 @@ class MultiplayerSessionRemoteDataSourceImpl
   }
 
   Future<Options> _optionsWithAuth({bool requireToken = false}) async {
-    // Adjunta el token (UUID) directamente sin wrapper Bearer; si es obligatorio y falta, falla.
     final headers = <String, dynamic>{};
     final token = await _tokenProvider?.call();
     if (token != null && token.isNotEmpty) {
-      print('[REST_AUTH] Using token: $token');
-      headers['Authorization'] = token;
-    } else if (requireToken) {
-      print('[REST_AUTH] ERROR: Token required but not available');
-      throw StateError('Se requiere un UUID válido para esta operación.');
-    } else {
-      print('[REST_AUTH] No token provided (not required)');
+      final authValue = RegExp(r'^bearer ', caseSensitive: false).hasMatch(token)
+          ? token
+          : 'Bearer $token';
+      headers['Authorization'] = authValue;
     }
     return Options(headers: headers.isEmpty ? null : headers);
   }

@@ -112,7 +112,12 @@ class ReportsRepositoryImpl implements ReportsRepository {
     });
     final json = await _getJson(uri);
     print('📋 [ReportsRepository] My results data received');
-    return MyResultsResponse.fromJson(json);
+    final response = MyResultsResponse.fromJson(json);
+    print('📋 [ReportsRepository] Parsed ${response.results.length} items from response');
+    for (final result in response.results) {
+      print('  📌 Item: kahootId=${result.kahootId}, gameId=${result.gameId}, gameType=${result.gameType}, title=${result.title}');
+    }
+    return response;
   }
 
   /// Validates limit parameter

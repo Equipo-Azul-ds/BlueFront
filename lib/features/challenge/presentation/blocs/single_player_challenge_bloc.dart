@@ -93,7 +93,10 @@ class SinglePlayerChallengeBloc extends ChangeNotifier {
     if (currentGame == null || _userId == null) return;
     _setLoading(true);
 
-    final result = await getSummaryUseCase.execute(currentGame!.gameId);
+    final result = await getSummaryUseCase.execute(
+      currentGame!.gameId,
+      quizId: currentGame!.quizId,
+    );
     finalSummary = result.summaryGame;
     await attemptTracker.clearAttempt(currentGame!.quizId, _userId!);
 

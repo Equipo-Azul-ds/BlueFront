@@ -47,23 +47,40 @@ class MultiplayerSocketClient {
     }
 
     final target = _buildNamespaceUrl();
-    // Socket.IO uses auth parameter for credentials that persist across all events
-    final auth = {
-      MultiplayerConstants.headerPin: params.pin,
-      MultiplayerConstants.headerRole: params.role.toHeaderValue(),
-      MultiplayerConstants.headerJwt: sanitizedToken,
-    };
+    
     print('[SOCKET_AUTH_SETUP] ========== AUTH SETUP PHASE =========');
     print('[SOCKET_AUTH_SETUP] Auth params to be sent: pin=${params.pin}, role=${params.role.toHeaderValue()}, jwt=${sanitizedToken.substring(0, (sanitizedToken.length / 4).toInt())}...***REDACTED***');
-    print('[SOCKET_AUTH_SETUP] Auth keys: ${auth.keys.join(", ")}');
+    print('[SOCKET_AUTH_SETUP] Base URL: $_baseUrl');
+    print('[SOCKET_AUTH_SETUP] Target namespace: $target');
+    
+    // Auth params: socket.io preserves query params through WebSocket upgrade
+    final authUri = Uri.parse(target).replace(
+      queryParameters: {
+        'pin': params.pin,
+        'role': params.role.toHeaderValue(),
+        'jwt': sanitizedToken,
+      },
+    );
+    
+    // Also set auth for socket.io handshake auth frame
+    final auth = {
+      'pin': params.pin,
+      'role': params.role.toHeaderValue(),
+      'jwt': sanitizedToken,
+    };
+    
     final options = io.OptionBuilder()
         .setTransports(MultiplayerConstants.socketTransports)
         .enableForceNew()
         .disableAutoConnect()
         .setAuth(auth)
+        .setReconnectionDelay(1000)
+        .setReconnectionDelayMax(5000)
+        .setReconnectionAttempts(5)
         .build();
 
-    final socket = io.io(target, options);
+    print('[SOCKET_AUTH_SETUP] Socket.IO options configured with auth + query params');
+    final socket = io.io(authUri.toString(), options);
     _socket = socket;
 
     final completer = Completer<void>();
@@ -106,10 +123,13 @@ class MultiplayerSocketClient {
       _statusController.add(MultiplayerSocketStatus.connecting);
     });
     void handleConnectError(dynamic error) {
-      print('[SOCKET_ERROR] ✗ CONNECTION ERROR at ${DateTime.now()}: $error');
-      print('[SOCKET_ERROR] Error type: ${error.runtimeType}');
-      if (error is String && error.contains('headers')) {
-        print('[SOCKET_ERROR] ⚠️ AUTH HEADERS ERROR DETECTED - Auth may not have persisted from handshake');
+      print('[SOCKET_ERROR] Connection failed: $error');
+      
+      // Detect specific error patterns
+      final errorStr = error.toString().toLowerCase();
+      if (errorStr.contains('websocket error') && errorStr.contains('transport')) {
+        print('[SOCKET_ERROR] → WebSocket transport error (backend may not be running)');
+        print('[SOCKET_ERROR] → Check: https://${_extractDomain(_baseUrl)}/health');
       }
       _handleError(error);
       try {
@@ -124,30 +144,20 @@ class MultiplayerSocketClient {
 
     socket.onConnectError(handleConnectError);
     socket.on('connect_timeout', (_) {
-      print('[SOCKET_ERROR] ✗ CONNECT TIMEOUT at ${DateTime.now()}');
+      print('[SOCKET_ERROR] Connection timeout');
       handleConnectError(TimeoutException('Tiempo de conexión agotado.'));
     });
     socket.onError((error) {
-      print('[SOCKET_ERROR] ✗ SOCKET ERROR at ${DateTime.now()}: $error');
       _handleError(error);
     });
     socket.onAny((event, data) {
-      print('[SOCKET_EVENT_RX] ← RECEIVED EVENT at ${DateTime.now()}: "$event"');
-      print('[SOCKET_EVENT_RX]    Data: ${_sanitizeLogData(data)}');
-      print('[SOCKET_EVENT_RX]    Socket.connected = ${socket.connected}, Has listeners = ${_eventControllers.containsKey(event)}');
       final controller = _eventControllers[event];
       if (controller != null && !controller.isClosed) {
         controller.add(_normalizePayload(data));
-      } else if (controller == null) {
-        print('[SOCKET_EVENT_RX]    ⚠️ No listener registered for event: $event');
       }
     });
 
     socket.connect();
-    print('[SOCKET_HANDSHAKE] ========== HANDSHAKE PHASE START =========');
-    print('[SOCKET_HANDSHAKE] Connecting to $_baseUrl/multiplayer-sessions');
-    print('[SOCKET_HANDSHAKE] Time: ${DateTime.now()}');
-    print('[SOCKET_HANDSHAKE] Auth attached: yes (via .setAuth())');
     timeoutTimer = Timer(const Duration(seconds: 10), () {
       handleConnectError(TimeoutException('Tiempo de conexión agotado.'));
     });
@@ -221,7 +231,27 @@ class MultiplayerSocketClient {
     final trimmedBase = _baseUrl.endsWith('/')
         ? _baseUrl.substring(0, _baseUrl.length - 1)
         : _baseUrl;
-    return '$trimmedBase/multiplayer-sessions';
+    
+    // Validate base URL format
+    if (!trimmedBase.startsWith('http://') && !trimmedBase.startsWith('https://') && 
+        !trimmedBase.startsWith('ws://') && !trimmedBase.startsWith('wss://')) {
+      print('[SOCKET_ERROR] ⚠️ WARNING: Base URL does not have a scheme: $trimmedBase');
+      print('[SOCKET_ERROR] ⚠️ Expected: http://, https://, ws://, or wss://');
+    }
+    
+    final namespaceUrl = '$trimmedBase/multiplayer-sessions';
+    print('[SOCKET_DEBUG] Namespace URL constructed: $namespaceUrl');
+    return namespaceUrl;
+  }
+
+  /// Extrae el dominio de una URL para diagnósticos.
+  String _extractDomain(String url) {
+    try {
+      final uri = Uri.parse(url);
+      return uri.host;
+    } catch (_) {
+      return url;
+    }
   }
 
   /// Sanitiza datos para logging (evita exponer tokens completos)

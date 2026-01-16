@@ -35,6 +35,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
   StreamSubscription<dynamic>? _hostGameEndSubscription;
   StreamSubscription<dynamic>? _playerGameEndSubscription;
   StreamSubscription<dynamic>? _sessionClosedSubscription;
+  StreamSubscription<dynamic>? _hostAnswerUpdateSubscription;
 
   // Getters
   SessionPhase get phase => _phase;
@@ -116,6 +117,15 @@ class SessionGamePhaseManager extends ChangeNotifier {
             MultiplayerEvents.sessionClosed)
         .listen(
           (payload) => _handleSessionClosed(payload, onEventError),
+          onError: onEventError,
+        );
+
+    _hostAnswerUpdateSubscription?.cancel();
+    _hostAnswerUpdateSubscription = _realtime
+        .listenToServerEvent<Map<String, dynamic>>(
+            MultiplayerEvents.hostAnswerUpdate)
+        .listen(
+          (payload) => _handleHostAnswerUpdate(payload, onEventError),
           onError: onEventError,
         );
   }
@@ -229,6 +239,22 @@ class SessionGamePhaseManager extends ChangeNotifier {
     }
   }
 
+  /// Maneja evento de actualización de respuestas del host: actualiza contador de respuestas enviadas.
+  void _handleHostAnswerUpdate(
+    Map<String, dynamic> payload,
+    void Function(Object error) onEventError,
+  ) {
+    try {
+      final event = HostAnswerUpdateEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: host_answer_update (numberOfSubmissions=${event.numberOfSubmissions})');
+      _hostAnswerSubmissions = event.numberOfSubmissions;
+      notifyListeners();
+    } catch (error) {
+      print('[EVENT] ✗ ERROR parsing host_answer_update: $error');
+      onEventError(error);
+    }
+  }
+
  /// Deduce la marca de tiempo de la pregunta basándose en el tiempo restante y el límite de tiempo.
   DateTime _resolveQuestionIssuedAt(int? timeRemainingMs, int timeLimitSeconds) {
     if (timeRemainingMs != null && timeLimitSeconds > 0) {
@@ -295,6 +321,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
     _hostGameEndSubscription?.cancel();
     _playerGameEndSubscription?.cancel();
     _sessionClosedSubscription?.cancel();
+    _hostAnswerUpdateSubscription?.cancel();
     super.dispose();
   }
 }

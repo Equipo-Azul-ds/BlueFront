@@ -16,7 +16,6 @@ class SessionConnectionManager extends ChangeNotifier {
     required MultiplayerSessionRealtime realtime,
   }) : _realtime = realtime {
     _statusSubscription = _realtime.statusStream.listen((status) {
-      print('[CONNECTION_MANAGER] Socket status changed: ${_socketStatus.toString()} → ${status.toString()}');
       _socketStatus = status;
       if (status == MultiplayerSocketStatus.disconnected) {
         _shouldEmitClientReady = true;
@@ -28,7 +27,6 @@ class SessionConnectionManager extends ChangeNotifier {
     });
 
     _errorSubscription = _realtime.errors.listen((error) {
-      print('[CONNECTION_MANAGER] Socket error: $error');
       _lastError = error.toString();
       notifyListeners();
     });

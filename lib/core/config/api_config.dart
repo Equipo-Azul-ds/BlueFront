@@ -4,37 +4,43 @@ class ApiConfig {
   const ApiConfig._({
     required this.httpBaseUrl,
     required this.websocketBaseUrl,
+    required this.backendType,
   });
 
   /// Factory for quizzybackend configuration.
-  /// HTTP requests use /api suffix, WebSocket uses wss:// protocol.
+  /// HTTP requests use /api suffix, WebSocket transforms https:// to wss://.
   factory ApiConfig.quizzyBackend(String baseDomain) {
     final httpUrl = 'https://$baseDomain/api';
     final wsUrl = 'wss://$baseDomain';
     return ApiConfig._(
       httpBaseUrl: httpUrl,
       websocketBaseUrl: wsUrl,
+      backendType: BackendType.quizzyBackend,
     );
   }
 
   /// Factory for backcomun configuration.
-  /// HTTP requests use no suffix, WebSocket uses wss:// protocol.
+  /// HTTP requests use no suffix, WebSocket keeps https:// (Socket.IO upgrades to WebSocket automatically).
   factory ApiConfig.backcomun(String baseDomain) {
     final httpUrl = 'https://$baseDomain';
-    final wsUrl = 'wss://$baseDomain';
+    final wsUrl = 'https://$baseDomain';
     return ApiConfig._(
       httpBaseUrl: httpUrl,
       websocketBaseUrl: wsUrl,
+      backendType: BackendType.backcomun,
     );
   }
 
   final String httpBaseUrl;
   final String websocketBaseUrl;
+  final BackendType backendType;
 
   /// Returns the appropriate base URL for HTTP requests.
   String getHttpUrl() => httpBaseUrl;
 
   /// Returns the appropriate base URL for WebSocket connections.
+  /// For quizzyBackend: returns wss:// URL
+  /// For backcomun: returns https:// URL (Socket.IO handles upgrade)
   String getWebSocketUrl() => websocketBaseUrl;
 
   /// Builds a complete HTTP endpoint URL.

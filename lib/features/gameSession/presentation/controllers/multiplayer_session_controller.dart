@@ -101,11 +101,12 @@ class MultiplayerSessionController extends ChangeNotifier {
   HostReturnedSessionEvent? get hostReturnedDto => _connectionManager.hostReturnedDto;
   SyncErrorEvent? get syncErrorDto => _connectionManager.syncErrorDto;
   ConnectionErrorEvent? get connectionErrorDto => _connectionManager.connectionErrorDto;
-  HostConnectedSuccessEvent? get hostConnectedSuccessDto => _lobbyManager.hostConnectedSuccessDto;
+  HostConnectedSuccessEvent? get hostConnectedSuccessDto => _connectionManager.hostConnectedSuccessDto;
   PlayerAnswerConfirmationEvent? get playerAnswerConfirmationDto => _lobbyManager.playerAnswerConfirmationDto;
   GameErrorEvent? get gameErrorDto => _connectionManager.gameErrorDto;
   UnavailableSessionEvent? get unavailableSessionDto => _connectionManager.unavailableSessionDto;
   PlayerConnectedEvent? get playerConnectedDto => _lobbyManager.playerConnectedDto;
+  PlayerConnectedToServerEvent? get playerConnectedToServerDto => _lobbyManager.playerConnectedToServerDto;
   DateTime? get questionStartedAt => _gamePhaseManager.questionStartedAt;
   SessionPhase get phase => _gamePhaseManager.phase;
   int get questionSequence => _gamePhaseManager.questionSequence;
@@ -150,7 +151,7 @@ class MultiplayerSessionController extends ChangeNotifier {
       hostReturnedDto: _connectionManager.hostReturnedDto,
       syncErrorDto: _connectionManager.syncErrorDto,
       connectionErrorDto: _connectionManager.connectionErrorDto,
-      hostConnectedSuccessDto: _lobbyManager.hostConnectedSuccessDto,
+      hostConnectedSuccessDto: _connectionManager.hostConnectedSuccessDto,
       playerAnswerConfirmationDto: _lobbyManager.playerAnswerConfirmationDto,
       gameErrorDto: _connectionManager.gameErrorDto,
       unavailableSessionDto: _connectionManager.unavailableSessionDto,
