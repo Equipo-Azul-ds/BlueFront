@@ -160,12 +160,16 @@ class GroupRepositoryImpl implements GroupRepository {
   }
 
   Future<GroupInvitationToken> generateInvitation(String groupId) async {
-    final uri = Uri.parse('$_base/groups/$groupId/invitation');
-    final res = await _post(uri, {});
+    final uri = Uri.parse('$_base/groups/$groupId/invitations');
+    // Según especificación: Body json { "expiresIn": "7d" }
+    final res = await _post(uri, {'expiresIn': '7d'});
     _ensureSuccess(res, {200, 201});
     final data = _asMap(res.body);
-    final rawLink = data['link'] ?? data['Link'] ?? '';
+    
+    // Mapeo según response: { "invitationLink": "...", "expiresAt": "..." }
+    final rawLink = data['invitationLink'] ?? data['link'] ?? '';
     final parsedLink = rawLink is String ? rawLink : rawLink.toString();
+    
     return GroupInvitationToken(
       token: parsedLink.isNotEmpty ? parsedLink.split('/').last : (data['token']?.toString() ?? ''),
       link: parsedLink,
