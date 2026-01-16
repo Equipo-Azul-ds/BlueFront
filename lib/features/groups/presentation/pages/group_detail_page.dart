@@ -327,25 +327,35 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   Future<void> _showEditGroupDialog(GroupsBloc bloc, Group group) async {
     final nameCtrl = TextEditingController(text: group.name);
     final descCtrl = TextEditingController(text: group.description ?? '');
-    final result = await showDialog<bool>(
+
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Editar grupo'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                decoration: const InputDecoration(labelText: 'Descripción', border: OutlineInputBorder()),
-                maxLines: 3,
-              ),
-            ],
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del grupo',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción (opcional)',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -361,22 +371,41 @@ class _GroupDetailPageState extends State<GroupDetailPage>
       },
     );
 
-    if (result == true) {
+    if (confirmed == true) {
       final newName = nameCtrl.text.trim();
       final newDesc = descCtrl.text.trim();
-      try {
-        await bloc.updateGroupInfo(groupId: group.id, name: newName.isEmpty ? null : newName, description: newDesc.isEmpty ? null : newDesc);
-        // Refrescar local
-        final updated = await bloc.refreshGroup(group.id);
-        setState(() {
-          _group = updated ?? _group?.copyWith(name: newName.isNotEmpty ? newName : _group!.name, description: newDesc.isNotEmpty ? newDesc : _group!.description);
-        });
+
+      if (newName.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Grupo actualizado')));
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('El nombre no puede estar vacío')),
+           );
+        }
+        return;
+      }
+      
+      setState(() => _loading = true); // Bloquear UI mientras guarda
+      
+      try {
+        await bloc.updateGroupInfo(
+            groupId: group.id,
+            name: newName,
+            description: newDesc
+        );
+        setState(() => _loading = false);
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             const SnackBar(content: Text('Grupo actualizado')),
+           );
+           // Recargar para refrescar campos
+           _load(); 
         }
       } catch (e) {
+        setState(() => _loading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No se pudo actualizar: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al actualizar: $e')),
+          );
         }
       }
     }

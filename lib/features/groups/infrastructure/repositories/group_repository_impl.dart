@@ -184,7 +184,15 @@ class GroupRepositoryImpl implements GroupRepository {
       if (name != null) 'name': name,
       if (description != null) 'description': description,
     };
+    
+    try {
+      // ignore: avoid_print
+      print('[groups] updateGroupInfo PATCH ${uri.toString()} body=$payload');
+    } catch (_) {}
+
     final res = await _patch(uri, payload);
+    
+    // Si falla, _ensureSuccess lanzará la excepción, la cual puede ser atrapada por el Bloc
     _ensureSuccess(res, {200});
     return Group.fromJson(_asMap(res.body));
   }
