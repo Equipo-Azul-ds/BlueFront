@@ -45,6 +45,11 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                  _visibility = quizBloc.currentQuiz!.visibility;
                  _coverImagePath = quizBloc.currentQuiz!.coverImageUrl;
                  _selectedThemeId = quizBloc.currentQuiz!.themeId;
+                 
+                 // Sincronizar texto de primera pregunta si existe
+                 if (quizBloc.currentQuiz!.questions.isNotEmpty) {
+                    _questionController.text = quizBloc.currentQuiz!.questions[0].text;
+                 }
               });
               // Actualizar campos del formulario si ya se construyeron
               _formKey.currentState?.fields['title']?.didChange(quizBloc.currentQuiz!.title);
@@ -179,6 +184,9 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
 
   // Estado temporal para elementos que antes se pasaban directo al BLoC
   String? _coverImagePath;
+  // Mapa para guardar las URLs resueltas de las preguntas (ID -> URL)
+  // Permite visualizar la imagen sin sobrescribir el ID en el objeto Question
+  final Map<String, String> _questionResolvedUrls = {};
   Uint8List? _coverImageBytes;
   Uint8List? _currentQuestionPreviewBytes;
   String _visibility = 'private';
@@ -211,50 +219,49 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
     final quiz = quizBloc.currentQuiz;
     if (quiz == null) return;
 
-    // Resolver portada
-    final resolvedCover = await _resolveMediaUrlIfNeeded(quiz.coverImageUrl);
-    if (resolvedCover != null && resolvedCover.startsWith('http')) {
-      setState(() {
-        _coverImagePath = resolvedCover;
-        _coverImageBytes = null;
-      });
-      quiz.coverImageUrl = resolvedCover;
+    // Resolver portada: SOLO actualizar estado local para vista previa, NO sobrescribir el ID en el modelo
+    final val = quiz.coverImageUrl;
+    if (val != null && val.isNotEmpty && !val.startsWith('http')) {
+       final resolvedCover = await _resolveMediaUrlIfNeeded(val);
+       if (resolvedCover != null && resolvedCover.startsWith('http')) {
+         if (mounted) {
+           setState(() {
+             _coverImagePath = resolvedCover;
+             _coverImageBytes = null;
+           });
+         }
+         // No actualizar quiz.coverImageUrl porque perderíamos el ID/UUID 
+         // necesario para posteriores guardados
+       }
+    } else if (val != null && val.startsWith('http')) {
+       // Si ya es http, mostrar directamente
+       if (mounted) {
+          setState(() {
+            _coverImagePath = val;
+            _coverImageBytes = null;
+          });
+       }
     }
 
     // Resolver media de preguntas y respuestas
-    if (quiz.questions.isNotEmpty) {
-      for (var i = 0; i < quiz.questions.length; i++) {
-        final q = quiz.questions[i];
-        final qUrl = await _resolveMediaUrlIfNeeded(q.mediaUrl);
-        // Reconstruir respuestas resolviendo mediaUrl si es id
-        final newAnswers = <A.Answer>[];
-        for (final a in q.answers) {
-          final aUrl = await _resolveMediaUrlIfNeeded(a.mediaUrl);
-          newAnswers.add(
-            A.Answer(
-              answerId: a.answerId,
-              questionId: a.questionId,
-              isCorrect: a.isCorrect,
-              text: a.text,
-              mediaUrl: aUrl ?? a.mediaUrl,
-            ),
-          );
+    // Usamos el mapa _questionResolvedUrls para guardar las URLs de vista previa
+    // sin modificar los IDs en el objeto Question.
+    for (final q in quiz.questions) {
+      final media = q.mediaUrl;
+      if (media != null && media.isNotEmpty) {
+        if (!media.startsWith('http')) {
+          // Es un ID, resolverlo
+          final resolved = await _resolveMediaUrlIfNeeded(media);
+          if (resolved != null && resolved.startsWith('http')) {
+             _questionResolvedUrls[q.questionId] = resolved;
+          }
+        } else {
+          // Ya es URL
+          _questionResolvedUrls[q.questionId] = media;
         }
-        final updatedQ = Q.Question(
-          questionId: q.questionId,
-          quizId: q.quizId,
-          text: q.text,
-          mediaUrl: qUrl ?? q.mediaUrl,
-          type: q.type,
-          timeLimit: q.timeLimit,
-          points: q.points,
-          answers: newAnswers,
-        );
-        quizBloc.updateQuestionAt(i, updatedQ);
       }
     }
-
-    quizBloc.setCurrentQuiz(quiz);
+    if (mounted) setState(() {});
   }
 
   // Devuelve el color asociado a un themeId; si no hay match devuelve null
@@ -1053,7 +1060,9 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                           quizBloc.currentQuiz!.visibility = _visibility;
                           quizBloc.currentQuiz!.status = _status;
                           quizBloc.currentQuiz!.category = _category;
-                          quizBloc.currentQuiz!.coverImageUrl = _coverImagePath;
+                          // FIX: No sobrescribir coverImageUrl con _coverImagePath (que es la URL/preview).
+                          // El ID ya se guardó en el modelo al momento de subir la imagen.
+                          // quizBloc.currentQuiz!.coverImageUrl = _coverImagePath;
                           quizBloc.currentQuiz!.themeId =
                               _selectedThemeId ?? quizBloc.currentQuiz!.themeId;
                           quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
@@ -1115,7 +1124,11 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                             final s = slides[idx];
                             final selected = idx == _selectedIndex;
                             return GestureDetector(
-                              onTap: () => setState(() => _selectedIndex = idx),
+                              onTap: () => setState(() {
+                                _selectedIndex = idx;
+                                _currentQuestionPreviewBytes = null;
+                                _questionController.text = s.text;
+                              }),
                               child: Container(
                                 width: constraints.maxWidth * 0.38,
                                 margin: EdgeInsets.symmetric(
@@ -1254,12 +1267,16 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                       newQ,
                                     );
                                     setState(
-                                      () => _selectedIndex =
+                                      () {
+                                        _selectedIndex =
                                           quizBloc
                                               .currentQuiz!
                                               .questions
                                               .length -
-                                          1,
+                                          1;
+                                        _currentQuestionPreviewBytes = null;
+                                        _questionController.text = newQ.text;
+                                      }
                                     );
 
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1281,23 +1298,9 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                 // Texto de la pregunta (usando controller persistente para preservar cursor)
                                 TextField(
                                   controller: _questionController,
-                                  enabled:
-                                      (selectedQuestion.mediaUrl == null ||
-                                      selectedQuestion.mediaUrl!.isEmpty),
+                                  // Habilitado siempre, permitiendo texto e imagen simultáneamente
+                                  enabled: true,
                                   onChanged: (val) {
-                                    if (selectedQuestion.mediaUrl != null &&
-                                        selectedQuestion.mediaUrl!.isNotEmpty) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Borra la imagen para editar el texto.',
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
                                     final q = selectedQuestion;
                                     final updated = Q.Question(
                                       questionId: q.questionId,
@@ -1438,25 +1441,11 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                 // Subir imagen para la pregunta
                                 media.MediaUpload(
                                   previewBytes: _currentQuestionPreviewBytes,
-                                  previewUrl: (selectedQuestion.mediaUrl != null && selectedQuestion.mediaUrl!.startsWith('http'))
-                                      ? selectedQuestion.mediaUrl
-                                      : null,
+                                  previewUrl: _questionResolvedUrls[selectedQuestion.questionId] ??
+                                      ((selectedQuestion.mediaUrl != null && selectedQuestion.mediaUrl!.startsWith('http'))
+                                          ? selectedQuestion.mediaUrl
+                                          : null),
                                   onMediaSelected: (file) async {
-                                    // Si hay texto, no permitir subir imagen hasta que se borre
-                                    if (_questionController.text
-                                        .trim()
-                                        .isNotEmpty) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Borra el texto de la pregunta antes de agregar una imagen.',
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
                                     final q = selectedQuestion;
                                     final mediaBloc =
                                         Provider.of<MediaEditorBloc>(
@@ -1481,6 +1470,11 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                       final uploadedMap = uploaded as dynamic;
                                       final id = (uploadedMap.id ?? uploadedMap.mediaId ?? '').toString();
                                       final url = (uploadedMap.path ?? uploadedMap.url ?? '').toString();
+
+                                      // Actualizar visualización local
+                                      if (url.isNotEmpty) {
+                                        _questionResolvedUrls[q.questionId] = url;
+                                      }
 
                                       final updated = Q.Question(
                                         questionId: q.questionId,

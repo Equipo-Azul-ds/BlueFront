@@ -33,8 +33,9 @@ class Media {
       }
     }
 
-    // Modificación para soportar 'asset_id' de Cloudinary, que es el UUID real que necesita el backend.
-    final id = _safeStringOrNull(json['asset_id'] ?? json['id'] ?? json['mediaId']) ?? '';
+    // Modificación para soportar 'assetId' (camelCase) como muestra la respuesta real,
+    // además de 'asset_id' y 'id'.
+    final id = _safeStringOrNull(json['assetId'] ?? json['asset_id'] ?? json['id'] ?? json['mediaId']) ?? '';
     final path = _safeStringOrNull(json['path'] ?? json['url'] ?? json['pathUrl'] ?? json['secure_url']) ?? '';
     final mimeType = _safeStringOrNull(json['mimeType'] ?? json['contentType']) ?? '';
     final size = (json['size'] ?? json['fileSize'] ?? 0);
