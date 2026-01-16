@@ -366,25 +366,46 @@ class QuizRepositoryImpl implements QuizRepository {
       return;
     }
 
-    _currentUserId = userId.trim();
-    if ((_currentUserId ?? '').isEmpty) {
-      throw Exception('delete requiere userId para enviar x-debug-user-id');
-    }
-
+    // Según la especificación:
+    // DELETE /kahoots/:kahootId
+    // Headers: Authorization: Bearer <JWT>
+    // Response: 204 No Content
+    
     final url = '$baseUrl/kahoots/$id';
-    final headers = await _headers(userId: _currentUserId ?? '', json: false);
+    
+    // Generamos headers (incluye Bearer Token)
+    // El parámetro userId se pasa por compatibilidad con la firma de _headers, 
+    // pero la autenticación real es el token.
+    final headers = await _headers(userId: userId, json: false);
+    
     try {
       print('QuizRepositoryImpl.delete -> DELETE $url');
       print('Request headers: $headers');
+      
       final response = await cliente.delete(Uri.parse(url), headers: headers);
-      print('QuizRepositoryImpl.delete -> Response status: ${response.statusCode} body: ${response.body}');
-      // El backend puede devolver 200 o 204
-      if (response.statusCode != 204 && response.statusCode != 200){
-        throw Exception('Error al eliminar el quiz: ${response.statusCode} - ${response.body}');
+      print('QuizRepositoryImpl.delete -> Response status: ${response.statusCode}');
+
+      // Éxito: 204 No Content
+      if (response.statusCode == 204 || response.statusCode == 200) {
+        // 200 permitido por robustez, aunque la spec dice 204
+        return;
       }
-    } catch (e, st) {
-      print('QuizRepositoryImpl.delete -> Exception performing DELETE: $e');
-      print(st);
+
+      // Manejo de errores según imagen
+      String msg = 'Error desconocido al eliminar quiz';
+      switch (response.statusCode) {
+        case 400: msg = 'Bad Request: Datos inválidos'; break;
+        case 401: msg = 'Unauthorized: Token faltante o inválido'; break;
+        case 403: msg = 'Forbidden: No tienes permiso para borrar este kahoot'; break;
+        case 404: msg = 'Not Found: El kahoot no existe'; break;
+        case 500: msg = 'Internal Server Error'; break;
+        default: msg = 'Error ${response.statusCode}: ${response.body}';
+      }
+      
+      throw Exception(msg);
+
+    } catch (e) {
+      print('QuizRepositoryImpl.delete -> Exception: $e');
       rethrow;
     }
   }
