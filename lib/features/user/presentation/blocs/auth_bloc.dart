@@ -47,24 +47,47 @@ class AuthBloc extends ChangeNotifier {
 
   // Carga usuario actual si hay sesión.
   Future<void> loadSession() async {
+    // Optimización: si no hay token, no intentamos nada.
+    final token = await storage.read('token');
+    if (token == null) {
+      if (currentUser != null) {
+        currentUser = null;
+        notifyListeners(); // Solo notificar si cambió el estado
+      }
+      return;
+    }
+
     await _run(() async {
-      currentUser = await getCurrentUser();
-      // Intentar recuperar el hash de contraseña desde el almacenamiento seguro
-      final savedHash = await storage.read('hashedPassword');
-      if (savedHash != null && savedHash.isNotEmpty) {
-        currentUser = currentUser!.copyWith(hashedPassword: savedHash);
+      try {
+        currentUser = await getCurrentUser();
+        if (currentUser == null) return;
+
+        // Intentar recuperar el hash de contraseña desde el almacenamiento seguro
+        final savedHash = await storage.read('hashedPassword');
+        if (savedHash != null && savedHash.isNotEmpty) {
+          currentUser = currentUser!.copyWith(hashedPassword: savedHash);
+        }
+        // Si aún no tenemos hash, intenta traerlo del backend directamente
+        if (currentUser != null && currentUser!.hashedPassword.isEmpty) {
+          try {
+            final fetched = await repository.getOneById(currentUser!.id);
+            if (fetched != null && fetched.hashedPassword.isNotEmpty) {
+              currentUser = currentUser!.copyWith(hashedPassword: fetched.hashedPassword);
+              await storage.write('hashedPassword', fetched.hashedPassword);
+            }
+          } catch (_) {}
+        }
+        await _scheduleTokenRefresh();
+      } catch (e) {
+        // Handle 401 specifically: clear session instead of throwing
+        if (e.toString().contains('401') || e.toString().contains('Unauthorized')) {
+           print('[auth] Session expired or invalid (401). clearing storage.');
+           currentUser = null;
+           await storage.deleteAll();
+           return; 
+        }
+        rethrow;
       }
-      // Si aún no tenemos hash, intenta traerlo del backend directamente
-      if (currentUser != null && currentUser!.hashedPassword.isEmpty) {
-        try {
-          final fetched = await repository.getOneById(currentUser!.id);
-          if (fetched != null && fetched.hashedPassword.isNotEmpty) {
-            currentUser = currentUser!.copyWith(hashedPassword: fetched.hashedPassword);
-            await storage.write('hashedPassword', fetched.hashedPassword);
-          }
-        } catch (_) {}
-      }
-      await _scheduleTokenRefresh();
     });
   }
 

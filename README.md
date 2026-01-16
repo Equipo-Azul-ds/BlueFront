@@ -42,12 +42,19 @@ flutter run -d chrome --web-renderer html --dart-define=API_BASE_URL=https://tu-
 - Media: `MediaEditorBloc` maneja subida, lectura y borrado de archivos usando `UploadMediaUseCase`, `GetMediaUseCase`, `DeleteMediaUseCase`.
 
 ## Estructura rápida
-- `lib/main.dart`: tema, rutas y DI (`provider`/`get_it`).
+- `lib/main.dart`: tema, rutas, DI (`provider`) y configuración dinámica de backend (`api_config`).
 - `lib/common_pages/`: dashboard y selector de plantillas.
 - `lib/common_widgets/`: tarjetas, grids, bottom nav, upload widget.
 - `lib/features/kahoot/`: editor, repositorios HTTP y entidades de quiz/pregunta/respuesta.
 - `lib/features/challenge/`: lógica de single-player (use cases, blocs, repositorio).
 - `lib/features/media/`: manejo de medios y storage provider.
+- `lib/features/groups/`: gestión de **Grupos** (unirse por código, crear, ranking/leaderboard, asignar quizzes).
+- `lib/features/user/`: autenticación, perfil, avatars, selector de backend (Dev/Prod) y **AccessGate** (control de sesión seguro).
+- `lib/features/library/`: biblioteca personal, favoritos y descubrimiento.
+- `lib/features/gameSession/`: lógica para partidas multijugador en tiempo real.
+- `lib/features/subscriptions/`: gestión de planes y pagos.
+- `lib/features/discovery/`: feed de contenido público.
+- `lib/features/report/`: historial de resultados y estadísticas.
 - `assets/`: imágenes y fuente Onest (varios pesos).
 - `Producción.postman_collection.json`: colección para probar el backend.
 

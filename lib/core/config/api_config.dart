@@ -1,3 +1,4 @@
+import '../../local/secure_storage.dart';
 /// Configuration for API endpoints supporting multiple backends.
 /// Handles URL construction differences between backends for HTTP and WebSocket connections.
 class ApiConfig {
@@ -67,9 +68,10 @@ enum BackendType {
 /// Central configuration manager for API backends.
 class ApiConfigManager {
   static ApiConfig? _currentConfig;
+  static const String _storageKey = 'preferred_backend_type';
 
-  /// Sets the current backend configuration.
-  static void setConfig(BackendType backend, String baseDomain) {
+  /// Sets the current backend configuration and optionally persists it.
+  static Future<void> setConfig(BackendType backend, String baseDomain, {bool persist = false}) async {
     switch (backend) {
       case BackendType.quizzyBackend:
         _currentConfig = ApiConfig.quizzyBackend(baseDomain);
@@ -78,6 +80,30 @@ class ApiConfigManager {
         _currentConfig = ApiConfig.backcomun(baseDomain);
         break;
     }
+    if (persist) {
+       await SecureStorage.instance.write(_storageKey, backend.name); 
+       await SecureStorage.instance.write('backend_domain', baseDomain);
+    }
+  }
+
+  /// Initialize from storage or environment.
+  static Future<void> initialize() async {
+     try {
+       final savedType = await SecureStorage.instance.read(_storageKey);
+       final savedDomain = await SecureStorage.instance.read('backend_domain');
+       
+       if (savedType != null && savedDomain != null) {
+          BackendType type = BackendType.values.firstWhere(
+            (e) => e.name == savedType, 
+            orElse: () => BackendType.backcomun
+          );
+          await setConfig(type, savedDomain, persist: false);
+          print('[ApiConfigManager] Loaded from storage: $savedType @ $savedDomain');
+          return;
+       }
+     } catch (e) {
+       print('[ApiConfigManager] Error loading config: $e');
+     }
   }
 
   /// Gets the current API configuration.

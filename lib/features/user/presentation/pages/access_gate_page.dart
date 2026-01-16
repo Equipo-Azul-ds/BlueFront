@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'onboarding_welcome_page.dart';
 import '../blocs/auth_bloc.dart';
 import '../../../../core/constants/colors.dart';
 import '../../../../common_pages/dashboard_page.dart';
+
+import '../../../../local/secure_storage.dart';
 
 /// Simple gate that can show loading, error, or route to welcome.
 class AccessGatePage extends StatefulWidget {
@@ -14,6 +17,7 @@ class AccessGatePage extends StatefulWidget {
 }
 
 class _AccessGatePageState extends State<AccessGatePage> {
+  // Inicializamos en loading=true
   bool _loading = true;
   bool _error = false;
   bool _hasSession = false;
@@ -21,23 +25,49 @@ class _AccessGatePageState extends State<AccessGatePage> {
   @override
   void initState() {
     super.initState();
-    _checkSession();
+    print('[AccessGate] initState - scheduling check');
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _checkSession();
+      }
+    });
   }
 
   Future<void> _checkSession() async {
+    if (!mounted) return;
     final auth = context.read<AuthBloc>();
+    
+    // 1. Verificación rápida local: ¿Tenemos token?
+    // Esto evita llamar a auth.loadSession() (que notifica listeners) si ni siquiera hay token.
+    final token = await SecureStorage.instance.read('token');
+    if (token == null) {
+      if (!mounted) return;
+      // Si no hay token, cortamos flujo inmediatamente.
+      setState(() {
+         _loading = false;
+         _error = false;
+         _hasSession = false;
+      });
+      return;
+    }
+
     try {
-      await auth.loadSession();
+      // 2. Si hay token, intentamos cargar la sesión completa
+      print('[AccessGate] Token found, calling auth.loadSession()...');
+      await auth.loadSession().timeout(const Duration(seconds: 5));
+
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _error = false;
         _hasSession = auth.currentUser != null;
       });
-    } catch (_) {
+    } catch (e) {
+      print('[AccessGate] Error checking session: $e');
+      if (!mounted) return;
       setState(() {
         _loading = false;
-        // Si falla la sesión (401/timeout), deja pasar a onboarding en lugar de bloquear.
-        _error = false;
+        _error = false; 
         _hasSession = false;
       });
     }
