@@ -231,8 +231,17 @@ class _CreateJoinSheetState extends State<_CreateJoinSheet> {
         }
       } catch (e) {
         if (mounted) {
+          // Extraemos el mensaje de la excepción para ver si menciona que ya es miembro
+          String msg = e.toString().replaceAll('Exception:', '').trim();
+          bool alreadyMember = msg.toLowerCase().contains('already') || 
+                               msg.toLowerCase().contains('ya eres miembro') ||
+                               msg.toLowerCase().contains('miembro del grupo');
+          
           ScaffoldMessenger.of(widget.rootContext).showSnackBar(
-            const SnackBar(content: Text('Link inválido o error al unirse.')),
+            SnackBar(
+              content: Text(alreadyMember ? 'Ya eres miembro de este grupo' : 'Error: $msg'),
+              backgroundColor: alreadyMember ? Colors.orange : Colors.red,
+            ),
           );
           // ignore: avoid_print
           print('[groups] join failed: $e');

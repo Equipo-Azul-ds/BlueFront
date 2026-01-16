@@ -179,8 +179,9 @@ class GroupRepositoryImpl implements GroupRepository {
 
   Future<String> joinByInvitation(String token) async {
     final uri = Uri.parse('$_base/groups/join');
-    final res = await _post(uri, {'token': token});
-    _ensureSuccess(res, {200});
+    // Según especificación: Body json { "invitationToken": "..." }
+    final res = await _post(uri, {'invitationToken': token});
+    _ensureSuccess(res, {200, 201});
     final data = _asMap(res.body);
     return data['groupId'] as String? ?? '';
   }
@@ -338,12 +339,24 @@ class GroupRepositoryImpl implements GroupRepository {
       } catch (_) {}
       
       String msg = 'Request failed: ${res.statusCode}';
-      if (res.statusCode == 400) msg = 'Datos inválidos (400)';
+      if (res.statusCode == 400) {
+        // Intentar parsear el mensaje del backend
+        try {
+          final body = jsonDecode(res.body);
+          if (body is Map && body['message'] != null) {
+            msg = body['message'].toString();
+          } else {
+            msg = 'Datos inválidos (400)';
+          }
+        } catch (_) {
+          msg = 'Datos inválidos (400)';
+        }
+      }
       if (res.statusCode == 401) msg = 'No autorizado (401)';
       if (res.statusCode == 403) msg = 'Sin permisos (403)';
       if (res.statusCode == 404) msg = 'No encontrado (404)';
       
-      throw Exception('$msg - ${res.body}');
+      throw Exception(msg); // Lanza solo el mensaje para que la UI lo muestre limpio
     }
   }
 
