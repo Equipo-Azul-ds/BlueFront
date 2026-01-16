@@ -236,6 +236,7 @@ class SessionLifecycleState {
     this.hostConnectedSuccessDto,
     this.playerAnswerConfirmationDto,
     this.gameErrorDto,
+    this.unavailableSessionDto,
     this.shouldEmitClientReady = false,
   });
 
@@ -250,6 +251,7 @@ class SessionLifecycleState {
   final HostConnectedSuccessEvent? hostConnectedSuccessDto;
   final PlayerAnswerConfirmationEvent? playerAnswerConfirmationDto;
   final GameErrorEvent? gameErrorDto;
+  final UnavailableSessionEvent? unavailableSessionDto;
   final bool shouldEmitClientReady;
 
   /// Cuando el socket está conectado.
@@ -270,6 +272,7 @@ class SessionLifecycleState {
     HostConnectedSuccessEvent? hostConnectedSuccessDto,
     PlayerAnswerConfirmationEvent? playerAnswerConfirmationDto,
     GameErrorEvent? gameErrorDto,
+    UnavailableSessionEvent? unavailableSessionDto,
     bool? shouldEmitClientReady,
     bool clearLastError = false,
     bool clearSessionClosed = false,
@@ -281,6 +284,7 @@ class SessionLifecycleState {
     bool clearHostConnectedSuccess = false,
     bool clearPlayerAnswerConfirmation = false,
     bool clearGameError = false,
+    bool clearUnavailableSession = false,
   }) {
     return SessionLifecycleState(
       socketStatus: socketStatus ?? this.socketStatus,
@@ -294,6 +298,7 @@ class SessionLifecycleState {
       hostConnectedSuccessDto: clearHostConnectedSuccess ? null : (hostConnectedSuccessDto ?? this.hostConnectedSuccessDto),
       playerAnswerConfirmationDto: clearPlayerAnswerConfirmation ? null : (playerAnswerConfirmationDto ?? this.playerAnswerConfirmationDto),
       gameErrorDto: clearGameError ? null : (gameErrorDto ?? this.gameErrorDto),
+      unavailableSessionDto: clearUnavailableSession ? null : (unavailableSessionDto ?? this.unavailableSessionDto),
       shouldEmitClientReady: shouldEmitClientReady ?? this.shouldEmitClientReady,
     );
   }

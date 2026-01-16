@@ -47,22 +47,40 @@ class MultiplayerSocketClient {
     }
 
     final target = _buildNamespaceUrl();
-    final authHeaderValue = 'Bearer $sanitizedToken';
-    final headers = {
-      MultiplayerConstants.headerPin: params.pin,
-      MultiplayerConstants.headerRole: params.role.toHeaderValue(),
-      MultiplayerConstants.headerJwt: sanitizedToken,
-      MultiplayerConstants.headerAuthorization: authHeaderValue,
-      MultiplayerConstants.headerAuthorizationLower: authHeaderValue,
+    
+    print('[SOCKET_AUTH_SETUP] ========== AUTH SETUP PHASE =========');
+    print('[SOCKET_AUTH_SETUP] Auth params to be sent: pin=${params.pin}, role=${params.role.toHeaderValue()}, jwt=${sanitizedToken.substring(0, (sanitizedToken.length / 4).toInt())}...***REDACTED***');
+    print('[SOCKET_AUTH_SETUP] Base URL: $_baseUrl');
+    print('[SOCKET_AUTH_SETUP] Target namespace: $target');
+    
+    // Auth params: socket.io preserves query params through WebSocket upgrade
+    final authUri = Uri.parse(target).replace(
+      queryParameters: {
+        'pin': params.pin,
+        'role': params.role.toHeaderValue(),
+        'jwt': sanitizedToken,
+      },
+    );
+    
+    // Also set auth for socket.io handshake auth frame
+    final auth = {
+      'pin': params.pin,
+      'role': params.role.toHeaderValue(),
+      'jwt': sanitizedToken,
     };
+    
     final options = io.OptionBuilder()
         .setTransports(MultiplayerConstants.socketTransports)
         .enableForceNew()
         .disableAutoConnect()
-        .setExtraHeaders(headers)
+        .setAuth(auth)
+        .setReconnectionDelay(1000)
+        .setReconnectionDelayMax(5000)
+        .setReconnectionAttempts(5)
         .build();
 
-    final socket = io.io(target, options);
+    print('[SOCKET_AUTH_SETUP] Socket.IO options configured with auth + query params');
+    final socket = io.io(authUri.toString(), options);
     _socket = socket;
 
     final completer = Completer<void>();
@@ -84,19 +102,35 @@ class MultiplayerSocketClient {
     }
 
     socket.onConnect((_) {
+      print('[SOCKET_HANDSHAKE] ✓ CONNECTED to multiplayer-sessions namespace');
+      print('[SOCKET_HANDSHAKE] Handshake complete at ${DateTime.now()}');
+      print('[SOCKET_HANDSHAKE] Socket.connected = ${socket.connected}, Socket.id = ${socket.id}');
+      print('[SOCKET_HANDSHAKE] Auth should now persist for all subsequent events');
       _statusController.add(MultiplayerSocketStatus.connected);
       completeSuccess();
     });
     socket.onDisconnect((_) {
+      print('[SOCKET_LIFECYCLE] ✗ DISCONNECTED from multiplayer-sessions namespace at ${DateTime.now()}');
       _statusController.add(MultiplayerSocketStatus.disconnected);
     });
     socket.onReconnect((_) {
+      print('[SOCKET_LIFECYCLE] ↻ RECONNECTED to multiplayer-sessions namespace at ${DateTime.now()}');
+      print('[SOCKET_LIFECYCLE] WARNING: Reconnection may require re-authentication');
       _statusController.add(MultiplayerSocketStatus.connected);
     });
     socket.onReconnectAttempt((_) {
+      print('[SOCKET_LIFECYCLE] ↻ RECONNECT ATTEMPT at ${DateTime.now()}...');
       _statusController.add(MultiplayerSocketStatus.connecting);
     });
     void handleConnectError(dynamic error) {
+      print('[SOCKET_ERROR] Connection failed: $error');
+      
+      // Detect specific error patterns
+      final errorStr = error.toString().toLowerCase();
+      if (errorStr.contains('websocket error') && errorStr.contains('transport')) {
+        print('[SOCKET_ERROR] → WebSocket transport error (backend may not be running)');
+        print('[SOCKET_ERROR] → Check: https://${_extractDomain(_baseUrl)}/health');
+      }
       _handleError(error);
       try {
         socket.disconnect();
@@ -110,9 +144,12 @@ class MultiplayerSocketClient {
 
     socket.onConnectError(handleConnectError);
     socket.on('connect_timeout', (_) {
+      print('[SOCKET_ERROR] Connection timeout');
       handleConnectError(TimeoutException('Tiempo de conexión agotado.'));
     });
-    socket.onError(_handleError);
+    socket.onError((error) {
+      _handleError(error);
+    });
     socket.onAny((event, data) {
       final controller = _eventControllers[event];
       if (controller != null && !controller.isClosed) {
@@ -155,9 +192,20 @@ class MultiplayerSocketClient {
   /// Emite un evento del cliente con payload opcional.
   void emit(String eventName, [dynamic payload]) {
     if (_socket == null) {
+      print('[SOCKET_EMIT] ✗ CANNOT EMIT "$eventName": socket is null');
       throw StateError('Socket is not connected. Unable to emit "$eventName".');
     }
+    if (!(_socket?.connected ?? false)) {
+      print('[SOCKET_EMIT] ✗ CANNOT EMIT "$eventName": socket.connected = false');
+      throw StateError('Socket is not connected. Unable to emit "$eventName".');
+    }
+    print('[SOCKET_EMIT] ========== EVENT EMISSION =========');
+    print('[SOCKET_EMIT] → EMIT "$eventName" at ${DateTime.now()}');
+    print('[SOCKET_EMIT]    Socket.connected = ${_socket!.connected}, Socket.id = ${_socket!.id}');
+    print('[SOCKET_EMIT]    Payload: ${_sanitizeLogData(payload)}');
+    print('[SOCKET_EMIT]    Auth should persist from handshake - server should have cached credentials');
     _socket!.emit(eventName, payload);
+    print('[SOCKET_EMIT]    Emission complete');
   }
 
   /// Libera todos los controllers y desconecta el socket subyacente.
@@ -183,7 +231,42 @@ class MultiplayerSocketClient {
     final trimmedBase = _baseUrl.endsWith('/')
         ? _baseUrl.substring(0, _baseUrl.length - 1)
         : _baseUrl;
-    return '$trimmedBase/multiplayer-sessions';
+    
+    // Validate base URL format
+    if (!trimmedBase.startsWith('http://') && !trimmedBase.startsWith('https://') && 
+        !trimmedBase.startsWith('ws://') && !trimmedBase.startsWith('wss://')) {
+      print('[SOCKET_ERROR] ⚠️ WARNING: Base URL does not have a scheme: $trimmedBase');
+      print('[SOCKET_ERROR] ⚠️ Expected: http://, https://, ws://, or wss://');
+    }
+    
+    final namespaceUrl = '$trimmedBase/multiplayer-sessions';
+    print('[SOCKET_DEBUG] Namespace URL constructed: $namespaceUrl');
+    return namespaceUrl;
+  }
+
+  /// Extrae el dominio de una URL para diagnósticos.
+  String _extractDomain(String url) {
+    try {
+      final uri = Uri.parse(url);
+      return uri.host;
+    } catch (_) {
+      return url;
+    }
+  }
+
+  /// Sanitiza datos para logging (evita exponer tokens completos)
+  dynamic _sanitizeLogData(dynamic data) {
+    if (data is Map) {
+      final sanitized = Map.from(data);
+      if (sanitized.containsKey('jwt')) {
+        sanitized['jwt'] = '***REDACTED***';
+      }
+      if (sanitized.containsKey('token')) {
+        sanitized['token'] = '***REDACTED***';
+      }
+      return sanitized;
+    }
+    return data;
   }
 
   /// Convierte recursivamente payloads dinámicos a estructuras JSON cuando es

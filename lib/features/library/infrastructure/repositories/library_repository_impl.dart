@@ -98,7 +98,7 @@ class LibraryRepositoryImpl implements LibraryRepository {
 
     final request = http.Request(method, url)
       ..headers['Content-Type'] = 'application/json';
-      
+
     if (token != null) {
       request.headers['Authorization'] = 'Bearer $token';
     }
@@ -121,19 +121,20 @@ class LibraryRepositoryImpl implements LibraryRepository {
   @override
   Future<Kahoot> getKahootById(String id, {String? userId}) async {
     final url = Uri.parse('$baseUrl/kahoots/$id');
+    final token = await SecureStorage.instance.read('token');
 
     final response = await client.get(
       url,
       headers: {
         'Content-Type': 'application/json',
-        // 'x-debug-user-id': userId ?? '', // REMOVE
+        if (token != null) 'Authorization': 'Bearer $token',
+        'x-debug-user-id': userId ?? '',
       },
     );
 
     if (response.statusCode == 200) {
       final dynamic decodedData = jsonDecode(response.body);
 
-      // Verificamos si los datos vienen envueltos en la llave "data"
       if (decodedData is Map<String, dynamic> &&
           decodedData.containsKey('data')) {
         return Kahoot.fromJson(decodedData['data']);

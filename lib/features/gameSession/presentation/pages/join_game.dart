@@ -8,6 +8,7 @@ import 'package:Trivvy/core/constants/colors.dart';
 
 import '../controllers/multiplayer_session_controller.dart';
 import 'player_lobby_screen.dart';
+import 'player_nickname_screen.dart';
 
 const _defaultNickname = 'Jugador';
 
@@ -131,7 +132,12 @@ class JoinGameScreenState extends State<JoinGameScreen> {
       // Solo navega si la conexión es exitosa y sin errores
       Navigator.of(
         context,
-      ).push(MaterialPageRoute(builder: (_) => const PlayerLobbyScreen()));
+      ).push(MaterialPageRoute(
+        builder: (_) => PlayerNicknameScreen(
+          initialNickname: nickname,
+          isFirstTime: !(sessionController.playerConnectedDto?.connectedBefore ?? false),
+        ),
+      ));
     } catch (error) {
       if (!mounted) return;
       await _showErrorDialog(

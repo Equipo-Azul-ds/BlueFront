@@ -250,11 +250,17 @@ class _HostGameScreenState extends State<HostGameScreen> {
                                       child: _ResultsLeaderboard(entries: leaderboardEntries),
                                     ),
                                     const SizedBox(height: 12),
-                                  ] else
+                                  ] else ...[
                                     _MediaAndTimerBlock(
                                       time: _timeRemaining,
                                       imageUrl: slide.imageUrl,
                                     ),
+                                    const SizedBox(height: 12),
+                                    _SubmissionsCounterCard(
+                                      submissions: controller.hostAnswerSubmissions ?? 0,
+                                      totalPlayers: controller.lobbyPlayers.length,
+                                    ),
+                                  ],
                                   const SizedBox(height: 16),
                                   GridView.builder(
                                     shrinkWrap: true,
@@ -721,6 +727,96 @@ List<_HostOption> _buildOptionsFromDto(
 Set<String> _extractCorrectAnswerIdsFromDto(HostResultsEvent? hostResults) {
   if (hostResults == null) return const <String>{};
   return hostResults.correctAnswerIds.toSet();
+}
+
+/// Widget que muestra el contador de respuestas en tiempo real durante la pregunta.
+class _SubmissionsCounterCard extends StatelessWidget {
+  const _SubmissionsCounterCard({
+    required this.submissions,
+    required this.totalPlayers,
+  });
+
+  final int submissions;
+  final int totalPlayers;
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = (totalPlayers - submissions).clamp(0, totalPlayers);
+    final percentage =
+        totalPlayers > 0 ? (submissions / totalPlayers * 100).round() : 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Respuestas enviadas',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Text(
+                '$submissions/$totalPlayers',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: totalPlayers > 0 ? submissions / totalPlayers : 0,
+              minHeight: 8,
+              backgroundColor: Colors.white.withValues(alpha: 0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                submissions == totalPlayers ? Colors.green : AppColor.secundary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (remaining > 0)
+            Text(
+              'Esperando $remaining ${remaining == 1 ? 'respuesta' : 'respuestas'} ($percentage%)',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
+            )
+          else
+            const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green, size: 16),
+                SizedBox(width: 6),
+                Text(
+                  'Todas las respuestas recibidas',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Mapea opción -> número de respuestas desde las estadísticas.

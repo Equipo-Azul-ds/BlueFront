@@ -46,5 +46,5 @@ abstract class SinglePlayerGameRepository {
 
   Future<AttemptStateRepositoryResponse> getAttemptState(String attemptId);
 
-  Future<SinglePlayerGame> getAttemptSummary(String attemptId);
+  Future<SinglePlayerGame> getAttemptSummary(String attemptId, {String? quizId});
 }

@@ -20,52 +20,52 @@ class SubscriptionRepositoryImpl implements ISubscriptionRepository {
     required String token,
     required String planId,
   }) async {
+    final url = '$baseUrl/subscription';
+
     final response = await client.post(
-      Uri.parse('$baseUrl/user/subscription/premium/'),
+      Uri.parse(url),
       headers: _headers(token),
+      body: jsonEncode({'planId': planId}),
     );
 
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      if (response.body.trim().isEmpty) {
-        return SubscriptionModel(
-          id: 'temp_id',
-          userId: '',
-          planId: 'Premium',
-          status: 'active',
-          expiresAt: DateTime.now().add(const Duration(days: 30)),
-        );
-      }
-
+    if (response.statusCode >= 200 && response.statusCode < 300) {
       final dynamic jsonData = jsonDecode(response.body);
-      return SubscriptionModel.fromJson(jsonData as Map<String, dynamic>);
-    } else {
-      throw Exception('Error al activar suscripción: ${response.body}');
+      final Map<String, dynamic> data =
+          (jsonData is Map<String, dynamic> && jsonData.containsKey('data'))
+          ? jsonData['data']
+          : jsonData;
+      return SubscriptionModel.fromJson(data);
     }
+    throw Exception('Error Backend: ${response.body}');
   }
 
   @override
   Future<void> cancelSubscription(String token) async {
+    final url = '$baseUrl/subscription';
     final response = await client.delete(
-      Uri.parse('$baseUrl/user/subscription/free/'),
+      Uri.parse(url),
       headers: _headers(token),
     );
-
-    if (response.statusCode != 200 && response.statusCode != 204) {
-      throw Exception('Error al cancelar suscripción');
-    }
+    print('📩 [BACKEND] Respuesta DELETE (${response.statusCode})');
   }
 
   @override
   Future<Subscription?> getSubscriptionStatus(String token) async {
-    final response = await client.get(
-      Uri.parse('$baseUrl/user/subscription/status'),
-      headers: _headers(token),
+    final url = '$baseUrl/subscription';
+
+    final response = await client.get(Uri.parse(url), headers: _headers(token));
+    print(
+      '📩 [BACKEND] Respuesta GET (${response.statusCode}): ${response.body}',
     );
 
     if (response.statusCode == 200) {
       if (response.body.trim().isEmpty) return null;
       final dynamic jsonData = jsonDecode(response.body);
-      return SubscriptionModel.fromJson(jsonData as Map<String, dynamic>);
+      final Map<String, dynamic> data =
+          (jsonData is Map<String, dynamic> && jsonData.containsKey('data'))
+          ? jsonData['data']
+          : jsonData;
+      return SubscriptionModel.fromJson(data);
     }
     return null;
   }

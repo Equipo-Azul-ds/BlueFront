@@ -27,19 +27,34 @@ class SubscriptionProvider extends ChangeNotifier {
   Subscription? get subscription => _subscription;
   String? get errorMessage => _errorMessage;
 
-  // Ajustado: Compara con el nombre del plan que devuelve el back
-  bool get isPremium =>
-      _subscription != null &&
-      (_subscription!.planId.toLowerCase().contains('premium')) &&
-      _subscription!.status == 'active';
+  bool get isPremium {
+    if (_subscription == null) return false;
+    final plan = _subscription!.planId.toUpperCase();
+    final status = _subscription!.status.toLowerCase();
+    return plan.contains('PREMIUM') && status == 'active';
+  }
 
-  // CARGAR ESTADO (Usando Token)
+  // Limpiar datos al cerrar sesión
+  void clear() {
+    _subscription = null;
+    _status = SubscriptionStatus.initial;
+    notifyListeners();
+  }
+
+  // Método para centralizar la actualización desde el servidor
+  Future<void> _refreshStatusFromServer(String token) async {
+    _subscription = await _getSubscriptionStatusUseCase.execute(token);
+    notifyListeners();
+  }
+
   Future<void> checkCurrentStatus(String token) async {
-    if (token.isEmpty) return;
+    if (token.isEmpty) {
+      return;
+    }
     _status = SubscriptionStatus.loading;
     notifyListeners();
     try {
-      _subscription = await _getSubscriptionStatusUseCase.execute(token);
+      await _refreshStatusFromServer(token);
       _status = SubscriptionStatus.success;
     } catch (e) {
       _status = SubscriptionStatus.error;
@@ -49,14 +64,13 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  // COMPRAR PLAN (Usando Token)
   Future<void> purchasePlan(String token, String planId) async {
     _status = SubscriptionStatus.loading;
-    _errorMessage = null;
     notifyListeners();
-
     try {
-      _subscription = await _subscribeUserUseCase.execute(token, planId);
+      await _subscribeUserUseCase.execute(token, planId);
+      // Tras éxito en POST, forzamos GET para sincronizar
+      await _refreshStatusFromServer(token);
       _status = SubscriptionStatus.success;
     } catch (e) {
       _status = SubscriptionStatus.error;
@@ -67,13 +81,13 @@ class SubscriptionProvider extends ChangeNotifier {
     }
   }
 
-  // CANCELAR (Usando Token)
   Future<void> cancelCurrentSubscription(String token) async {
     _status = SubscriptionStatus.loading;
     notifyListeners();
     try {
       await _cancelSubscriptionUseCase.execute(token);
-      _subscription = null;
+      // Tras éxito en DELETE, forzamos GET para confirmar que el back ahora devuelve FREE
+      await _refreshStatusFromServer(token);
       _status = SubscriptionStatus.success;
     } catch (e) {
       _status = SubscriptionStatus.error;

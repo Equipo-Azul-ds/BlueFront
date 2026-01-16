@@ -44,6 +44,7 @@ class SessionConnectionManager extends ChangeNotifier {
   ConnectionErrorEvent? _connectionErrorDto;
   HostConnectedSuccessEvent? _hostConnectedSuccessDto;
   GameErrorEvent? _gameErrorDto;
+  UnavailableSessionEvent? _unavailableSessionDto;
 
   StreamSubscription<MultiplayerSocketStatus>? _statusSubscription;
   StreamSubscription<Object>? _errorSubscription;
@@ -53,6 +54,7 @@ class SessionConnectionManager extends ChangeNotifier {
   StreamSubscription<dynamic>? _hostReturnedSubscription;
   StreamSubscription<dynamic>? _hostConnectedSuccessSubscription;
   StreamSubscription<dynamic>? _gameErrorSubscription;
+  StreamSubscription<dynamic>? _unavailableSessionSubscription;
 
   // Getters
   MultiplayerSocketStatus get socketStatus => _socketStatus;
@@ -64,6 +66,7 @@ class SessionConnectionManager extends ChangeNotifier {
   ConnectionErrorEvent? get connectionErrorDto => _connectionErrorDto;
   HostConnectedSuccessEvent? get hostConnectedSuccessDto => _hostConnectedSuccessDto;
   GameErrorEvent? get gameErrorDto => _gameErrorDto;
+  UnavailableSessionEvent? get unavailableSessionDto => _unavailableSessionDto;
 
   /// Registra oyentes para eventos de conexión y ciclo de vida (errores de sincronización, errores de conexión, anfitrión salió/retornó, errores de juego).
   void registerLifecycleListeners(
@@ -120,6 +123,15 @@ class SessionConnectionManager extends ChangeNotifier {
           (payload) => _handleGameError(payload, onEventError),
           onError: onEventError,
         );
+
+    _unavailableSessionSubscription?.cancel();
+    _unavailableSessionSubscription = _realtime
+        .listenToServerEvent<Map<String, dynamic>>(
+            MultiplayerEvents.unavailableSession)
+        .listen(
+          (payload) => _handleUnavailableSession(payload, onEventError),
+          onError: onEventError,
+        );
   }
  
    /// Marca la sesión como lista para sincronizar y emite evento client_ready si el socket está conectado.
@@ -142,18 +154,20 @@ class SessionConnectionManager extends ChangeNotifier {
     }
   }
 
-   /// Maneja evento de error de sincronización: cachea error, establece mensaje de error, desconecta socket.
+  /// Maneja evento de error de sincronización: cachea error, establece mensaje de error, desconecta socket.
   void _handleSyncError(
     Map<String, dynamic> payload,
     void Function(Object error) onEventError,
   ) {
     try {
       final event = SyncErrorEvent.fromJson(payload);
+      print('[EVENT] ✗ RECEIVED: sync_error with message=\"${event.message}\" - DISCONNECTING SOCKET');
       _syncErrorDto = event;
       _lastError = event.message ?? MultiplayerConstants.errorSyncDefault;
       _realtime.disconnect();
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing sync_error: $error');
       onEventError(error);
     }
   }
@@ -165,10 +179,12 @@ class SessionConnectionManager extends ChangeNotifier {
   ) {
     try {
       final event = ConnectionErrorEvent.fromJson(payload);
+      print('[EVENT] ✗ RECEIVED: connection_error with message=\"${event.message}\"');
       _connectionErrorDto = event;
       _lastError = event.message ?? MultiplayerConstants.errorConnectionDefault;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing connection_error: $error');
       onEventError(error);
     }
   }
@@ -231,6 +247,24 @@ class SessionConnectionManager extends ChangeNotifier {
     }
   }
 
+  /// Maneja evento de sesión no disponible: cachea evento, establece mensaje de error, desconecta socket.
+  void _handleUnavailableSession(
+    Map<String, dynamic> payload,
+    void Function(Object error) onEventError,
+  ) {
+    try {
+      final event = UnavailableSessionEvent.fromJson(payload);
+      print('[EVENT] ✗ RECEIVED: unavailable_session with message="${event.message}" - DISCONNECTING SOCKET');
+      _unavailableSessionDto = event;
+      _lastError = event.message ?? MultiplayerConstants.errorSessionNotFound;
+      _realtime.disconnect();
+      notifyListeners();
+    } catch (error) {
+      print('[EVENT] ✗ ERROR parsing unavailable_session: $error');
+      onEventError(error);
+    }
+  }
+
   /// Limpia el cache de error de sincronización y notifica a oyentes.
   void clearSyncError() {
     _syncErrorDto = null;
@@ -261,6 +295,12 @@ class SessionConnectionManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Limpia el cache de evento de sesión no disponible y notifica a oyentes.
+  void clearUnavailableSession() {
+    _unavailableSessionDto = null;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _statusSubscription?.cancel();
@@ -271,6 +311,7 @@ class SessionConnectionManager extends ChangeNotifier {
     _hostReturnedSubscription?.cancel();
     _hostConnectedSuccessSubscription?.cancel();
     _gameErrorSubscription?.cancel();
+    _unavailableSessionSubscription?.cancel();
     super.dispose();
   }
 }

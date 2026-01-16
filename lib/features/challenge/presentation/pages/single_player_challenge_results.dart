@@ -64,7 +64,9 @@ class _SinglePlayerChallengeResultsScreenState
     _bloc.hydrate(widget.initialSummaryGame);
 
     // Cargamos el resumen del intento al iniciar el estado.
-    _bloc.load(widget.gameId);
+    // Pasamos el quizId del juego inicial para asegurar que se preserve en el resumen.
+    final quizId = widget.initialSummaryGame?.quizId;
+    _bloc.load(widget.gameId, quizId: quizId);
 
     _controller.forward();
     _confettiController =

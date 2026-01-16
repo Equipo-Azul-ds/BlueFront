@@ -1,16 +1,18 @@
 import 'dart:convert';
 
 /// Tipo de juego para diferenciar attempts single player vs sesiones multijugador.
-enum GameType { singleplayer, multiplayer }
+enum GameType { singleplayer, multiplayer_player, multiplayer_host }
 
 GameType gameTypeFromString(String? raw) {
   switch (raw?.toLowerCase()) {
     case 'singleplayer':
       return GameType.singleplayer;
-    case 'multiplayer':
-      return GameType.multiplayer;
+    case 'multiplayer_player':
+      return GameType.multiplayer_player;
+    case 'multiplayer_host':
+      return GameType.multiplayer_host;
     default:
-      return GameType.multiplayer;
+      return GameType.singleplayer;
   }
 }
 
