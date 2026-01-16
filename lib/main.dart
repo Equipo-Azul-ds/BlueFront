@@ -94,7 +94,6 @@ import 'features/subscriptions/domain/repositories/subscription_repository.dart'
 import 'features/subscriptions/application/usecases/subscribe_user_usecase.dart';
 import 'features/subscriptions/application/usecases/get_subscription_status_usecase.dart';
 import 'features/subscriptions/application/usecases/cancel_subscription_usecase.dart';
-import 'features/subscriptions/infrastructure/repositories/simulated_subscription_repository.dart';
 import 'features/subscriptions/infrastructure/repositories/subscription_repository_impl.dart';
 import 'features/subscriptions/presentation/provider/subscription_provider.dart';
 import 'features/subscriptions/presentation/screens/plans_screen.dart';
@@ -111,7 +110,10 @@ const String apiBaseUrl = String.fromEnvironment(
 );
 
 // Token (UUID) usado mientras el backend mockea la verificación real.
-const String apiAuthToken = String.fromEnvironment('API_AUTH_TOKEN', defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333');
+const String apiAuthToken = String.fromEnvironment(
+  'API_AUTH_TOKEN',
+  defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333',
+);
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (!kUseFirebase) return;
@@ -181,24 +183,20 @@ class MyApp extends StatelessWidget {
           ),
         ),
         Provider<GetMyResultsUseCase>(
-          create: (context) => GetMyResultsUseCase(
-            context.read<ReportsRepository>(),
-          ),
+          create: (context) =>
+              GetMyResultsUseCase(context.read<ReportsRepository>()),
         ),
         Provider<GetSessionReportUseCase>(
-          create: (context) => GetSessionReportUseCase(
-            context.read<ReportsRepository>(),
-          ),
+          create: (context) =>
+              GetSessionReportUseCase(context.read<ReportsRepository>()),
         ),
         Provider<GetMultiplayerResultUseCase>(
-          create: (context) => GetMultiplayerResultUseCase(
-            context.read<ReportsRepository>(),
-          ),
+          create: (context) =>
+              GetMultiplayerResultUseCase(context.read<ReportsRepository>()),
         ),
         Provider<GetSingleplayerResultUseCase>(
-          create: (context) => GetSingleplayerResultUseCase(
-            context.read<ReportsRepository>(),
-          ),
+          create: (context) =>
+              GetSingleplayerResultUseCase(context.read<ReportsRepository>()),
         ),
         ChangeNotifierProvider<ReportsListBloc>(
           create: (context) => ReportsListBloc(
@@ -231,9 +229,8 @@ class MyApp extends StatelessWidget {
         ),
 
         Provider<ToggleAdminRoleUseCase>(
-          create: (context) => ToggleAdminRoleUseCase(
-            context.read<IUserRepository>(),
-          ),
+          create: (context) =>
+              ToggleAdminRoleUseCase(context.read<IUserRepository>()),
         ),
         ChangeNotifierProvider(
           create: (context) => UserManagementProvider(
@@ -400,7 +397,8 @@ class MyApp extends StatelessWidget {
         ),
         Provider<MultiplayerSessionRepository>(
           create: (context) => MultiplayerSessionRepositoryImpl(
-            remoteDataSource: context.read<MultiplayerSessionRemoteDataSource>(),
+            remoteDataSource: context
+                .read<MultiplayerSessionRemoteDataSource>(),
           ),
         ),
         Provider<MultiplayerSessionRealtime>(
@@ -452,15 +450,18 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (context) => MultiplayerSessionController(
             realtime: context.read<MultiplayerSessionRealtime>(),
-            initializeHostLobbyUseCase: context.read<InitializeHostLobbyUseCase>(),
-            resolvePinFromQrTokenUseCase:
-                context.read<ResolvePinFromQrTokenUseCase>(),
+            initializeHostLobbyUseCase: context
+                .read<InitializeHostLobbyUseCase>(),
+            resolvePinFromQrTokenUseCase: context
+                .read<ResolvePinFromQrTokenUseCase>(),
             joinLobbyUseCase: context.read<JoinLobbyUseCase>(),
             leaveSessionUseCase: context.read<LeaveSessionUseCase>(),
             emitHostStartGameUseCase: context.read<EmitHostStartGameUseCase>(),
             emitHostNextPhaseUseCase: context.read<EmitHostNextPhaseUseCase>(),
-            emitHostEndSessionUseCase: context.read<EmitHostEndSessionUseCase>(),
-            submitPlayerAnswerUseCase: context.read<SubmitPlayerAnswerUseCase>(),
+            emitHostEndSessionUseCase: context
+                .read<EmitHostEndSessionUseCase>(),
+            submitPlayerAnswerUseCase: context
+                .read<SubmitPlayerAnswerUseCase>(),
           ),
         ),
         // Blocs / ChangeNotifiers
@@ -534,7 +535,10 @@ class MyApp extends StatelessWidget {
         ),
         //Epica Suscripción
         Provider<ISubscriptionRepository>(
-          create: (_) => SimulatedSubscriptionRepository(),
+          create: (context) => SubscriptionRepositoryImpl(
+            baseUrl: apiBaseUrl,
+            client: context.read<http.Client>(),
+          ),
         ),
         Provider<SubscribeUserUseCase>(
           create: (context) =>
@@ -566,101 +570,101 @@ class MyApp extends StatelessWidget {
           builder: (context) {
             return SessionExpiryListener(
               child: MaterialApp(
-              debugShowCheckedModeBanner: false,
-              title: 'Trivvy',
-              // Esto viene de la rama epica9y11 para que funcionen los SnackBar de notificaciones
-              scaffoldMessengerKey: context
-                  .read<NotificationProvider>()
-                  .messengerKey,
-              theme: ThemeData(
-                fontFamily: 'Onest',
-                primarySwatch: createMaterialColor(AppColor.primary),
-                primaryColor: AppColor.primary,
-                scaffoldBackgroundColor: AppColor.background,
-                appBarTheme: AppBarTheme(
-                  backgroundColor: AppColor.primary,
-                  iconTheme: IconThemeData(color: AppColor.onPrimary),
-                  titleTextStyle: TextStyle(
-                    color: AppColor.onPrimary,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                debugShowCheckedModeBanner: false,
+                title: 'Trivvy',
+                // Esto viene de la rama epica9y11 para que funcionen los SnackBar de notificaciones
+                scaffoldMessengerKey: context
+                    .read<NotificationProvider>()
+                    .messengerKey,
+                theme: ThemeData(
+                  fontFamily: 'Onest',
+                  primarySwatch: createMaterialColor(AppColor.primary),
+                  primaryColor: AppColor.primary,
+                  scaffoldBackgroundColor: AppColor.background,
+                  appBarTheme: AppBarTheme(
+                    backgroundColor: AppColor.primary,
+                    iconTheme: IconThemeData(color: AppColor.onPrimary),
+                    titleTextStyle: TextStyle(
+                      color: AppColor.onPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                floatingActionButtonTheme: FloatingActionButtonThemeData(
-                  backgroundColor: AppColor.secundary,
-                  foregroundColor: AppColor.onPrimary,
-                ),
-                elevatedButtonTheme: ElevatedButtonThemeData(
-                  style: ElevatedButton.styleFrom(
+                  floatingActionButtonTheme: FloatingActionButtonThemeData(
                     backgroundColor: AppColor.secundary,
                     foregroundColor: AppColor.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevatedButtonTheme: ElevatedButtonThemeData(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColor.secundary,
+                      foregroundColor: AppColor.onPrimary,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              // Decidimos la ruta inicial (AccessGatePage suele ser para Login/Onboarding)
-              initialRoute: '/',
-              routes: {
-                '/': (context) => const AccessGatePage(),
-                '/dashboard': (context) => DashboardPage(),
-                '/welcome': (context) => const AccessGatePage(),
-                '/profile': (context) {
-                  // Usamos la lógica de la rama principal para el perfil
-                  final auth = Provider.of<AuthBloc>(context, listen: false);
-                  final user = auth.currentUser;
-                  if (user == null) return const AccessGatePage();
-                  return ProfilePage(user: user);
+                // Decidimos la ruta inicial (AccessGatePage suele ser para Login/Onboarding)
+                initialRoute: '/',
+                routes: {
+                  '/': (context) => const AccessGatePage(),
+                  '/dashboard': (context) => DashboardPage(),
+                  '/welcome': (context) => const AccessGatePage(),
+                  '/profile': (context) {
+                    // Usamos la lógica de la rama principal para el perfil
+                    final auth = Provider.of<AuthBloc>(context, listen: false);
+                    final user = auth.currentUser;
+                    if (user == null) return const AccessGatePage();
+                    return ProfilePage(user: user);
+                  },
+                  '/create': (context) {
+                    final args = ModalRoute.of(context)?.settings.arguments;
+                    Quiz? template;
+                    bool explicitClear = false;
+                    if (args is Quiz) template = args;
+                    if (args is Map && args['clear'] == true)
+                      explicitClear = true;
+                    final quizBloc = Provider.of<QuizEditorBloc>(
+                      context,
+                      listen: false,
+                    );
+                    final shouldClear =
+                        template == null &&
+                        (explicitClear ||
+                            quizBloc.currentQuiz == null ||
+                            (quizBloc.currentQuiz?.quizId.isEmpty ?? false));
+                    if (shouldClear) {
+                      quizBloc.clear();
+                    }
+                    return QuizEditorPage(template: template);
+                  },
+                  '/questionEditor': (context) {
+                    final args =
+                        ModalRoute.of(context)!.settings.arguments
+                            as Map<String, String>;
+                    return QuestionEditorPage(
+                      quizId: args['quizId']!,
+                      questionId: args['questionId']!,
+                    );
+                  },
+                  '/templateSelector': (context) => TemplateSelectorPage(),
+                  '/discover': (context) => const DiscoverScreen(),
+                  '/library': (context) => LibraryPage(),
+                  '/groups': (context) => const GroupsPage(),
+                  '/kahoots-category': (context) => const KahootsCategoryPage(),
+                  '/kahoot-detail': (context) => const KahootDetailPage(),
+                  '/discovery-detail': (context) => const DiscoveryDetailPage(),
+                  '/subscriptions': (context) => const PlansScreen(),
+                  '/subscription-management': (context) =>
+                      const SubscriptionManagementScreen(),
+                  '/admin': (context) => const AdminPage(),
+                  '/admin/users': (context) => const UserManagementPage(),
+                  '/admin/notifications': (context) =>
+                      const NotificationAdminPage(),
+                  '/admin/dashboard': (context) => const AdminDashboardPage(),
+                  '/notifications-history': (context) =>
+                      const NotificationsHistoryPage(),
                 },
-                '/create': (context) {
-                  final args = ModalRoute.of(context)?.settings.arguments;
-                  Quiz? template;
-                  bool explicitClear = false;
-                  if (args is Quiz) template = args;
-                  if (args is Map && args['clear'] == true)
-                    explicitClear = true;
-                  final quizBloc = Provider.of<QuizEditorBloc>(
-                    context,
-                    listen: false,
-                  );
-                  final shouldClear =
-                      template == null &&
-                      (explicitClear ||
-                          quizBloc.currentQuiz == null ||
-                          (quizBloc.currentQuiz?.quizId.isEmpty ?? false));
-                  if (shouldClear) {
-                    quizBloc.clear();
-                  }
-                  return QuizEditorPage(template: template);
-                },
-                '/questionEditor': (context) {
-                  final args =
-                      ModalRoute.of(context)!.settings.arguments
-                          as Map<String, String>;
-                  return QuestionEditorPage(
-                    quizId: args['quizId']!,
-                    questionId: args['questionId']!,
-                  );
-                },
-                '/templateSelector': (context) => TemplateSelectorPage(),
-                '/discover': (context) => const DiscoverScreen(),
-                '/library': (context) => LibraryPage(),
-                '/groups': (context) => const GroupsPage(),
-                '/kahoots-category': (context) => const KahootsCategoryPage(),
-                '/kahoot-detail': (context) => const KahootDetailPage(),
-                '/discovery-detail': (context) => const DiscoveryDetailPage(),
-                '/subscriptions': (context) => const PlansScreen(),
-                '/subscription-management': (context) =>
-                    const SubscriptionManagementScreen(),
-                '/admin': (context) => const AdminPage(),
-                '/admin/users': (context) => const UserManagementPage(),
-                '/admin/notifications': (context) =>
-                    const NotificationAdminPage(),
-                '/admin/dashboard': (context) => const AdminDashboardPage(),
-                '/notifications-history': (context) =>
-                    const NotificationsHistoryPage(),
-              },
               ),
             );
           },
