@@ -95,6 +95,8 @@ dev_dependencies:
     sdk: flutter
   mocktail: ^1.0.0
 
+  bdd_widget_test: ^1.6.0
+
   # Para generar íconos de la app
   flutter_launcher_icons: ^0.14.4
 

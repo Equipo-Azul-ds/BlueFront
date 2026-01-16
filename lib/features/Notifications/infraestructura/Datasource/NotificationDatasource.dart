@@ -18,11 +18,21 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
   @override
   Future<void> registerDevice(String token, String deviceType) async {
+    final tokenid = await storage.read('token');
+
+
     final response = await client.post(
       Uri.parse('$baseUrl/notifications/register-device'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({"token": token, "deviceType": deviceType}), //
+      headers: {'Content-Type': 'application/json',
+        //'x-debug-user-id': debugUserId,
+        'Authorization': 'Bearer $tokenid',
+      },
+      body: jsonEncode({"token": token, "deviceType": deviceType}),
     );
+
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode != 201) {
       throw Exception(
@@ -32,11 +42,18 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
   @override
   Future<void> unregisterDevice(String token) async {
+    final tokenid = await storage.read('token');
+
     final response = await client.delete(
       Uri.parse('$baseUrl/notifications/unregister-device'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json',
+         'Authorization': 'Bearer $tokenid',},
       body: jsonEncode({"token": token}),
     );
+
+    print('--- HTTP RESPONSE ---');
+    print('STATUS: ${response.statusCode}');
+    print('BODY: ${response.body}');
 
     if (response.statusCode != 204) {
       throw Exception(
@@ -49,11 +66,15 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     int limit = 20,
     int page = 1,
   }) async {
+    final token = await storage.read('token');
+    //final userId = await storage.read('userId');
+    const String debugUserId = '123e4567-e89b-42d3-a456-426614174000';
     final uri = Uri.parse('$baseUrl/notifications').replace(
-      queryParameters: {
-        'limit': limit.toString(),
-        'page': page.toString(),
-      },
+      //queryParameters: {
+        //'limit': limit.toString(),
+        //'page': page.toString(),
+      //},
+
     );
 
     try {
@@ -61,15 +82,21 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
       final response = await client.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: {'Content-Type': 'application/json',
+          //'x-debug-user-id': debugUserId,
+          'Authorization': 'Bearer $token',},
       );
 
+      print('URL: PATCH $uri');
+      print('HEADERS: {"Content-Type": "application/json", "user": "$debugUserId"}');
+      print('--- HTTP RESPONSE ---');
+      print('STATUS: ${response.statusCode}');
+      print('BODY: ${response.body}');
+
       if (response.statusCode == 200) {
-        final dynamic jsonBody = jsonDecode(response.body);
-        return NotificationListResponseDto.fromDynamicJson(jsonBody);
-      } else {
+        final dynamic decodedJson = jsonDecode(response.body);
+        return NotificationListResponseDto.fromDynamicJson(decodedJson);
+      }else {
         throw Exception('Error al recuperar historial: ${response.statusCode}');
       }
     } catch (e) {
@@ -80,9 +107,11 @@ class NotificationRemoteDataSource implements INotificationDataSource {
 
   @override
   Future<Map<String, dynamic>> markAsRead(String id) async {
+    final token = await storage.read('token');
     final response = await client.patch(
       Uri.parse('$baseUrl/notifications/$id'), //
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',},
       body: jsonEncode({"isRead": true}), //
     );
 
@@ -118,15 +147,14 @@ class NotificationRemoteDataSource implements INotificationDataSource {
   }) async {
     final uri = Uri.parse('$baseUrl/backoffice/massNotification');
     final token = await storage.read('token');
-    //final adminId = await storage.read('userId');
-    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
+    final headers = await _getHeaders();
 
     final response = await client.post(
-      uri,
-      headers: {
+      uri, headers: headers,
+      /*headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? '',
-      },
+        'Authorization': 'Bearer $token',
+      },*/
       body: jsonEncode({
         "title": title,
         "message": message,
@@ -136,6 +164,10 @@ class NotificationRemoteDataSource implements INotificationDataSource {
         }
       }),
     );
+    print('URL: POST $uri');
+    print('HEADERS: $headers');
+    print('BODY: $title $message');
+
     print('--- HTTP RESPONSE ---');
     print('STATUS: ${response.statusCode}');
     print('BODY: ${response.body}');
@@ -164,16 +196,17 @@ class NotificationRemoteDataSource implements INotificationDataSource {
     final uri = Uri.parse('$baseUrl/backoffice/massNotifications')
         .replace(queryParameters: queryParams);
     final token = await storage.read('token');
-    //final adminId = await storage.read('userId');
-    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
+    final headers = await _getHeaders();
 
     final response = await client.get(
-      uri,
-      headers: {
+      uri, headers: headers
+      /*headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? '',
-      },
+        'Authorization': 'Bearer $token',
+      },*/
     );
+    print('URL: PATCH $uri');
+    print('HEADERS: {"Content-Type": "application/json", "user": "$token"}');
     print('--- HTTP RESPONSE ---');
     print('STATUS: ${response.statusCode}');
     print('BODY: ${response.body}');
@@ -183,6 +216,29 @@ class NotificationRemoteDataSource implements INotificationDataSource {
       return AdminNotificationListResponseDto.fromDynamicJson(jsonBody);
     } else {
       throw Exception('Error al cargar historial: ${response.statusCode}');
+    }
+  }
+
+  bool isUsingBackcomun() {
+    return !baseUrl.contains('/api');
+  }
+
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await storage.read('token');
+    final bool usingBackcomun = isUsingBackcomun();
+
+    if (usingBackcomun) {
+      // Configuración para Backcomun
+      return {
+        'Content-Type': 'application/json',
+        'authorization': token ?? '',
+      };
+    } else {
+      // Configuración para Quizzy
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
     }
   }
 }

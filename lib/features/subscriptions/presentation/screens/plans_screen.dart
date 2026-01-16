@@ -28,8 +28,8 @@ class _PlansScreenState extends State<PlansScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Planes y Membresías'),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: trivvyBlue,
+        foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: Stack(

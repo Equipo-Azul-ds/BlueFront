@@ -99,7 +99,7 @@ import 'features/subscriptions/presentation/screens/subscription_management_scre
 
 // API base URL configurable vía --dart-define=API_BASE_URL
 // Por defecto apunta al backend desplegado en Render
-// API base 1: https://backcomun-mzvy.onrender.com 
+// API base 1: https://backcomun-mzvy.onrender.com
 // API base 2: https://quizzy-backend-1-zpvc.onrender.com
 // https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
@@ -112,7 +112,9 @@ Future<String?> _getAuthToken() async {
   try {
     final token = await SecureStorage.instance.read('token');
     if (token != null && token.isNotEmpty) {
-      final preview = token.length > 20 ? '${token.substring(0, 20)}...' : token;
+      final preview = token.length > 20
+          ? '${token.substring(0, 20)}...'
+          : token;
       print('[TOKEN_PROVIDER] Using JWT token from storage: $preview');
       return token;
     }
@@ -129,48 +131,77 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
-  // Initialize API configuration based on environment
-  _initializeApiConfig();
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize API configuration based on environment or storage
+  await _initializeApiConfig();
 
   // Mostrar en consola la URL base que la app está usando (útil para depuración)
   print('API_BASE_URL = $apiBaseUrl');
   print('HTTP Base URL = ${ApiConfigManager.httpBaseUrl}');
   print('WebSocket Base URL = ${ApiConfigManager.websocketBaseUrl}');
 
-  WidgetsFlutterBinding.ensureInitialized();
   if (kUseFirebase) {
     await Firebase.initializeApp();
 
     // Configurar el handler de segundo plano
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 /// Initializes the API configuration based on the API_BASE_URL environment variable.
 /// Supports both quizzybackend and backcomun backends.
-void _initializeApiConfig() {
-  // Extract domain from the full URL
-  final url = Uri.parse(apiBaseUrl);
-  final domain = '${url.host}${url.hasPort ? ':${url.port}' : ''}';
+Future<void> _initializeApiConfig() async {
+  // 1. Try to load from storage
+  await ApiConfigManager.initialize();
 
-  // Determine backend type based on domain
-  if (domain.contains('quizzy-backend')) {
-    ApiConfigManager.setConfig(BackendType.quizzyBackend, domain);
-  } else if (domain.contains('backcomun')) {
-    ApiConfigManager.setConfig(BackendType.backcomun, domain);
-  } else {
-    // Default to backcomun if unrecognized
-    ApiConfigManager.setConfig(BackendType.backcomun, domain);
+  // 2. Check if it's set
+  try {
+    // If this doesn't throw, we are good
+    ApiConfigManager.current;
+  } catch (_) {
+    // 3. Fallback to Env variable
+    final url = Uri.parse(apiBaseUrl);
+    final domain = '${url.host}${url.hasPort ? ':${url.port}' : ''}';
+
+    // Determine backend type based on domain
+    if (domain.contains('quizzy-backend')) {
+      await ApiConfigManager.setConfig(BackendType.quizzyBackend, domain);
+    } else if (domain.contains('backcomun')) {
+      await ApiConfigManager.setConfig(BackendType.backcomun, domain);
+    } else {
+      // Default to backcomun if unrecognized
+      await ApiConfigManager.setConfig(BackendType.backcomun, domain);
+    }
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  static void restartApp(BuildContext context) {
+    context.findAncestorStateOfType<_MyAppState>()?.restart();
+  }
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  Key _key = UniqueKey();
+
+  void restart() {
+    setState(() {
+      _key = UniqueKey();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
+    return KeyedSubtree(
+      key: _key,
+      child: MultiProvider(
       providers: [
         Provider<http.Client>(create: (_) => http.Client()),
         Provider<ReportsRepository>(
@@ -263,9 +294,8 @@ class MyApp extends StatelessWidget {
           ),
         ),
         Provider<GetThemesUseCase>(
-          create: (context) => GetThemesUseCase(
-            context.read<ThemeRepository>(),
-          ),
+          create: (context) =>
+              GetThemesUseCase(context.read<ThemeRepository>()),
         ),
         ChangeNotifierProvider(
           create: (context) => CategoryManagementProvider(
@@ -373,13 +403,17 @@ class MyApp extends StatelessWidget {
         //Estos son los proveedores para los repositorios (inyeccion de dependencias)
         // Repositorios con configuración mínima (ajusta baseUrl según tu entorno)
         Provider<QuizRepository>(
-          create: (_) => QuizRepositoryImpl(baseUrl: ApiConfigManager.httpBaseUrl),
+          create: (_) =>
+              QuizRepositoryImpl(baseUrl: ApiConfigManager.httpBaseUrl),
         ),
         Provider<MediaRepository>(
-          create: (_) => MediaRepositoryImpl(baseUrl: ApiConfigManager.httpBaseUrl),
+          create: (_) =>
+              MediaRepositoryImpl(baseUrl: ApiConfigManager.httpBaseUrl),
         ),
         Provider<StorageProviderRepository>(
-          create: (_) => StorageProviderRepositoryImpl(baseUrl: ApiConfigManager.httpBaseUrl),
+          create: (_) => StorageProviderRepositoryImpl(
+            baseUrl: ApiConfigManager.httpBaseUrl,
+          ),
         ),
         Provider<MultiplayerSessionRemoteDataSource>(
           create: (context) => MultiplayerSessionRemoteDataSourceImpl(
@@ -530,7 +564,7 @@ class MyApp extends StatelessWidget {
         //Epica Suscripción
         Provider<ISubscriptionRepository>(
           create: (context) => SubscriptionRepositoryImpl(
-            baseUrl: apiBaseUrl,
+            baseUrl: ApiConfigManager.httpBaseUrl,
             client: context.read<http.Client>(),
           ),
         ),
@@ -664,6 +698,7 @@ class MyApp extends StatelessWidget {
           },
         ),
       ),
+     ),
     );
   }
 }

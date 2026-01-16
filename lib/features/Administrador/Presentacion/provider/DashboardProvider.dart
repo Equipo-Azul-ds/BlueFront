@@ -49,7 +49,7 @@ class DashboardProvider extends ChangeNotifier {
     try {
       // 1. Cargar Usuarios y métricas de nuevos usuarios
       final usersResult = await userRepository.getUsers(
-          const UserQueryParams(limit: 100, page: 1)
+          const UserQueryParams(limit: 50, page: 1)
       );
 
       usersResult.fold(

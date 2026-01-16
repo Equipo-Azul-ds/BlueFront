@@ -2,6 +2,7 @@ import '../entities/Group.dart';
 import '../entities/GroupMember.dart';
 import '../entities/GroupInvitationToken.dart';
 import '../entities/GroupQuizAssignment.dart';
+import '../entities/GroupLeaderboardEntry.dart';
 
 abstract class GroupRepository {
   /// Obtiene un grupo por id; devuelve null si no existe.
@@ -25,7 +26,14 @@ abstract class GroupRepository {
   Future<void> leaveGroup(String groupId);
   Future<void> removeMember({required String groupId, required String memberId});
   Future<Group> updateGroupInfo({required String groupId, String? name, String? description});
+  Future<void> deleteGroup(String groupId);
   Future<void> transferAdmin({required String groupId, required String newAdminUserId});
-  Future<GroupQuizAssignment> assignQuizToGroup({required String groupId, required String quizId, required DateTime availableUntil});
+  Future<GroupQuizAssignment> assignQuizToGroup({
+    required String groupId,
+    required String quizId,
+    required DateTime availableFrom,
+    required DateTime availableUntil,
+  });
   Future<List<GroupQuizAssignment>> getGroupAssignments(String groupId);
+  Future<List<GroupLeaderboardEntry>> getGroupLeaderboard(String groupId);
 }

@@ -6,6 +6,7 @@ import '../../domain/entities/Group.dart';
 import '../../domain/entities/GroupInvitationToken.dart';
 import '../../domain/entities/GroupMember.dart';
 import '../../domain/entities/GroupQuizAssignment.dart';
+import '../../domain/entities/GroupLeaderboardEntry.dart';
 import '../../domain/repositories/GroupRepository.dart';
 
 /// Provides HTTP headers (Authorization, etc.) at call time.
@@ -42,6 +43,8 @@ class GroupRepositoryImpl implements GroupRepository {
     final uri = Uri.parse('$_base/groups');
     final res = await _get(uri);
     _ensureSuccess(res, {200});
+    // ignore: avoid_print
+    print('DEBUG: GET /groups response for user $userId: ${res.body}');
     final decoded = jsonDecode(res.body);
     // Aceptar múltiples formas: List<Map>, {groups: List}, {data: List}, etc.
     List<Map<String, dynamic>>? list;
@@ -120,6 +123,8 @@ class GroupRepositoryImpl implements GroupRepository {
       throw Exception('Group $groupId not found');
     }
     _ensureSuccess(res, {200});
+    // ignore: avoid_print
+    print('DEBUG: GET /groups/$groupId response: ${res.body}');
     return Group.fromJson(_asMap(res.body));
   }
 
@@ -127,7 +132,19 @@ class GroupRepositoryImpl implements GroupRepository {
     final uri = Uri.parse('$_base/groups/$groupId/members');
     final res = await _get(uri);
     _ensureSuccess(res, {200});
-    final data = jsonDecode(res.body);
+    // ignore: avoid_print
+    print('DEBUG: GET /groups/$groupId/members response: ${res.body}');
+    final dynamic data = jsonDecode(res.body);
+
+    // Caso 1: Lista directa (como se ve en la captura del usuario: [{userId, ...}, ...])
+    if (data is List) {
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(GroupMember.fromJson)
+          .toList();
+    }
+    
+    // Caso 2: Objeto envolvente (como estaba antes: {members: [...]})
     if (data is Map<String, dynamic>) {
       final members = data['members'];
       if (members is List) {
@@ -136,17 +153,24 @@ class GroupRepositoryImpl implements GroupRepository {
             .map(GroupMember.fromJson)
             .toList();
       }
+      // Caso 3: Objeto vacío o estructura diferente
+      return [];
     }
+    
     throw Exception('Unexpected response for group members');
   }
 
   Future<GroupInvitationToken> generateInvitation(String groupId) async {
-    final uri = Uri.parse('$_base/groups/$groupId/invitation');
-    final res = await _post(uri, {});
+    final uri = Uri.parse('$_base/groups/$groupId/invitations');
+    // Según especificación: Body json { "expiresIn": "7d" }
+    final res = await _post(uri, {'expiresIn': '7d'});
     _ensureSuccess(res, {200, 201});
     final data = _asMap(res.body);
-    final rawLink = data['link'] ?? data['Link'] ?? '';
+    
+    // Mapeo según response: { "invitationLink": "...", "expiresAt": "..." }
+    final rawLink = data['invitationLink'] ?? data['link'] ?? '';
     final parsedLink = rawLink is String ? rawLink : rawLink.toString();
+    
     return GroupInvitationToken(
       token: parsedLink.isNotEmpty ? parsedLink.split('/').last : (data['token']?.toString() ?? ''),
       link: parsedLink,
@@ -156,10 +180,17 @@ class GroupRepositoryImpl implements GroupRepository {
 
   Future<String> joinByInvitation(String token) async {
     final uri = Uri.parse('$_base/groups/join');
-    final res = await _post(uri, {'token': token});
-    _ensureSuccess(res, {200});
+    // Según especificación: Body json { "invitationToken": "..." }
+    final res = await _post(uri, {'invitationToken': token});
+    _ensureSuccess(res, {200, 201});
     final data = _asMap(res.body);
     return data['groupId'] as String? ?? '';
+  }
+
+  Future<void> deleteGroup(String groupId) async {
+    final uri = Uri.parse('$_base/groups/$groupId');
+    final res = await _delete(uri);
+    _ensureSuccess(res, {200, 204});
   }
 
   Future<void> leaveGroup(String groupId) async {
@@ -175,7 +206,8 @@ class GroupRepositoryImpl implements GroupRepository {
   Future<void> removeMember({required String groupId, required String memberId}) async {
     final uri = Uri.parse('$_base/groups/$groupId/members/$memberId');
     final res = await _delete(uri);
-    _ensureSuccess(res, {200});
+    // 200 OK or 204 No Content are valid for deletion
+    _ensureSuccess(res, {200, 204});
   }
 
   Future<Group> updateGroupInfo({required String groupId, String? name, String? description}) async {
@@ -184,32 +216,42 @@ class GroupRepositoryImpl implements GroupRepository {
       if (name != null) 'name': name,
       if (description != null) 'description': description,
     };
+    
+    try {
+      // ignore: avoid_print
+      print('[groups] updateGroupInfo PATCH ${uri.toString()} body=$payload');
+    } catch (_) {}
+
     final res = await _patch(uri, payload);
+    
+    // Si falla, _ensureSuccess lanzará la excepción, la cual puede ser atrapada por el Bloc
     _ensureSuccess(res, {200});
     return Group.fromJson(_asMap(res.body));
   }
 
   Future<void> transferAdmin({required String groupId, required String newAdminUserId}) async {
     final uri = Uri.parse('$_base/groups/$groupId/transfer-admin');
-    final res = await _post(uri, {'newAdminUserId': newAdminUserId});
-    _ensureSuccess(res, {200});
+    final res = await _patch(uri, {'newAdminId': newAdminUserId});
+    _ensureSuccess(res, {200, 201});
   }
 
   Future<GroupQuizAssignment> assignQuizToGroup({
     required String groupId,
     required String quizId,
+    required DateTime availableFrom,
     required DateTime availableUntil,
   }) async {
     final uri = Uri.parse('$_base/groups/$groupId/quizzes');
     final res = await _post(uri, {
       'quizId': quizId,
+      'availableFrom': availableFrom.toIso8601String(),
       'availableUntil': availableUntil.toIso8601String(),
     });
     try {
       // ignore: avoid_print
       print('[groups] assignQuizToGroup <- status=${res.statusCode} body=${res.body}');
     } catch (_) {}
-    _ensureSuccess(res, {201});
+    _ensureSuccess(res, {200, 201});
     return GroupQuizAssignment.fromJson(_asMap(res.body));
   }
 
@@ -241,6 +283,26 @@ class GroupRepositoryImpl implements GroupRepository {
       print('[groups] getGroupAssignments -> parsed ${parsed.length} assignments');
     } catch (_) {}
     return parsed;
+  }
+
+  Future<List<GroupLeaderboardEntry>> getGroupLeaderboard(String groupId) async {
+    final uri = Uri.parse('$_base/groups/$groupId/leaderboard');
+    final res = await _get(uri);
+    try {
+      // ignore: avoid_print
+      print('[groups] getGroupLeaderboard <- status=${res.statusCode} body=${res.body}');
+    } catch (_) {}
+    _ensureSuccess(res, {200});
+    final decoded = jsonDecode(res.body);
+    List<dynamic> list;
+    if (decoded is List) {
+      list = decoded;
+    } else if (decoded is Map<String, dynamic>) {
+       list = (decoded['data'] ?? decoded['items'] ?? []) as List? ?? [];
+    } else {
+      list = [];
+    }
+    return list.map((e) => GroupLeaderboardEntry.fromJson(e)).toList();
   }
 
   // --- HTTP helpers ---------------------------------------------------
@@ -298,7 +360,26 @@ class GroupRepositoryImpl implements GroupRepository {
         // ignore: avoid_print
         print('[groups] ERROR status=${res.statusCode} body=${res.body}');
       } catch (_) {}
-      throw Exception('Request failed: ${res.statusCode} ${res.body}');
+      
+      String msg = 'Request failed: ${res.statusCode}';
+      if (res.statusCode == 400) {
+        // Intentar parsear el mensaje del backend
+        try {
+          final body = jsonDecode(res.body);
+          if (body is Map && body['message'] != null) {
+            msg = body['message'].toString();
+          } else {
+            msg = 'Datos inválidos (400)';
+          }
+        } catch (_) {
+          msg = 'Datos inválidos (400)';
+        }
+      }
+      if (res.statusCode == 401) msg = 'No autorizado (401)';
+      if (res.statusCode == 403) msg = 'Sin permisos (403)';
+      if (res.statusCode == 404) msg = 'No encontrado (404)';
+      
+      throw Exception(msg); // Lanza solo el mensaje para que la UI lo muestre limpio
     }
   }
 

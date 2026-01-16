@@ -64,8 +64,7 @@ class UserProviders extends StatelessWidget {
                   return {
                     if (token != null) 'Authorization': 'Bearer $token',
                     'Accept': 'application/json',
-                    if (currentUserId != null && currentUserId.isNotEmpty)
-                      'x-debug-user-id': currentUserId,
+                    // 'x-debug-user-id': currentUserId, // REMOVE: No longer used
                   };
                 };
                 return GroupRepositoryImpl(
@@ -78,6 +77,7 @@ class UserProviders extends StatelessWidget {
             ChangeNotifierProvider<GroupsBloc>(
               create: (context) => GroupsBloc(
                 repository: context.read<GroupRepository>(),
+                userRepository: context.read<AuthBloc>().repository,
                 auth: context.read<AuthBloc>(),
               ),
             ),

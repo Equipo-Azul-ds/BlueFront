@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/colors.dart';
+import '../../../../core/config/api_config.dart';
+import '../../../../main.dart';
 import 'login_page.dart';
 import 'account_type_page.dart';
 
@@ -222,6 +224,8 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 16),
+                            _BackendSwitcher(),
                             const SizedBox(height: 8),
                           ],
                         ),
@@ -234,6 +238,62 @@ class _OnboardingWelcomePageState extends State<OnboardingWelcomePage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _BackendSwitcher extends StatelessWidget {
+  const _BackendSwitcher();
+
+  Future<void> _switch(BuildContext context, BackendType type, String domain) async {
+    await ApiConfigManager.setConfig(type, domain, persist: true);
+    if (context.mounted) {
+      MyApp.restartApp(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Conectado a ${type == BackendType.backcomun ? "BackComun (Prod)" : "QuizzyBackend (Dev)"}'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine current active backend to highlight style
+    final current = ApiConfigManager.current.backendType;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _btn(context, 
+              label: 'BackComun', 
+              isActive: current == BackendType.backcomun,
+              onTap: () => _switch(context, BackendType.backcomun, 'backcomun-mzvy.onrender.com')),
+          const SizedBox(width: 8),
+          _btn(context, 
+              label: 'Quizzy', 
+              isActive: current == BackendType.quizzyBackend, 
+              onTap: () => _switch(context, BackendType.quizzyBackend, 'quizzy-backend-1-zpvc.onrender.com')),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(BuildContext context, {required String label, required bool isActive, required VoidCallback onTap}) {
+    return OutlinedButton(
+      onPressed: onTap,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: isActive ? Colors.white : Colors.grey,
+        backgroundColor: isActive ? AppColor.primary : Colors.transparent,
+        side: BorderSide(color: isActive ? AppColor.primary : Colors.grey.shade300),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        visualDensity: VisualDensity.compact,
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 }

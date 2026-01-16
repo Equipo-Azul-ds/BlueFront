@@ -10,12 +10,16 @@ class SubscriptionModel extends Subscription {
   });
 
   factory SubscriptionModel.fromJson(Map<String, dynamic> json) {
+    final rawPlan = (json['plan'] ?? json['planId'] ?? 'FREE')
+        .toString()
+        .toUpperCase();
+    final rawStatus = (json['status'] ?? 'inactive').toString().toLowerCase();
+
     return SubscriptionModel(
       id: json['id']?.toString() ?? '',
       userId: json['userId']?.toString() ?? '',
-      planId:
-          json['plan']?.toString() ?? json['planId']?.toString() ?? 'Gratis',
-      status: json['status']?.toString() ?? 'inactive',
+      planId: rawPlan,
+      status: rawStatus,
       expiresAt: json['expiresAt'] != null
           ? DateTime.tryParse(json['expiresAt'].toString())
           : null,

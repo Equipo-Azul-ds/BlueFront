@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../../../../core/config/api_config.dart';
 import '../../../../core/errors/exception.dart';
 import '../../../../local/secure_storage.dart';
 import '../../Aplication/dtos/userDTO.dart';
@@ -41,18 +42,23 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
   Future<PaginatedResponse> fetchUsers(UserQueryParams params) async {
     final uri = _buildUri('/backoffice/users', params.toMap());
     final token = await storage.read('token');
-    //final adminId = await storage.read('userId');
-    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
+    final headers = await _getHeaders();
+
 
     try {
       final response = await cliente.get(
           uri,
-          headers: {
+          headers: headers
+          /*{
             'Content-Type': 'application/json',
-            'userId': adminId ?? '',
-          }
+            'authorization': token ?? '',
+            //'Authorization': 'Bearer $token',
+          }*/
       );
 
+      print('URL: PATCH $uri');
+      print('BACKEND: ${isUsingBackcomun() ? "Backcomun" : "Quizzy/Otro"}');
+      print('HEADERS: {"Content-Type": "application/json", "Authorization": Bearer "$token"}');
       print('--- HTTP RESPONSE ---');
       print('STATUS: ${response.statusCode}');
       print('BODY: ${response.body}');
@@ -74,24 +80,25 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
   Future<UserEntity> toggleUserStatus(String userId, String currentStatus) async {
 
     final bool isCurrentlyActive = currentStatus.trim().toLowerCase() == 'active';
+    final headers = await _getHeaders();
 
     final String action = isCurrentlyActive ? 'blockUser' : 'unblockUser';
     final uri = Uri.parse('$baseUrl/backoffice/$action/$userId');
     final token = await storage.read('token');
-    //final adminId = await storage.read('userId');
-    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
+
 
     print('--- HTTP REQUEST (Toggle Status) ---');
     print('URL: PATCH $uri');
-    print('HEADERS: {"Content-Type": "application/json", "user": "$adminId"}');
+    print('HEADERS: {"Content-Type": "application/json", "user": "$token"}');
     print('ACTION: $action para el usuario $userId de estado $currentStatus');
 
     final response = await cliente.patch(
-      uri,
-      headers: {
+      uri, headers: headers
+      /*headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? '',
-      },
+        //'authorization': token ?? '',
+        'Authorization': 'Bearer $token',
+      },*/
     );
     print('--- HTTP RESPONSE ---');
     print('STATUS: ${response.statusCode}');
@@ -116,15 +123,15 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
   Future<void> deleteUser(String userId) async {
     final uri = Uri.parse('$baseUrl/backoffice/user/$userId');
     final token = await storage.read('token');
-    //final adminId = await storage.read('userId');
-    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
+    final headers = await _getHeaders();
 
     final response = await cliente.delete(
       uri,
-      headers: {
+        headers: headers
+      /*headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? '',
-      },
+        'Authorization': 'Bearer $token',
+      },*/
     );
     print('--- HTTP RESPONSE ---');
     print('STATUS: ${response.statusCode}');
@@ -147,17 +154,17 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
     final String action = currentlyIsAdmin ? 'removeAdmin' : 'giveAdmin';
     final uri = Uri.parse('$baseUrl/backoffice/$action/$userId');
     final token = await storage.read('token');
-    //final adminId = await storage.read('userId');
-    final adminId = '9fa9df55-a70b-47cb-9f8d-ddb8d2c3c76a';
+    final headers = await _getHeaders();
+
 
     print('UserRemoteDataSource.toggleAdminStatus -> PATCH $uri');
 
     final response = await cliente.patch(
-      uri,
-      headers: {
+      uri, headers: headers
+      /*headers: {
         'Content-Type': 'application/json',
-        'user': adminId ?? ''
-      },
+        'Authorization': 'Bearer $token',
+      },*/
     );
     print('--- HTTP RESPONSE ---');
     print('STATUS: ${response.statusCode}');
@@ -165,7 +172,11 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonBody = json.decode(response.body);
-      return UserDto.fromJson(jsonBody['user']).toEntity();
+      final userData = (jsonBody is Map<String, dynamic> && jsonBody.containsKey('user'))
+          ? jsonBody['user']
+          : jsonBody;
+
+      return UserDto.fromJson(userData).toEntity();
     } else if (response.statusCode == 400) {
       throw ServerException(message: 'El usuario con el id dado no existe');
     } else if (response.statusCode == 401) {
@@ -175,5 +186,27 @@ class UserRemoteDataSourceImpl implements IUserDataSource {
     }
   }
 
+  bool isUsingBackcomun() {
+    return !baseUrl.contains('/api');
+  }
+
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await storage.read('token');
+    final bool usingBackcomun = isUsingBackcomun();
+
+    if (usingBackcomun) {
+      // Configuración para Backcomun
+      return {
+        'Content-Type': 'application/json',
+        'authorization': token ?? '',
+      };
+    } else {
+      // Configuración para Quizzy
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
+    }
+  }
 
 }
