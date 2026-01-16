@@ -20,7 +20,7 @@ class Answer{
       questionId: json['questionId'] ?? json['question_id'] ?? '', // Default to empty if missing
       isCorrect: json['isCorrect'],
       text: json['text'] ?? json['answerText'] ?? json['answer_text'],
-      mediaUrl: json['mediaUrl'] ?? json['mediaId'] ?? json['media_id'],
+      mediaUrl: json['mediaId'] ?? json['media_id'] ?? json['mediaUrl'],
     );
   }
 
