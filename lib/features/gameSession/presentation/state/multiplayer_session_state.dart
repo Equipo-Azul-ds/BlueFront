@@ -49,7 +49,7 @@ class SessionPlayer {
   int get hashCode => Object.hash(playerId, nickname, isDisconnected);
 }
 
-/// Immutable state container for lobby-related data.
+/// Contenedor inmutable para datos relacionados con el lobby.
 class LobbyState {
   const LobbyState({
     this.hostSession,

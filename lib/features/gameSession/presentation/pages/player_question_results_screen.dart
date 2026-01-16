@@ -66,7 +66,7 @@ class _PlayerQuestionResultsScreenState extends State<PlayerQuestionResultsScree
     super.dispose();
   }
 
-  /// Trigger haptic feedback when results are shown
+  /// Activar retroalimentación háptica cuando se muestren los resultados
   void _triggerResultsHaptic(bool isCorrect) {
     if (_hapticTriggered) return;
     _hapticTriggered = true;
@@ -99,7 +99,7 @@ class _PlayerQuestionResultsScreenState extends State<PlayerQuestionResultsScree
       return _loadingScaffold();
     }
 
-    // Trigger haptic feedback once when results are shown
+    // Activar retroalimentación háptica una vez cuando se muestren los resultados
     _triggerResultsHaptic(result.isCorrect);
 
     final isCorrect = result.isCorrect;
@@ -135,8 +135,12 @@ class _PlayerQuestionResultsScreenState extends State<PlayerQuestionResultsScree
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const SizedBox(height: 12),
-                    FadeTransition(
-                      opacity: _fadeAnimation,
+                    AnimatedBuilder(
+                      animation: _fadeAnimation,
+                      builder: (context, child) {
+                        final opacity = _fadeAnimation.value.clamp(0.0, 1.0);
+                        return Opacity(opacity: opacity, child: child);
+                      },
                       child: Text(
                         questionLabel,
                         style: const TextStyle(
@@ -196,8 +200,12 @@ class _PlayerQuestionResultsScreenState extends State<PlayerQuestionResultsScree
                       ),
                     ),
                     const Spacer(),
-                    FadeTransition(
-                      opacity: _fadeAnimation,
+                    AnimatedBuilder(
+                      animation: _fadeAnimation,
+                      builder: (context, child) {
+                        final opacity = _fadeAnimation.value.clamp(0.0, 1.0);
+                        return Opacity(opacity: opacity, child: child);
+                      },
                       child: const _WaitingIndicator(),
                     ),
                     const SizedBox(height: 16),

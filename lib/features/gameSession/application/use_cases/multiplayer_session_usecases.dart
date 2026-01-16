@@ -1,22 +1,22 @@
 import '../dtos/multiplayer_session_dtos.dart';
-import '../../domain/repositories/multiplayer_session_repository.dart';
+import '../../infrastructure/datasources/multiplayer_session_remote_data_source.dart';
 import '../../domain/repositories/multiplayer_session_realtime.dart';
 
 /// Crea la sesión (REST) y conecta socket como host.
 class InitializeHostLobbyUseCase {
   InitializeHostLobbyUseCase({
-    required this.repository,
+    required this.dataSource,
     required this.realtime,
   });
 
-  final MultiplayerSessionRepository repository;
+  final MultiplayerSessionRemoteDataSource dataSource;
   final MultiplayerSessionRealtime realtime;
 
   Future<CreateSessionResponse> execute({
     required String kahootId,
     String? jwt,
   }) async {
-    final session = await repository.createSession(
+    final session = await dataSource.createSession(
       CreateSessionRequest(kahootId: kahootId),
     );
     await realtime.connect(
@@ -32,12 +32,12 @@ class InitializeHostLobbyUseCase {
 
 /// Resuelve PIN a partir de token QR provisto por backend.
 class ResolvePinFromQrTokenUseCase {
-  ResolvePinFromQrTokenUseCase({required this.repository});
+  ResolvePinFromQrTokenUseCase({required this.dataSource});
 
-  final MultiplayerSessionRepository repository;
+  final MultiplayerSessionRemoteDataSource dataSource;
 
   Future<String> execute(String qrToken) async {
-    final response = await repository.getSessionPinFromQr(qrToken);
+    final response = await dataSource.getSessionPinFromQr(qrToken);
     return response.sessionPin;
   }
 }

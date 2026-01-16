@@ -26,6 +26,8 @@ class _HostGameScreenState extends State<HostGameScreen> {
   int _lastQuestionSequence = 0;
   int _lastHostGameEndSequence = 0;
   bool _sessionTerminated = false;
+  // Tracks whether we've already auto-advanced for the current question to avoid double calls
+  bool _autoAdvancedForCurrentQuestion = false;
   final RealtimeErrorHandler _errorHandler = RealtimeErrorHandler();
   final CountdownService _countdown = CountdownService();
 
@@ -72,6 +74,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
       _lastQuestionSequence = controller.questionSequence;
       _currentSlideId = slideId;
       _timeRemaining = initialRemaining;
+      _autoAdvancedForCurrentQuestion = false; // reset for new question
     });
     _countdown.start(
       issuedAt: issuedAt,
@@ -79,6 +82,19 @@ class _HostGameScreenState extends State<HostGameScreen> {
       onTick: (remaining) {
         if (!mounted) return;
         setState(() => _timeRemaining = remaining);
+        // When timer reaches zero, auto-advance to results once per question
+        if (remaining <= 0 && !_autoAdvancedForCurrentQuestion) {
+          _autoAdvancedForCurrentQuestion = true;
+          final controller = context.read<MultiplayerSessionController>();
+          if (controller.phase == SessionPhase.question) {
+            try {
+              controller.emitHostNextPhase();
+              print('[HOST] → Auto-advancing to results due to timer expiry (seq=${_lastQuestionSequence})');
+            } catch (e) {
+              print('[HOST] ✗ Failed to auto-advance: $e');
+            }
+          }
+        }
       },
     );
   }
@@ -113,7 +129,7 @@ class _HostGameScreenState extends State<HostGameScreen> {
     final showingResults =
       controller.phase == SessionPhase.results && hostResults != null;
     final quizTitle = controller.quizTitle ?? 'Trivvy!';
-    final headerSubtitle = _buildHeaderSubtitle(slide, hostResults);
+    final headerSubtitle = _buildHeaderSubtitle(slide, hostResults, controller.questionSequence);
     final options = _buildOptionsFromDto(slide, hostResults);
     final leaderboardEntries = hostResults?.leaderboard ??
       const <LeaderboardEntry>[];
@@ -204,8 +220,45 @@ class _HostGameScreenState extends State<HostGameScreen> {
                               ),
                               icon: const Icon(Icons.stop_circle_outlined),
                               label: const Text('Terminar juego'),
+                            ),                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final controller = context.read<MultiplayerSessionController>();
+                              // If the game is still active, confirm with the host to avoid
+                              // accidentally closing the session for players.
+                              if (controller.phase != SessionPhase.end && controller.lobbyPlayers.isNotEmpty) {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Salir de la sesión'),
+                                    content: const Text('La partida sigue activa. Si sales ahora, los jugadores no serán expulsados pero perderás el control. ¿Deseas continuar?'),
+                                    actions: [
+                                      TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
+                                      TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Salir')),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
+                              }
+
+                              try {
+                                // Leave the session locally without emitting host_end_session
+                                // to avoid forcibly kicking players.
+                                await controller.leaveSession();
+                                if (!mounted) return;
+                                Navigator.of(context).popUntil((route) => route.isFirst);
+                              } catch (error) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al salir de la sesión: $error')));
+                              }
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white54),
                             ),
-                          ],
+                            icon: const Icon(Icons.exit_to_app),
+                            label: const Text('Salir y cerrar sesión'),
+                          ),                          ],
                         ),
                       ],
                     ),
@@ -256,6 +309,15 @@ class _HostGameScreenState extends State<HostGameScreen> {
                                       imageUrl: slide.imageUrl,
                                     ),
                                     const SizedBox(height: 12),
+                                    // Debug: log submissions and players when building the counter
+                                    Builder(
+                                      builder: (context) {
+                                        final submissionsDebug = controller.hostAnswerSubmissions ?? 0;
+                                        final playersDebug = controller.lobbyPlayers.length;
+                                        print('[UI] Building submissions counter: submissions=$submissionsDebug, players=$playersDebug');
+                                        return const SizedBox.shrink();
+                                      },
+                                    ),
                                     _SubmissionsCounterCard(
                                       submissions: controller.hostAnswerSubmissions ?? 0,
                                       totalPlayers: controller.lobbyPlayers.length,
@@ -473,13 +535,17 @@ class _StatsCard extends StatelessWidget {
                 duration: Duration(milliseconds: 400 + index * 100),
                 curve: Curves.easeOutBack,
                 tween: Tween(begin: 0.0, end: option.isCorrect ? 1.0 : 0.0),
-                builder: (context, value, child) => Opacity(
-                  opacity: value,
-                  child: Transform.scale(
-                    scale: 0.5 + 0.5 * value,
-                    child: child,
-                  ),
-                ),
+                builder: (context, value, child) {
+                  // Clamp animation output to valid opacity range to avoid exceptions
+                  final clamped = (value as double).clamp(0.0, 1.0);
+                  return Opacity(
+                    opacity: clamped,
+                    child: Transform.scale(
+                      scale: 0.5 + 0.5 * clamped,
+                      child: child,
+                    ),
+                  );
+                },
                 child: option.isCorrect
                     ? const Icon(Icons.check_circle, color: AppColor.success)
                     : const SizedBox(height: 24),
@@ -489,14 +555,17 @@ class _StatsCard extends StatelessWidget {
                 duration: Duration(milliseconds: 600 + index * 100),
                 curve: Curves.easeOutCubic,
                 tween: Tween(begin: 0.0, end: heightFactor),
-                builder: (context, animatedHeight, _) => Container(
-                  width: 50,
-                  height: 160 * animatedHeight,
-                  decoration: BoxDecoration(
-                    color: option.color,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
+                builder: (context, animatedHeight, _) {
+                  final h = (animatedHeight as double).clamp(0.0, 1.0);
+                  return Container(
+                    width: 50,
+                    height: 160 * h,
+                    decoration: BoxDecoration(
+                      color: option.color,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 8),
               AnimatedCounter(
@@ -567,7 +636,7 @@ class _ResultsLeaderboard extends StatelessWidget {
       ..sort((a, b) {
         final scoreDiff = b.score.compareTo(a.score);
         if (scoreDiff != 0) return scoreDiff;
-        // Tie-breaker: lower rank first when present.
+        // Desempate: prioriza el rango menor cuando esté presente.
         if (a.rank != 0 && b.rank != 0) {
           final rankDiff = a.rank.compareTo(b.rank);
           if (rankDiff != 0) return rankDiff;
@@ -679,10 +748,15 @@ class _HostOption {
 }
 
 /// Construye subtítulo de cabecera con posición de pregunta.
-String _buildHeaderSubtitle(SlideData? slide, HostResultsEvent? hostResults) {
+String _buildHeaderSubtitle(SlideData? slide, HostResultsEvent? hostResults, int questionSequence) {
   if (slide == null) return 'Esperando pregunta';
   final totalSlides = hostResults?.progress.total;
-  final current = slide.position + 1;
+  // Prefer the controller's sequence (1-based) when available and > 0 because
+  // it reflects the number of questions processed by the client. Otherwise
+  // fall back to slide.position with sensible bounds.
+  final current = (questionSequence > 0)
+      ? questionSequence
+      : (slide.position <= 0 ? 1 : slide.position);
   if (totalSlides != null && totalSlides > 0) {
     return 'Pregunta $current de $totalSlides';
   }

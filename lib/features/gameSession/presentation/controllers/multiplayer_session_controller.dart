@@ -11,18 +11,19 @@ import '../state/multiplayer_session_state.dart';
 import 'session_connection_manager.dart';
 import 'session_game_phase_manager.dart';
 import 'session_lobby_manager.dart';
+import 'session_player_connection_manager.dart';
 
-// Re-export commonly used types from state file for backwards compatibility.
 export '../state/multiplayer_session_state.dart' 
     show SessionPhase, SessionPlayer, LobbyState, GameplayState, SessionLifecycleState;
 
 /// Orquesta la sesión multijugador: oyentes en tiempo real, estado tipado para UI,
 /// y comandos host/jugador a través de casos de uso.
 /// 
-/// Este controlador compone tres gestores especializados:
+/// Este controlador compone cuatro gestores especializados:
 /// - SessionConnectionManager: estado del socket, reconexión, eventos del ciclo de vida
 /// - SessionLobbyManager: lista de jugadores, estado del lobby, unirse/salir
 /// - SessionGamePhaseManager: flujo de preguntas, resultados, transiciones de fase
+/// - SessionPlayerConnectionManager: flujo específico de conexión de jugadores
 class MultiplayerSessionController extends ChangeNotifier {
   MultiplayerSessionController({
     required MultiplayerSessionRealtime realtime,
@@ -45,7 +46,8 @@ class MultiplayerSessionController extends ChangeNotifier {
         _submitPlayerAnswerUseCase = submitPlayerAnswerUseCase,
         _connectionManager = SessionConnectionManager(realtime: realtime),
         _lobbyManager = SessionLobbyManager(realtime: realtime),
-        _gamePhaseManager = SessionGamePhaseManager(realtime: realtime) {
+        _gamePhaseManager = SessionGamePhaseManager(realtime: realtime),
+        _playerConnectionManager = SessionPlayerConnectionManager(realtime: realtime) {
     // Configura oyentes para todos los gestores
     _setupManagers();
   }
@@ -63,6 +65,7 @@ class MultiplayerSessionController extends ChangeNotifier {
   final SessionConnectionManager _connectionManager;
   final SessionLobbyManager _lobbyManager;
   final SessionGamePhaseManager _gamePhaseManager;
+  final SessionPlayerConnectionManager _playerConnectionManager;
 
   String? _lastError;
 
@@ -70,11 +73,27 @@ class MultiplayerSessionController extends ChangeNotifier {
   void _setupManagers() {
     _connectionManager.addListener(_onManagerChanged);
     _lobbyManager.addListener(_onManagerChanged);
+    // Also add a specific lobby listener to react to player answer confirmations
+    _lobbyManager.addListener(_onLobbyChanged);
     _gamePhaseManager.addListener(_onManagerChanged);
+    _playerConnectionManager.addListener(_onManagerChanged);
   }
 
   void _onManagerChanged() {
     notifyListeners();
+  }
+
+  void _onLobbyChanged() {
+    // When a PlayerAnswerConfirmationEvent is present, optimistically increment
+    // the host submissions counter so the UI reflects incoming answers immediately.
+    final confirmation = _lobbyManager.playerAnswerConfirmationDto;
+    if (confirmation != null) {
+      final current = _gamePhaseManager.hostAnswerSubmissions ?? 0;
+      print('[CONTROLLER] ↑ PlayerAnswerConfirmation received — incrementing submissions ${current}→${current + 1}');
+      _gamePhaseManager.setHostAnswerSubmissions(current + 1);
+      // Clear the confirmation event so we don't double-count it.
+      _lobbyManager.clearPlayerAnswerConfirmationDto();
+    }
   }
 
   /// Estado de creación de sala (host)
@@ -96,6 +115,7 @@ class MultiplayerSessionController extends ChangeNotifier {
   HostGameEndEvent? get hostGameEndDto => _gamePhaseManager.hostGameEndDto;
   PlayerGameEndEvent? get playerGameEndDto => _gamePhaseManager.playerGameEndDto;
   SessionClosedEvent? get sessionClosedDto => _gamePhaseManager.sessionClosedDto;
+  DateTime? get sessionJoinedAt => _lobbyManager.joinedAt;
   PlayerLeftSessionEvent? get playerLeftDto => _lobbyManager.playerLeftDto;
   HostLeftSessionEvent? get hostLeftDto => _connectionManager.hostLeftDto;
   HostReturnedSessionEvent? get hostReturnedDto => _connectionManager.hostReturnedDto;
@@ -164,9 +184,11 @@ class MultiplayerSessionController extends ChangeNotifier {
     _connectionManager.removeListener(_onManagerChanged);
     _lobbyManager.removeListener(_onManagerChanged);
     _gamePhaseManager.removeListener(_onManagerChanged);
+    _playerConnectionManager.removeListener(_onManagerChanged);
     _connectionManager.dispose();
     _lobbyManager.dispose();
     _gamePhaseManager.dispose();
+    _playerConnectionManager.dispose();
     _realtime.disconnect();
     super.dispose();
   }
@@ -240,6 +262,8 @@ class MultiplayerSessionController extends ChangeNotifier {
     final previousPin = _lobbyManager.currentPin;
     try {
       _lobbyManager.setCurrentRole(MultiplayerRole.player);
+      // Prepara el nickname para ser enviado automáticamente cuando se reciba player_connected_to_server
+      _playerConnectionManager.setPendingNickname(safeNickname);
       await _joinLobbyUseCase.execute(
         pin: pin,
         jwt: jwt,
@@ -294,8 +318,48 @@ class MultiplayerSessionController extends ChangeNotifier {
   }
 
   /// El host fuerza fin de sesión emitiendo evento de fin de sesión a todos los jugadores.
-  void emitHostEndSession() {
-    _emitHostEndSessionUseCase.execute();
+  /// Intenta emitir el evento, y si el socket está desconectado intentará reconectar
+  /// brevemente usando el PIN de la sesión antes de volver a intentar la emisión.
+  /// Emit host_end_session. By default, if the socket is disconnected we will
+  /// attempt a brief reconnection to ensure the event is delivered. For the
+  /// "Salir y cerrar sesión" action we can set `tryReconnect=false` to avoid
+  /// any reconnection attempts and simply leave the session locally.
+  Future<void> emitHostEndSession({bool tryReconnect = true}) async {
+    _lastError = null;
+    try {
+      _emitHostEndSessionUseCase.execute();
+    } catch (error) {
+      if (!tryReconnect) {
+        // Don't attempt reconnection — just record the error and continue to leave.
+        _lastError = error.toString();
+      } else {
+        // If the socket is not connected, attempt a brief reconnect then retry
+        if (!_realtime.isConnected) {
+          try {
+            final pin = _lobbyManager.currentPin ?? _lobbyManager.hostSession?.sessionPin;
+            if (pin == null || pin.isEmpty) throw StateError('No session PIN available to reconnect the socket.');
+            print('[SESSION] ✱ Socket disconnected — attempting reconnection to emit host_end_session (pin=$pin)');
+            await _realtime.connect(MultiplayerSocketParams(pin: pin, role: MultiplayerRole.host));
+            // Reintentar emisión
+            _emitHostEndSessionUseCase.execute();
+          } catch (reconnectError) {
+            _lastError = reconnectError.toString();
+            print('[SESSION] ✗ Failed to reconnect/emit host_end_session: $reconnectError');
+            rethrow;
+          }
+        } else {
+          _lastError = error.toString();
+          rethrow;
+        }
+      }
+    } finally {
+      // Leave session and cleanup regardless of whether we retried or not.
+      try {
+        await leaveSession();
+      } catch (_) {
+        // Ignore errors when leaving to avoid blocking the UI
+      }
+    }
   }
 
   /// El jugador envía respuesta con ID de pregunta, opciones de respuesta y tiempo consumido; emitido al servidor.
@@ -304,6 +368,7 @@ class MultiplayerSessionController extends ChangeNotifier {
     required List<String> answerIds,
     required int timeElapsedMs,
   }) async {
+    print('[EVENT] → EMIT: player_submit_answer (questionId=$questionId, answers=${answerIds.join(',')}, timeElapsedMs=$timeElapsedMs)');
     _submitPlayerAnswerUseCase.execute(
       questionId: questionId,
       answerIds: answerIds,
@@ -350,11 +415,12 @@ class MultiplayerSessionController extends ChangeNotifier {
 
   // ==================== Private Methods ====================
 
-  /// Registra todos los oyentes (lobby, fase de juego y eventos del ciclo de vida) con manejador de errores.
+  /// Registra todos los oyentes (lobby, fase de juego, ciclo de vida y conexión del jugador) con manejador de errores.
   void _registerAllListeners() {
     _lobbyManager.registerLobbyListeners(_handleEventError);
     _gamePhaseManager.registerGamePhaseListeners(_handleEventError);
     _connectionManager.registerLifecycleListeners(_handleEventError);
+    _playerConnectionManager.registerPlayerConnectionListeners(_handleEventError);
   }
 
   /// Limpia cachés y contadores entre sesiones o al salir.
