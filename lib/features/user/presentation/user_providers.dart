@@ -64,8 +64,7 @@ class UserProviders extends StatelessWidget {
                   return {
                     if (token != null) 'Authorization': 'Bearer $token',
                     'Accept': 'application/json',
-                    if (currentUserId != null && currentUserId.isNotEmpty)
-                      'x-debug-user-id': currentUserId,
+                    // 'x-debug-user-id': currentUserId, // REMOVE: No longer used
                   };
                 };
                 return GroupRepositoryImpl(

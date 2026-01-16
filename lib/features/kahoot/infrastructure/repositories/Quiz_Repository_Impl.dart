@@ -43,7 +43,7 @@ class QuizRepositoryImpl implements QuizRepository {
     return trimmed;
   }
 
-  // Construye headers según contrato: Content-Type y x-debug-user-id.
+  // Construye headers según contrato: Content-Type y Authorization.
   Future<Map<String, String>> _headers({required String userId, bool json = false}) async {
     final h = <String, String>{
       'Accept': 'application/json',

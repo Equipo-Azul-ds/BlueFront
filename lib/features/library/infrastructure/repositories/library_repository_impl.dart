@@ -126,7 +126,7 @@ class LibraryRepositoryImpl implements LibraryRepository {
       url,
       headers: {
         'Content-Type': 'application/json',
-        'x-debug-user-id': userId ?? '', // ID dinámico del usuario actual
+        // 'x-debug-user-id': userId ?? '', // REMOVE
       },
     );
 

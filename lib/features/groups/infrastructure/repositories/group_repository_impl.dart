@@ -42,6 +42,8 @@ class GroupRepositoryImpl implements GroupRepository {
     final uri = Uri.parse('$_base/groups');
     final res = await _get(uri);
     _ensureSuccess(res, {200});
+    // ignore: avoid_print
+    print('DEBUG: GET /groups response for user $userId: ${res.body}');
     final decoded = jsonDecode(res.body);
     // Aceptar múltiples formas: List<Map>, {groups: List}, {data: List}, etc.
     List<Map<String, dynamic>>? list;
@@ -120,6 +122,8 @@ class GroupRepositoryImpl implements GroupRepository {
       throw Exception('Group $groupId not found');
     }
     _ensureSuccess(res, {200});
+    // ignore: avoid_print
+    print('DEBUG: GET /groups/$groupId response: ${res.body}');
     return Group.fromJson(_asMap(res.body));
   }
 
@@ -127,6 +131,8 @@ class GroupRepositoryImpl implements GroupRepository {
     final uri = Uri.parse('$_base/groups/$groupId/members');
     final res = await _get(uri);
     _ensureSuccess(res, {200});
+    // ignore: avoid_print
+    print('DEBUG: GET /groups/$groupId/members response: ${res.body}');
     final data = jsonDecode(res.body);
     if (data is Map<String, dynamic>) {
       final members = data['members'];

@@ -53,10 +53,30 @@ class GroupsBloc extends ChangeNotifier {
 
   Future<Group?> refreshGroup(String groupId) async {
     try {
-      final grp = await repository.getGroupDetail(groupId);
-      _groups = _groups.map((g) => g.id == groupId ? grp : g).toList();
+      var fresh = await repository.getGroupDetail(groupId);
+      
+      // Combinar con datos existentes para no perder info de la vista de lista (roles, contadores)
+      // si el endpoint de detalle no los retorna.
+      final idx = _groups.indexWhere((g) => g.id == groupId);
+      if (idx != -1) {
+        final existing = _groups[idx];
+        String? role = fresh.currentUserRole ?? existing.currentUserRole;
+        int? countSnapshot;
+        
+        // Si no vienen miembros y el conteo es 0, preservar el conteo del snapshot anterior
+        if (fresh.members.isEmpty && fresh.memberCount == 0 && existing.memberCount > 0) {
+          countSnapshot = existing.memberCount;
+        }
+        
+        fresh = fresh.copyWith(
+          userRoleSnapshot: role, 
+          memberCountSnapshot: countSnapshot
+        );
+      }
+
+      _groups = _groups.map((g) => g.id == groupId ? fresh : g).toList();
       notifyListeners();
-      return grp;
+      return fresh;
     } catch (e) {
       _error = e.toString();
       notifyListeners();

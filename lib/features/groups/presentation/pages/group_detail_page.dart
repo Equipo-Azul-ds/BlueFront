@@ -156,7 +156,9 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   bool _isCurrentUserAdmin(BuildContext context, Group? group) {
     if (group == null) return false;
     final auth = context.read<AuthBloc>();
-    return auth.currentUser?.id == group.adminId;
+    final userId = auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) return false;
+    return group.isAdmin(userId);
   }
 
   bool _isCurrentUserMember(BuildContext context, Group? group) {
@@ -170,17 +172,20 @@ class _GroupDetailPageState extends State<GroupDetailPage>
   String _adminDisplayName(BuildContext context, Group group) {
     final auth = context.read<AuthBloc>();
     final current = auth.currentUser;
-    if (current != null && current.id == group.adminId) {
-      return current.userName.isNotEmpty ? current.userName : (current.email.isNotEmpty ? current.email : group.adminId);
+    // Si somos admin (por rol o id), mostramos nuestro nombre
+    if (current != null && group.isAdmin(current.id)) {
+      return current.userName.isNotEmpty ? current.userName : (current.email.isNotEmpty ? current.email : 'Tú');
     }
-    return group.adminId;
+    // Si no, fallback al adminId
+    return group.adminId.isNotEmpty ? group.adminId : 'Admin';
   }
 
   Widget _activityTab(Group group, String adminLabel) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _infoRow('Miembros', '${group.members.length}'),
+        // Usar memberCount para respetar el snapshot del listado
+        _infoRow('Miembros', '${group.memberCount}'),
         const SizedBox(height: 8),
         _infoRow('Admin', adminLabel),
         if ((group.description ?? '').isNotEmpty) ...[

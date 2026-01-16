@@ -85,6 +85,8 @@ class Group {
     List<GroupQuizAssignment>? quizAssignments,
     List<GroupQuizCompletion>? completions,
     GroupInvitationToken? invitation,
+    int? memberCountSnapshot,
+    String? userRoleSnapshot,
   }) {
     return Group(
       id: id ?? this.id,
@@ -97,6 +99,8 @@ class Group {
       quizAssignments: quizAssignments ?? this.quizAssignments,
       completions: completions ?? this.completions,
       invitation: invitation ?? this.invitation,
+      memberCountSnapshot: memberCountSnapshot ?? _memberCountSnapshot,
+      userRoleSnapshot: userRoleSnapshot ?? _userRoleSnapshot,
     );
   }
 
