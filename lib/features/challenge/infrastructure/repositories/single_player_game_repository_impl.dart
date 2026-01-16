@@ -12,13 +12,11 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
   final String baseUrl;
   final http.Client httpClient;
   final FutureOr<String?> Function()? tokenProvider;
-  final String? mockAuthToken;
 
   SinglePlayerGameRepositoryImpl({
     required this.baseUrl,
     http.Client? client,
     this.tokenProvider,
-    this.mockAuthToken,
   }) : httpClient = client ?? http.Client();
 
   void _logRequest(
@@ -65,7 +63,10 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
 
     final token = await _resolveAuthToken();
     if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = token;
+      final authValue = RegExp(r'^bearer ', caseSensitive: false).hasMatch(token)
+          ? token
+          : 'Bearer $token';
+      headers['Authorization'] = authValue;
     }
 
     return headers;
@@ -84,12 +85,6 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
     } catch (e) {
       print('SinglePlayerGameRepositoryImpl -> tokenProvider failed: $e');
     }
-
-    final fallback = mockAuthToken?.trim();
-    if (fallback != null && fallback.isNotEmpty) {
-      return fallback;
-    }
-
     return null;
   }
 
@@ -237,11 +232,12 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
   }
 
   @override
-  Future<SinglePlayerGame> getAttemptSummary(String attemptId) async {
+  Future<SinglePlayerGame> getAttemptSummary(String attemptId, {String? quizId}) async {
     final uri = Uri.parse('$baseUrl/attempts/$attemptId/summary');
     http.Response response;
     final headers = await _buildJsonHeaders();
     try {
+      print('[SinglePlayer] 📊 getAttemptSummary: attemptId=$attemptId, quizId=$quizId');
       print('SinglePlayerGameRepositoryImpl.getAttemptSummary -> GET $uri');
       _logRequest('GET', uri, headers);
       response = await httpClient.get(uri, headers: headers);
@@ -254,10 +250,14 @@ class SinglePlayerGameRepositoryImpl implements SinglePlayerGameRepository {
 
     if (response.statusCode == 200) {
       final decoded = _decodeBody(response.body);
-      return _extractGameFromPayload(
+      print('[SinglePlayer] 📊 Summary response - extracting game with fallbackKahootId=$quizId');
+      final game = _extractGameFromPayload(
         decoded,
         fallbackAttemptId: attemptId,
+        fallbackKahootId: quizId,
       );
+      print('[SinglePlayer] ✅ Extracted game: gameId=${game.gameId}, quizId=${game.quizId}, score=${game.gameScore.score}');
+      return game;
     }
 
     throw Exception(

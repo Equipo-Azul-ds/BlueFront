@@ -35,6 +35,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
   StreamSubscription<dynamic>? _hostGameEndSubscription;
   StreamSubscription<dynamic>? _playerGameEndSubscription;
   StreamSubscription<dynamic>? _sessionClosedSubscription;
+  StreamSubscription<dynamic>? _hostAnswerUpdateSubscription;
 
   // Getters
   SessionPhase get phase => _phase;
@@ -118,6 +119,15 @@ class SessionGamePhaseManager extends ChangeNotifier {
           (payload) => _handleSessionClosed(payload, onEventError),
           onError: onEventError,
         );
+
+    _hostAnswerUpdateSubscription?.cancel();
+    _hostAnswerUpdateSubscription = _realtime
+        .listenToServerEvent<Map<String, dynamic>>(
+            MultiplayerEvents.hostAnswerUpdate)
+        .listen(
+          (payload) => _handleHostAnswerUpdate(payload, onEventError),
+          onError: onEventError,
+        );
   }
 
   /// Maneja evento de pregunta iniciada: incrementa secuencia, actualiza fase, cachea datos de pregunta y limpia resultados obsoletos.
@@ -128,6 +138,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
     try {
       final event = QuestionStartedEvent.fromJson(payload);
       _questionSequence++;
+      print('[EVENT] ← RECEIVED: question_started (seq=$_questionSequence, questionId=${event.slide.id}, timeLimit=${event.slide.timeLimitSeconds}s)');
       _phase = SessionPhase.question;
       _currentQuestionDto = event;
       _questionStartedAt =
@@ -140,6 +151,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
       _hostAnswerSubmissions = null;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing question_started: $error');
       onEventError(error);
     }
   }
@@ -151,9 +163,11 @@ class SessionGamePhaseManager extends ChangeNotifier {
   ) {
     try {
       _hostResultsDto = HostResultsEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: host_results (state=${_hostResultsDto?.state}, players=${_hostResultsDto?.leaderboard.length})');
       _phase = SessionPhase.results;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing host_results: $error');
       onEventError(error);
     }
   }
@@ -165,9 +179,11 @@ class SessionGamePhaseManager extends ChangeNotifier {
   ) {
     try {
       _playerResultsDto = PlayerResultsEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: player_results (rank=${_playerResultsDto?.rank}, correct=${_playerResultsDto?.isCorrect})');
       _phase = SessionPhase.results;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing player_results: $error');
       onEventError(error);
     }
   }
@@ -180,9 +196,11 @@ class SessionGamePhaseManager extends ChangeNotifier {
     try {
       _hostGameEndDto = HostGameEndEvent.fromJson(payload);
       _hostGameEndSequence++;
+      print('[EVENT] ← RECEIVED: host_game_end (seq=$_hostGameEndSequence, podium=${_hostGameEndDto?.finalPodium.length})');
       _phase = SessionPhase.end;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing host_game_end: $error');
       onEventError(error);
     }
   }
@@ -195,9 +213,11 @@ class SessionGamePhaseManager extends ChangeNotifier {
     try {
       _playerGameEndDto = PlayerGameEndEvent.fromJson(payload);
       _playerGameEndSequence++;
+      print('[EVENT] ← RECEIVED: player_game_end (seq=$_playerGameEndSequence, rank=${_playerGameEndDto?.rank})');
       _phase = SessionPhase.end;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing player_game_end: $error');
       onEventError(error);
     }
   }
@@ -209,10 +229,28 @@ class SessionGamePhaseManager extends ChangeNotifier {
   ) {
     try {
       final event = SessionClosedEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: session_closed (reason=${event.reason}, message=${event.message})');
       _sessionClosedDto = event;
       _phase = SessionPhase.end;
       notifyListeners();
     } catch (error) {
+      print('[EVENT] ✗ ERROR parsing session_closed: $error');
+      onEventError(error);
+    }
+  }
+
+  /// Maneja evento de actualización de respuestas del host: actualiza contador de respuestas enviadas.
+  void _handleHostAnswerUpdate(
+    Map<String, dynamic> payload,
+    void Function(Object error) onEventError,
+  ) {
+    try {
+      final event = HostAnswerUpdateEvent.fromJson(payload);
+      print('[EVENT] ← RECEIVED: host_answer_update (numberOfSubmissions=${event.numberOfSubmissions})');
+      _hostAnswerSubmissions = event.numberOfSubmissions;
+      notifyListeners();
+    } catch (error) {
+      print('[EVENT] ✗ ERROR parsing host_answer_update: $error');
       onEventError(error);
     }
   }
@@ -283,6 +321,7 @@ class SessionGamePhaseManager extends ChangeNotifier {
     _hostGameEndSubscription?.cancel();
     _playerGameEndSubscription?.cancel();
     _sessionClosedSubscription?.cancel();
+    _hostAnswerUpdateSubscription?.cancel();
     super.dispose();
   }
 }

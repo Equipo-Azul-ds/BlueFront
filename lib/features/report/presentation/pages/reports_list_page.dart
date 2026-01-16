@@ -7,6 +7,7 @@ import '../blocs/reports_list_bloc.dart';
 import '../widgets/ranking_badge.dart';
 import '../widgets/shimmer_loading.dart';
 import 'report_detail_page.dart';
+import 'hosted_sessions_list_page.dart';
 
 /// Pantalla estilizada para listar los informes personales (endpoint my-results).
 class ReportsListPage extends StatefulWidget {
@@ -44,7 +45,7 @@ class _ReportsListPageState extends State<ReportsListPage> {
       body: SafeArea(
         child: Column(
           children: [
-            const _HeroHeader(),
+            _HeroHeader(onHostedSessionsTap: _openHostedSessions),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _refresh,
@@ -57,7 +58,6 @@ class _ReportsListPageState extends State<ReportsListPage> {
                     if (bloc.error != null && !bloc.hasData) {
                       return _ErrorState(
                         message: 'No se pudieron cargar los informes',
-                        detail: bloc.error!,
                         onRetry: _refresh,
                       );
                     }
@@ -101,10 +101,20 @@ class _ReportsListPageState extends State<ReportsListPage> {
       ),
     );
   }
+
+  void _openHostedSessions() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const HostedSessionsListPage(),
+      ),
+    );
+  }
 }
 
 class _HeroHeader extends StatelessWidget {
-  const _HeroHeader();
+  const _HeroHeader({this.onHostedSessionsTap});
+
+  final VoidCallback? onHostedSessionsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -148,7 +158,7 @@ class _HeroHeader extends StatelessWidget {
                 ),
               ),
               const Text(
-                'Informes de Estadísticas',
+                'Informes',
                 style: TextStyle(
                   color: AppColor.onPrimary,
                   fontSize: 22,
@@ -167,6 +177,25 @@ class _HeroHeader extends StatelessWidget {
               fontSize: 14,
             ),
           ),
+          const SizedBox(height: 16),
+          // Button to view hosted sessions
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onHostedSessionsTap,
+              icon: const Icon(Icons.groups, size: 20),
+              label: const Text('Ver Sesiones que Alojé'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColor.primary,
+                elevation: 2,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -181,8 +210,7 @@ class _ReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isSingle = item.gameType == GameType.singleplayer;
-    final chipColor = isSingle ? AppColor.success : AppColor.accent;
+    final (label, color) = _getGameTypeInfo(item.gameType);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -207,7 +235,7 @@ class _ReportCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _TagChip(label: isSingle ? 'Singleplayer' : 'Multiplayer', color: chipColor),
+                  _TagChip(label: label, color: color),
                   const SizedBox(width: 8),
                   _TagChip(label: 'Puntaje ${item.finalScore}', color: AppColor.primary),
                   if (item.rankingPosition != null) ...[
@@ -288,12 +316,25 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: const [
-        SizedBox(height: 32),
+      children: [
+        const SizedBox(height: 48),
         Center(
-          child: Text(
-            'No hay informes disponibles',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          child: Column(
+            children: [
+              Icon(Icons.sentiment_satisfied, size: 64, color: AppColor.primary),
+              const SizedBox(height: 16),
+              const Text(
+                'Aún no has jugado ningún Kahoot',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Cuando juegues partidas, aquí aparecerán tus informes y análisis.',
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
       ],
@@ -302,10 +343,9 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.detail, required this.onRetry});
+  const _ErrorState({required this.message, required this.onRetry});
 
   final String message;
-  final String detail;
   final VoidCallback onRetry;
 
   @override
@@ -326,7 +366,11 @@ class _ErrorState extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                Text(detail, textAlign: TextAlign.center),
+                const Text(
+                  'Por favor, inténtalo de nuevo más tarde.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey),
+                ),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: onRetry,
@@ -350,6 +394,17 @@ class _SkeletonList extends StatelessWidget {
       itemCount: 6,
       itemBuilder: (_, __) => const ReportCardSkeleton(),
     );
+  }
+}
+
+(String, Color) _getGameTypeInfo(GameType type) {
+  switch (type) {
+    case GameType.singleplayer:
+      return ('Singleplayer', AppColor.success);
+    case GameType.multiplayer_player:
+      return ('Jugador', AppColor.accent);
+    case GameType.multiplayer_host:
+      return ('Anfitrión', AppColor.accent);
   }
 }
 

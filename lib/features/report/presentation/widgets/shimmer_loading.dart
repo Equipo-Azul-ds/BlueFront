@@ -196,6 +196,81 @@ class _QuestionSkeleton extends StatelessWidget {
   }
 }
 
+/// A skeleton placeholder for session report detail (host view).
+class SessionReportSkeleton extends StatelessWidget {
+  const SessionReportSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: ShimmerLoading(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Hero card
+            Container(
+              height: 180,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Podium
+            _SkeletonBox(width: 150, height: 24, borderRadius: 8),
+            const SizedBox(height: 12),
+            Container(
+              height: 200,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            const SizedBox(height: 24),
+            // Stats
+            Row(
+              children: [
+                Expanded(child: _SkeletonBox(height: 100, borderRadius: 14)),
+                const SizedBox(width: 12),
+                Expanded(child: _SkeletonBox(height: 100, borderRadius: 14)),
+              ],
+            ),
+            const SizedBox(height: 24),
+            _SkeletonBox(width: 140, height: 20, borderRadius: 8),
+            const SizedBox(height: 12),
+            // Player cards
+            for (int i = 0; i < 5; i++) ...[
+              Container(
+                height: 70,
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            _SkeletonBox(width: 180, height: 20, borderRadius: 8),
+            const SizedBox(height: 12),
+            // Question analysis cards
+            for (int i = 0; i < 4; i++) ...[
+              Container(
+                height: 90,
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SkeletonBox extends StatelessWidget {
   const _SkeletonBox({
     this.width,

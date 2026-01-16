@@ -106,8 +106,8 @@ class GetSummaryUseCase {
   final SinglePlayerGameRepository repository;
   GetSummaryUseCase(this.repository);
 
-  Future<SummaryResult> execute(String attemptId) async {
-    final game = await repository.getAttemptSummary(attemptId);
+  Future<SummaryResult> execute(String attemptId, {String? quizId}) async {
+    final game = await repository.getAttemptSummary(attemptId, quizId: quizId);
     return SummaryResult(summaryGame: game);
   }
 }

@@ -29,6 +29,7 @@ class MultiplayerSessionRemoteDataSourceImpl
   Future<CreateSessionResponse> createSession(
     CreateSessionRequest request,
   ) async {
+    print('[REST] → POST /multiplayer-sessions with kahootId="${request.kahootId}"');
     const maxAttempts = 3;
     DioException? lastError;
 
@@ -39,6 +40,7 @@ class MultiplayerSessionRemoteDataSourceImpl
           data: request.toJson(),
           options: await _optionsWithAuth(requireToken: true),
         );
+        print('[REST] ✓ POST /multiplayer-sessions SUCCESS: sessionPin=${response.data?['sessionPin'] ?? 'N/A'}, qrToken=${response.data?['qrToken']?.toString().substring(0, 20) ?? 'N/A'}...');
         return CreateSessionResponse.fromJson(
           response.data ?? const <String, dynamic>{},
         );
@@ -46,6 +48,7 @@ class MultiplayerSessionRemoteDataSourceImpl
         lastError = error;
         final status = error.response?.statusCode;
         final shouldRetry = status == 500 && attempt < maxAttempts;
+        print('[REST] ✗ POST /multiplayer-sessions ATTEMPT $attempt FAILED (${status ?? 'UNKNOWN'}): ${error.message}');
         if (!shouldRetry) {
           throw MultiplayerSessionApiException.fromDio(error);
         }
@@ -53,32 +56,36 @@ class MultiplayerSessionRemoteDataSourceImpl
       }
     }
 
+    print('[REST] ✗ POST /multiplayer-sessions FAILED after $maxAttempts attempts');
     throw MultiplayerSessionApiException.fromDio(lastError!);
   }
 
   @override
   Future<QrTokenLookupResponse> getSessionPinFromQr(String qrToken) async {
+    print('[REST] → GET /multiplayer-sessions/qr-token/$qrToken');
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/multiplayer-sessions/qr-token/$qrToken',
         options: await _optionsWithAuth(),
       );
+      print('[REST] ✓ GET /multiplayer-sessions/qr-token SUCCESS: sessionPin=${response.data?['sessionPin'] ?? 'N/A'}');
       return QrTokenLookupResponse.fromJson(
         response.data ?? const <String, dynamic>{},
       );
     } on DioException catch (error) {
+      print('[REST] ✗ GET /multiplayer-sessions/qr-token FAILED: ${error.message}');
       throw MultiplayerSessionApiException.fromDio(error);
     }
   }
 
   Future<Options> _optionsWithAuth({bool requireToken = false}) async {
-    // Adjunta bearer token cuando existe; si es obligatorio y falta, falla.
     final headers = <String, dynamic>{};
     final token = await _tokenProvider?.call();
     if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
-    } else if (requireToken) {
-      throw StateError('Se requiere un JWT válido para esta operación.');
+      final authValue = RegExp(r'^bearer ', caseSensitive: false).hasMatch(token)
+          ? token
+          : 'Bearer $token';
+      headers['Authorization'] = authValue;
     }
     return Options(headers: headers.isEmpty ? null : headers);
   }

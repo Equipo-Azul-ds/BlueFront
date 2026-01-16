@@ -28,14 +28,14 @@ class SinglePlayerResultsBloc extends ChangeNotifier {
 
   // Carga el resumen del intento (`gameId`) usando el caso de uso.
   // Maneja estados de carga y errores para que la UI los muestre.
-  Future<void> load(String gameId) async {
+  Future<void> load(String gameId, {String? quizId}) async {
     _setLoading(true);
     error = null;
     notifyListeners();
 
     final cached = summaryGame;
     try {
-      final res = await getSummaryUseCase.execute(gameId);
+      final res = await getSummaryUseCase.execute(gameId, quizId: quizId);
       summaryGame = cached == null
           ? res.summaryGame
           : _mergeSummaries(remote: res.summaryGame, cached: cached);
@@ -50,7 +50,7 @@ class SinglePlayerResultsBloc extends ChangeNotifier {
   }
 
   // Reintenta cargar el resumen (alias para `load`).
-  Future<void> retry(String gameId) => load(gameId);
+  Future<void> retry(String gameId, {String? quizId}) => load(gameId, quizId: quizId);
 
   SinglePlayerGame _mergeSummaries({
     required SinglePlayerGame remote,

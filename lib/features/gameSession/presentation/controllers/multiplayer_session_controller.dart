@@ -101,15 +101,19 @@ class MultiplayerSessionController extends ChangeNotifier {
   HostReturnedSessionEvent? get hostReturnedDto => _connectionManager.hostReturnedDto;
   SyncErrorEvent? get syncErrorDto => _connectionManager.syncErrorDto;
   ConnectionErrorEvent? get connectionErrorDto => _connectionManager.connectionErrorDto;
-  HostConnectedSuccessEvent? get hostConnectedSuccessDto => _lobbyManager.hostConnectedSuccessDto;
+  HostConnectedSuccessEvent? get hostConnectedSuccessDto => _connectionManager.hostConnectedSuccessDto;
   PlayerAnswerConfirmationEvent? get playerAnswerConfirmationDto => _lobbyManager.playerAnswerConfirmationDto;
   GameErrorEvent? get gameErrorDto => _connectionManager.gameErrorDto;
+  UnavailableSessionEvent? get unavailableSessionDto => _connectionManager.unavailableSessionDto;
+  PlayerConnectedEvent? get playerConnectedDto => _lobbyManager.playerConnectedDto;
+  PlayerConnectedToServerEvent? get playerConnectedToServerDto => _lobbyManager.playerConnectedToServerDto;
   DateTime? get questionStartedAt => _gamePhaseManager.questionStartedAt;
   SessionPhase get phase => _gamePhaseManager.phase;
   int get questionSequence => _gamePhaseManager.questionSequence;
   int get hostGameEndSequence => _gamePhaseManager.hostGameEndSequence;
   int get playerGameEndSequence => _gamePhaseManager.playerGameEndSequence;
   int? get hostAnswerSubmissions => _gamePhaseManager.hostAnswerSubmissions;
+  bool get isSocketConnected => _realtime.isConnected;
 
   /// Devuelve una instantánea inmutable del estado actual de la sesión.
   /// Útil para consumidores que prefieren trabajar con objetos de estado inmutable.
@@ -147,9 +151,10 @@ class MultiplayerSessionController extends ChangeNotifier {
       hostReturnedDto: _connectionManager.hostReturnedDto,
       syncErrorDto: _connectionManager.syncErrorDto,
       connectionErrorDto: _connectionManager.connectionErrorDto,
-      hostConnectedSuccessDto: _lobbyManager.hostConnectedSuccessDto,
+      hostConnectedSuccessDto: _connectionManager.hostConnectedSuccessDto,
       playerAnswerConfirmationDto: _lobbyManager.playerAnswerConfirmationDto,
       gameErrorDto: _connectionManager.gameErrorDto,
+      unavailableSessionDto: _connectionManager.unavailableSessionDto,
       shouldEmitClientReady: _connectionManager.shouldEmitClientReady,
     ),
   );
@@ -242,7 +247,6 @@ class MultiplayerSessionController extends ChangeNotifier {
       _lobbyManager.setCurrentPin(pin);
       _registerAllListeners();
       _connectionManager.markReadyForSync();
-      _realtime.emitPlayerJoin(PlayerJoinPayload(nickname: safeNickname));
     } catch (error) {
       _lastError = error.toString();
       if (previousPin != null) {
@@ -252,6 +256,30 @@ class MultiplayerSessionController extends ChangeNotifier {
     } finally {
       _lobbyManager.setIsJoiningSession(false);
       notifyListeners();
+    }
+  }
+
+  /// El jugador cambia su nickname emitiendo nuevo evento de unirse con nickname actualizado.
+  Future<void> joinLobbyWithNickname({required String nickname}) async {
+    String safeNickname;
+    try {
+      safeNickname = _validateNickname(nickname);
+    } catch (error) {
+      rethrow;
+    }
+    _lobbyManager.setCurrentNickname(safeNickname);
+    notifyListeners();
+    try {
+      // Verifica que el socket esté conectado antes de emitir player_join
+      if (!_realtime.isConnected) {
+        throw StateError(
+          'Socket is not connected. Unable to emit player_join. Please reconnect.',
+        );
+      }
+      _realtime.emitPlayerJoin(PlayerJoinPayload(nickname: safeNickname));
+    } catch (error) {
+      _lastError = error.toString();
+      rethrow;
     }
   }
 

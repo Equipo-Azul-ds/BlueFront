@@ -106,14 +106,23 @@ import 'features/subscriptions/presentation/screens/subscription_management_scre
 // https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-  defaultValue: 'https://quizzy-backend-1-zpvc.onrender.com',
+  defaultValue: 'https://backcomun-mzvy.onrender.com',
 );
 
-// Token (UUID) usado mientras el backend mockea la verificación real.
-const String apiAuthToken = String.fromEnvironment(
-  'API_AUTH_TOKEN',
-  defaultValue: 'acde070d-8c4c-4f0d-9d8a-162843c10333',
-);
+// Token provider que obtiene el JWT token del almacenamiento seguro
+Future<String?> _getAuthToken() async {
+  try {
+    final token = await SecureStorage.instance.read('token');
+    if (token != null && token.isNotEmpty) {
+      final preview = token.length > 20 ? '${token.substring(0, 20)}...' : token;
+      print('[TOKEN_PROVIDER] Using JWT token from storage: $preview');
+      return token;
+    }
+  } catch (e) {
+    print('[TOKEN_PROVIDER] Error reading token from storage: $e');
+  }
+  return null;
+}
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (!kUseFirebase) return;
@@ -166,20 +175,11 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<http.Client>(create: (_) => http.Client()),
-
-        // Reportes: repo + casos de uso + BLoC (ChangeNotifier)
         Provider<ReportsRepository>(
           create: (context) => ReportsRepositoryImpl(
             baseUrl: ApiConfigManager.httpBaseUrl,
             client: context.read<http.Client>(),
-            headersProvider: () async {
-              final token = await SecureStorage.instance.read('userId');
-              return {
-                'Content-Type': 'application/json',
-                if (token != null && token.isNotEmpty)
-                  'Authorization': 'Bearer $token',
-              };
-            },
+            tokenProvider: _getAuthToken,
           ),
         ),
         Provider<GetMyResultsUseCase>(
@@ -293,7 +293,7 @@ class MyApp extends StatelessWidget {
         Provider<SinglePlayerGameRepositoryImpl>(
           create: (context) => SinglePlayerGameRepositoryImpl(
             baseUrl: ApiConfigManager.httpBaseUrl,
-            mockAuthToken: apiAuthToken,
+            tokenProvider: _getAuthToken,
           ),
         ),
         Provider<SinglePlayerGameRepository>(
@@ -386,13 +386,13 @@ class MyApp extends StatelessWidget {
         Provider<MultiplayerSessionRemoteDataSource>(
           create: (context) => MultiplayerSessionRemoteDataSourceImpl(
             dio: context.read<Dio>(),
-            tokenProvider: () async => apiAuthToken,
+            tokenProvider: _getAuthToken,
           ),
         ),
         Provider<MultiplayerSocketClient>(
           create: (_) => MultiplayerSocketClient(
             baseUrl: ApiConfigManager.websocketBaseUrl,
-            defaultTokenProvider: () async => apiAuthToken,
+            defaultTokenProvider: _getAuthToken,
           ),
         ),
         Provider<MultiplayerSessionRepository>(
