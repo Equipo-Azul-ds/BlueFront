@@ -107,9 +107,7 @@ import 'features/subscriptions/presentation/screens/subscription_management_scre
 // https://bec2a32a-edf0-42b0-bfef-20509e9a5a17.mock.pstmn.io
 const String apiBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
-
   defaultValue: 'https://quizzy-backend-1-zpvc.onrender.com',
-
 );
 
 // Token (UUID) usado mientras el backend mockea la verificación real.
@@ -211,10 +209,7 @@ class MyApp extends StatelessWidget {
         Provider<IUserDataSource>(
           create: (context) => UserRemoteDataSourceImpl(
             baseUrl: ApiConfigManager.httpBaseUrl,
-            cliente: context
-                .read<
-                  http.Client
-                >(),
+            cliente: context.read<http.Client>(),
           ),
         ),
         Provider<IUserRepository>(
