@@ -156,17 +156,23 @@ class GroupsBloc extends ChangeNotifier {
 
   List<Group> joinedGroups() {
     final userId = _currentUserId;
-    if (userId == null) return _groups;
-    return _groups.where((g) => g.members.any((m) => m.userId == userId)).toList();
+    if (userId == null) return []; 
+    // En la vista resumen /groups, asumimos que todos los grupos en _groups pertenecen al usuario.
+    // Filtrar los que NO administra.
+    return _groups.where((g) => !g.isAdmin(userId)).toList();
   }
 
   List<Group> ownedGroups() {
     final userId = _currentUserId;
     if (userId == null) return [];
-    return _groups.where((g) => g.adminId == userId).toList();
+    // Filtrar los que SÍ administra.
+    return _groups.where((g) => g.isAdmin(userId)).toList();
   }
 
-  bool isCurrentUserAdmin(Group group) => group.adminId == _currentUserId;
+  bool isCurrentUserAdmin(Group group) {
+    final uid = _currentUserId;
+    return uid != null && group.isAdmin(uid);
+  }
 
   GroupMember? findMember(Group group, String userId) {
     for (final m in group.members) {

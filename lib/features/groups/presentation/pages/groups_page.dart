@@ -84,7 +84,7 @@ class _GroupsPageState extends State<GroupsPage> with SingleTickerProviderStateM
   Widget _groupCard(Group group) {
     final bloc = context.read<GroupsBloc>();
     final isAdmin = bloc.isCurrentUserAdmin(group);
-    final members = group.members.length;
+    final members = group.memberCount;
 
     return Card(
       color: const Color(0xFFF6F6F6),

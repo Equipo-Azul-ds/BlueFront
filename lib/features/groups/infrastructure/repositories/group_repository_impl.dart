@@ -298,7 +298,14 @@ class GroupRepositoryImpl implements GroupRepository {
         // ignore: avoid_print
         print('[groups] ERROR status=${res.statusCode} body=${res.body}');
       } catch (_) {}
-      throw Exception('Request failed: ${res.statusCode} ${res.body}');
+      
+      String msg = 'Request failed: ${res.statusCode}';
+      if (res.statusCode == 400) msg = 'Datos inválidos (400)';
+      if (res.statusCode == 401) msg = 'No autorizado (401)';
+      if (res.statusCode == 403) msg = 'Sin permisos (403)';
+      if (res.statusCode == 404) msg = 'No encontrado (404)';
+      
+      throw Exception('$msg - ${res.body}');
     }
   }
 

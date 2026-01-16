@@ -15,6 +15,10 @@ class Group {
   final List<GroupQuizAssignment> quizAssignments;
   final List<GroupQuizCompletion> completions;
   final GroupInvitationToken? invitation;
+  
+  // Campos para vista resumen (endpoint /groups)
+  final int? _memberCountSnapshot;
+  final String? _userRoleSnapshot;
 
   Group({
     required this.id,
@@ -27,12 +31,25 @@ class Group {
     this.quizAssignments = const [],
     this.completions = const [],
     this.invitation,
-  });
+    int? memberCountSnapshot,
+    String? userRoleSnapshot,
+  }) : _memberCountSnapshot = memberCountSnapshot,
+       _userRoleSnapshot = userRoleSnapshot;
 
   bool get hasInvitation => invitation != null;
-  int get memberCount => members.length;
+  
+  // Usa el snapshot si existe (vista lista), sino cuenta la lista completa (vista detalle)
+  int get memberCount => _memberCountSnapshot ?? members.length;
+  
+  // Exponer el rol del usuario autenticado si se conoce por snapshot
+  String? get currentUserRole => _userRoleSnapshot;
 
-  bool isAdmin(String userId) => adminId == userId;
+  bool isAdmin(String userId) {
+    if (_userRoleSnapshot != null) {
+      return _userRoleSnapshot!.toLowerCase() == 'admin';
+    }
+    return adminId == userId;
+  }
   bool isMember(String userId) => members.any((m) => m.userId == userId);
 
   Group addMember(GroupMember member, DateTime now) {
@@ -109,6 +126,14 @@ class Group {
       invitation = GroupInvitationToken.fromJson(invitationJson);
     }
 
+    // Safely parse memberCount
+    int? parsedMemberCount;
+    if (json['memberCount'] != null) {
+      final v = json['memberCount'];
+      if (v is int) parsedMemberCount = v;
+      else if (v is String) parsedMemberCount = int.tryParse(v);
+    }
+
     return Group(
       id: json['id'] as String? ?? json['groupId'] as String? ?? '',
       name: json['name'] as String? ?? '',
@@ -124,6 +149,8 @@ class Group {
       quizAssignments: assignmentsJson,
       completions: completionsJson,
       invitation: invitation,
+      memberCountSnapshot: parsedMemberCount,
+      userRoleSnapshot: json['role'] as String?,
     );
   }
 
