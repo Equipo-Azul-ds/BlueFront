@@ -31,6 +31,7 @@ import 'features/discovery/infraestructure/dataSource/ThemeRemoteDataSource.dart
 import 'features/discovery/infraestructure/dataSource/kahootRemoteDataSource.dart';
 import 'features/discovery/infraestructure/repositories/DiscoverRepository.dart';
 import 'features/discovery/infraestructure/repositories/ThemeRepository.dart';
+import 'features/discovery/application/usecases/GetThemeUseCase.dart';
 import 'features/discovery/presentation/pages/discover_page.dart';
 
 import 'common_pages/dashboard_page.dart';
@@ -271,6 +272,11 @@ class MyApp extends StatelessWidget {
             remoteDataSource: context.read<ThemeRemoteDataSource>(),
           ),
         ),
+        Provider<GetThemesUseCase>(
+          create: (context) => GetThemesUseCase(
+            context.read<ThemeRepository>(),
+          ),
+        ),
         ChangeNotifierProvider(
           create: (context) => CategoryManagementProvider(
             repository: context.read<ThemeRepository>(),
@@ -464,7 +470,10 @@ class MyApp extends StatelessWidget {
         ),
         // Blocs / ChangeNotifiers
         ChangeNotifierProvider(
-          create: (context) => QuizEditorBloc(context.read<QuizRepository>()),
+          create: (context) => QuizEditorBloc(
+            context.read<QuizRepository>(),
+            getThemesUseCase: context.read<GetThemesUseCase>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (context) => MediaEditorBloc(

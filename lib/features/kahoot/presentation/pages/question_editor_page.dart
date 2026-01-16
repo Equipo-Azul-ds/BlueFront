@@ -96,10 +96,20 @@ class _QuestionEditorPageState extends State<QuestionEditorPage> {
 
       // Subida via MediaEditorBloc (que usa UploadMediaUseCase)
       final uploaded = await mediaBloc.upload(dto);
-      //  Monta el path de la media subida
-      final path = (uploaded as dynamic).path as String?;
-      if (path != null) {
-        setState(() => _mediaPath = path);
+      
+      final uploadedMap = uploaded as dynamic;
+      // Modificado para asegurar que tomamos el ID (assetId/UUID) para el backend
+      final id = (uploadedMap.id ?? uploadedMap.mediaId ?? '').toString();
+      final path = (uploadedMap.path ?? uploadedMap.url ?? '').toString();
+
+      // Preferir ID explícitamente porque el backend requiere UUID
+      // Si recibimos un ID válido, lo usamos.
+      final result = id.isNotEmpty ? id : path;
+      
+      print('[DEBUG] QuestionEditor: Uploaded media. ID=$id, Path=$path. Saving=$result');
+
+      if (result.isNotEmpty) {
+        setState(() => _mediaPath = result);
       }
       ScaffoldMessenger.of(
         context,

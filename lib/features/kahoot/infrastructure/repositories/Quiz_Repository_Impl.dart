@@ -208,13 +208,27 @@ class QuizRepositoryImpl implements QuizRepository {
       return v.toString();
     }
 
-    // Acepta UUID o URL; el backend usa 'mediaId' pero almacenaremos el URL cuando sea disponible.
+    // Acepta solo UUIDs válidos. Si recibe una URL, intenta extraer un UUID de ella.
+    // Si no encuentra un UUID, devuelve null para evitar enviar datos inválidos al backend (ImageId ValueObject).
     String? _mediaIdAllowingUrl(String? v) {
       if (v == null || v.trim().isEmpty) return null;
       final trimmed = v.trim();
+
+      // 1. Si ya es un UUID, lo devuelve.
       if (_isUuidV4(trimmed)) return trimmed;
-      if (Uri.tryParse(trimmed)?.hasAbsolutePath == true) return trimmed;
-      throw Exception('Formato inválido para mediaId: $v');
+
+      // 2. Si es una URL, busca si contiene un UUID en alguna parte (ej. nombre de archivo).
+      // Regex para encontrar UUID v4 en cualquier parte del string
+      final uuidRegex = RegExp(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}');
+      final match = uuidRegex.firstMatch(trimmed);
+      if (match != null) {
+        final extracted = match.group(0);
+        print('_mediaIdAllowingUrl -> UUID extracted from URL: $extracted');
+        return extracted;
+      }
+
+      print('_mediaIdAllowingUrl -> Value is not a UUID and no UUID found in it. Ignoring to prevent 400 Error. Value: $trimmed');
+      return null;
     }
 
     // Normaliza a los valores que el backend muestra en el contrato: "Public" / "Private".

@@ -8,6 +8,7 @@ import '../blocs/quiz_editor_bloc.dart';
 import '../../domain/entities/Question.dart' as Q;
 import '../../domain/entities/Answer.dart' as A;
 import '../../domain/entities/Quiz.dart';
+import '../../../discovery/domain/entities/theme.dart';
 import '../../../user/presentation/blocs/auth_bloc.dart';
 
 import '../../../../common_widgets/media_upload.dart' as media;
@@ -27,7 +28,10 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
   void initState() {
     super.initState();
     _questionController = TextEditingController();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchThemes());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchThemes();
+      Provider.of<QuizEditorBloc>(context, listen: false).loadThemes();
+    });
     // Si se pasa una plantilla, inicializamos el quiz en el Bloc como una copia lista para edición
     if (widget.template != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -153,6 +157,7 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
   // Estado temporal para elementos que antes se pasaban directo al BLoC
   String? _coverImagePath;
   Uint8List? _coverImageBytes;
+  Uint8List? _currentQuestionPreviewBytes;
   String _visibility = 'private';
   String _status = 'draft';
   String _category = 'Tecnología';
@@ -657,10 +662,12 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
         _currentEditingQuestionId = selectedQuestion.questionId;
         // Actualizar texto del controller sin perder el cursor (asigna directamente)
         _questionController.text = selectedQuestion.text;
+        _currentQuestionPreviewBytes = null;
       }
     } else {
       _currentEditingQuestionId = null;
       _questionController.text = '';
+      _currentQuestionPreviewBytes = null;
     }
 
     // Al construir por primera vez, intentar precargar las imágenes del quiz en edición
@@ -712,41 +719,56 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                             file,
                             bearerToken: bearer,
                           );
-                          // 'uploaded' puede contener 'id' y/o 'path/url'. Se prefiere 'path' si es una URL.
-                          final uploadedMap = uploaded as dynamic;
-                          final returnedPath =
-                              (uploadedMap.path ??
-                                      uploadedMap.url ??
-                                      uploadedMap.previewPath)
-                                  as String?;
-                          final returnedId =
-                              (uploadedMap.id ?? uploadedMap.mediaId)
-                                  as String?;
+                        // 'uploaded' puede contener 'id' y/o 'path/url'. Se prefiere 'path' si es una URL.
+                        final uploadedMap = uploaded as dynamic;
+                        final returnedPath = (uploadedMap.path ??
+                                uploadedMap.url ??
+                                uploadedMap.previewPath) as String?;
+                        final returnedId =
+                            (uploadedMap.id ?? uploadedMap.mediaId) as String?;
 
-                          if (returnedPath != null &&
-                              returnedPath.startsWith('http')) {
-                            // el backend devolvió una URL pública utilizable
+                        // Fix: Guardar el ID en el objeto Quiz para el backend, pero usar el PATH para mostrar en UI.
+                        if (returnedId != null && returnedId.isNotEmpty) {
+                          if (mounted) {
+                            setState(() {
+                              // Si tenemos URL local/remota la guardamos para preview
+                              if (returnedPath != null) {
+                                _coverImagePath = returnedPath;
+                              }
+                              // Si tenemos bytes locales, _coverImageBytes ya se seteó arriba
+                            });
+                            // Guardar ID en el modelo
+                            if (quizBloc.currentQuiz != null) {
+                              // IMPORTANTE: El backend espera el assetId (UUID), no la URL.
+                              quizBloc.currentQuiz!.coverImageUrl = returnedId;
+                              quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
+                              print(
+                                  '[DEBUG] Saved coverImageId as $returnedId (url: $returnedPath)');
+                            }
+                          }
+                        } else if (returnedPath != null &&
+                            returnedPath.startsWith('http')) {
+                          // Fallback: Si no hay ID pero sí URL pública, intentamos con la URL (aunque puede fallar si backend es estricto)
+                          if (mounted) {
                             setState(() {
                               _coverImagePath = returnedPath;
-                              _coverImageBytes = null; // usar imagen de red
+                              _coverImageBytes = null;
                             });
                             if (quizBloc.currentQuiz != null) {
-                              quizBloc.currentQuiz!.coverImageUrl =
-                                  returnedPath;
+                              quizBloc.currentQuiz!.coverImageUrl = returnedPath;
                               quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
                             }
-                          } else if (returnedId != null &&
-                              returnedId.isNotEmpty) {
-                            // El backend no devolvió URL. No guardamos el id como coverImage
-                            // para cumplir con el requisito de usar URL renderizable.
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'La subida no devolvió URL pública. Intenta de nuevo.',
-                                ),
-                              ),
-                            );
                           }
+                        } else {
+                          // El backend no devolvió ni ID ni URL.
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'La subida no devolvió ID ni URL válida. Intenta de nuevo.',
+                              ),
+                            ),
+                          );
+                        }
 
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Imagen subida')),
@@ -946,18 +968,21 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                         SizedBox(width: 12),
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _category,
-                            items: ['Tecnología', 'Educación', 'General']
+                            value: (quizBloc.themes?.any((t) => t.name == _category) ?? false) 
+                                ? _category 
+                                : null,
+                            hint: (quizBloc.themes == null) ? Text('Cargando...') : Text('Seleccione'),
+                            items: (quizBloc.themes ?? [])
                                 .map(
-                                  (c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text(c),
+                                  (t) => DropdownMenuItem(
+                                    value: t.name,
+                                    child: Text(t.name),
                                   ),
                                 )
                                 .toList(),
                             onChanged: (v) {
-                              final val = v ?? 'Tecnología';
-                              setState(() => _category = val);
+                              if (v == null) return;
+                              setState(() => _category = v);
                               if (quizBloc.currentQuiz != null) {
                                 quizBloc.currentQuiz!.category = _category;
                                 quizBloc.setCurrentQuiz(quizBloc.currentQuiz!);
@@ -1384,6 +1409,7 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
 
                                 // Subir imagen para la pregunta
                                 media.MediaUpload(
+                                  previewBytes: _currentQuestionPreviewBytes,
                                   previewUrl: (selectedQuestion.mediaUrl != null && selectedQuestion.mediaUrl!.startsWith('http'))
                                       ? selectedQuestion.mediaUrl
                                       : null,
@@ -1410,6 +1436,12 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                           listen: false,
                                         );
                                     try {
+                                      // Previsualización inmediata
+                                      final bytes = await file.readAsBytes();
+                                      setState(() {
+                                        _currentQuestionPreviewBytes = bytes;
+                                      });
+
                                       final auth = Provider.of<AuthBloc>(
                                         context,
                                         listen: false,
@@ -1417,15 +1449,17 @@ class _QuizEditorPageState extends State<QuizEditorPage> {
                                       final bearer = auth.currentUser?.id ?? '';
                                       final uploaded = await mediaBloc
                                           .uploadFromXFile(file, bearerToken: bearer);
-                                      // Preferir URL absoluta (path puede contener la URL según el repositorio)
-                                      final url = ((uploaded as dynamic).path ?? (uploaded as dynamic).url ?? '')
-                                          .toString();
+                                      
+                                      final uploadedMap = uploaded as dynamic;
+                                      final id = (uploadedMap.id ?? uploadedMap.mediaId ?? '').toString();
+                                      final url = (uploadedMap.path ?? uploadedMap.url ?? '').toString();
+
                                       final updated = Q.Question(
                                         questionId: q.questionId,
                                         quizId: q.quizId,
                                         text: q.text,
-                                        // Guardar la URL para que se pueda renderizar directamente
-                                        mediaUrl: url,
+                                        // Guardar ID si existe, sino URL (fallback)
+                                        mediaUrl: id.isNotEmpty ? id : url,
                                         type: q.type,
                                         timeLimit: q.timeLimit,
                                         points: q.points,

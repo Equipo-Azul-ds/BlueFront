@@ -37,12 +37,13 @@ class Quiz {
     return Quiz(
       quizId: json['quizId'] ?? json['id'],
       authorId: json['authorId'] ?? (json['author'] != null ? json['author']['authorId'] : null) ?? '',
-      title: json['title'],
-      description: json['description'],
-      visibility: json['visibility'],
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      visibility: json['visibility'] ?? 'private',
       status: json['status'],
       category: json['category'],
-      themeId: json['themeId'],
+      // Fix: backend returns 'theme' object or 'themeId' string. Handle both and ensure not null.
+      themeId: json['themeId'] ?? (json['theme'] != null ? json['theme']['id'] : '') ?? '',
       isLocal: false,
       templateId: json['templateId'],
       // Acepta tanto URL como assetId; si solo viene coverImageId lo guardamos aquí para resolver más adelante.

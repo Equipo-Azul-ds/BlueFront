@@ -41,7 +41,7 @@ class Question {
   factory Question.fromJson(Map<String, dynamic> json){
     return Question(
       questionId: json['questionId'] ?? json['id'],
-      quizId: json['quizId'] ?? json['quiz_id'] ?? json['quizId'],
+      quizId: json['quizId'] ?? json['quiz_id'] ?? '', // Default to empty if missing
       text: json['text'] ?? json['questionText'] ?? json['question_text'] ?? '',
       mediaUrl: json['mediaUrl'] ?? json['mediaId'] ?? json['media_id'],
       type: json['type'] ?? json['questionType'] ?? json['question_type'] ?? 'quiz',
