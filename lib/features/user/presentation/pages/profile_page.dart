@@ -47,7 +47,8 @@ class _ProfilePageState extends State<ProfilePage> {
     ).push<String>(MaterialPageRoute(builder: (_) => const AvatarPickerPage()));
     if (picked != null && picked.isNotEmpty) {
       // Construye la URL del avatar a partir del seed seleccionado
-      final avatarUrl = 'https://api.dicebear.com/7.x/micah/png?seed=$picked&background=%23ffffff&size=128';
+      final avatarUrl =
+          'https://api.dicebear.com/7.x/micah/png?seed=$picked&background=%23ffffff&size=128';
       setState(() => _avatarUrl = avatarUrl);
     }
   }
@@ -239,8 +240,17 @@ class _ProfilePageState extends State<ProfilePage> {
     if (user.id.isNotEmpty) {
       final subProvider = context.read<SubscriptionProvider>();
       if (subProvider.status == SubscriptionStatus.initial) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          subProvider.checkCurrentStatus(user.id);
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          final authBloc = context.read<AuthBloc>();
+          final token = await authBloc.storage.read('token') ?? '';
+
+          if (token.isNotEmpty) {
+            subProvider.checkCurrentStatus(token);
+          } else {
+            print(
+              'ERROR: No se pudo obtener el token para verificar suscripción',
+            );
+          }
         });
       }
     }
@@ -341,11 +351,17 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final nameVal = _nameCtrl.text.trim();
       final descVal = _descCtrl.text.trim();
-      final avatarChanged = _avatarUrl.isNotEmpty && _avatarUrl != (auth.currentUser?.avatarUrl ?? widget.user.avatarUrl);
+      final avatarChanged =
+          _avatarUrl.isNotEmpty &&
+          _avatarUrl != (auth.currentUser?.avatarUrl ?? widget.user.avatarUrl);
 
       // Use currentUser values if form fields are empty
-      final name = nameVal.isNotEmpty ? nameVal : (auth.currentUser?.name ?? '');
-      final description = descVal.isNotEmpty ? descVal : (auth.currentUser?.description ?? '');
+      final name = nameVal.isNotEmpty
+          ? nameVal
+          : (auth.currentUser?.name ?? '');
+      final description = descVal.isNotEmpty
+          ? descVal
+          : (auth.currentUser?.description ?? '');
 
       await auth.updateProfile(
         name: name,
@@ -384,6 +400,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
     if (ok == true) {
+      context.read<SubscriptionProvider>().clear();
       await auth.logout();
       if (!mounted) return;
       // Usa el Navigator raíz para reemplazar toda la app stack por la vista de bienvenida
